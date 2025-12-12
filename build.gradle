@@ -111,6 +111,8 @@ dependencies {
     // Example mod dependency using a file as dependency
     // implementation files("libs/coolmod-${mc_version}-${coolmod_version}.jar")
 
+    implementation "de.javagl:jgltf-model:2.0.4"
+
     // Example project dependency using a sister or child project:
     // implementation project(":myproject")
 
