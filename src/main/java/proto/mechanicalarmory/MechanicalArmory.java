@@ -22,6 +22,7 @@ import net.neoforged.neoforge.registries.DeferredHolder;
 import net.neoforged.neoforge.registries.DeferredRegister;
 import org.slf4j.Logger;
 import proto.mechanicalarmory.common.blocks.MABlocks;
+import proto.mechanicalarmory.common.entities.MAEntities;
 import proto.mechanicalarmory.common.items.MAItems;
 
 // The value here should match an entry in the META-INF/neoforge.mods.toml file
@@ -57,6 +58,8 @@ public class MechanicalArmory {
         MABlocks.BLOCKS.register(modEventBus);
         // Register the Deferred Register to the mod event bus so items get registered
         MAItems.ITEMS.register(modEventBus);
+
+        MAEntities.BLOCK_ENTITY_TYPES.register(modEventBus);
         // Register the Deferred Register to the mod event bus so tabs get registered
         CREATIVE_MODE_TABS.register(modEventBus);
 
