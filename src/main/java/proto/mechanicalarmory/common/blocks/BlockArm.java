@@ -23,6 +23,11 @@ public class BlockArm extends Block implements EntityBlock {
     }
 
     @Override
+    protected RenderShape getRenderShape(BlockState state) {
+        return RenderShape.INVISIBLE;
+    }
+
+    @Override
     protected @NotNull MapCodec<BlockArm> codec() {
         return COMPLEX_CODEC.value();
     }
