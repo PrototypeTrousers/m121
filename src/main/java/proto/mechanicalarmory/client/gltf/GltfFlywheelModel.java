@@ -6,6 +6,7 @@ import de.javagl.jgltf.model.MeshPrimitiveModel;
 import de.javagl.jgltf.model.NodeModel;
 import dev.engine_room.flywheel.api.model.Model;
 import dev.engine_room.flywheel.lib.material.SimpleMaterial;
+import org.joml.Vector4f;
 import org.joml.Vector4fc;
 
 import java.util.ArrayList;
@@ -30,12 +31,12 @@ public class GltfFlywheelModel implements Model {
 
     @Override
     public List<ConfiguredMesh> meshes() {
-        return List.of();
+        return meshes;
     }
 
     @Override
     public Vector4fc boundingSphere() {
-        return null;
+        return new Vector4f(1,1,1,1);
     }
 
     public List<Model> getChildren() {

@@ -35,7 +35,7 @@ import static proto.mechanicalarmory.MechanicalArmory.MODID;
 @EventBusSubscriber(modid = MODID, value = Dist.CLIENT)
 public class MechanicalArmoryClient {
     public static ModelResourceLocation arm = ModelResourceLocation.standalone(ResourceLocation.fromNamespaceAndPath(MODID, "models/fullarm.glb"));
-
+    public static GltfFlywheelModel gltfFlywheelModel;
     public MechanicalArmoryClient(ModContainer container) {
         // Allows NeoForge to create a config screen for this mod's configs.
         // The config screen is accessed by going to the Mods screen > clicking on your mod > clicking on config.
@@ -55,7 +55,7 @@ public class MechanicalArmoryClient {
     public static void registerAdditional(ModelEvent.RegisterAdditional event) {
         event.register(arm);
         loadglTFModel(arm);
-        GltfFlywheelModel gltfFlywheelModel = new GltfFlywheelModel(loadglTFModel(arm));
+        gltfFlywheelModel = new GltfFlywheelModel(loadglTFModel(arm));
     }
 
     public static GltfModel loadglTFModel(ModelResourceLocation modelResourceLocation) {

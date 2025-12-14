@@ -10,6 +10,7 @@ import dev.engine_room.flywheel.lib.util.RecyclingPoseStack;
 import dev.engine_room.flywheel.lib.visual.AbstractBlockEntityVisual;
 import net.minecraft.world.level.block.Blocks;
 import org.jetbrains.annotations.Nullable;
+import proto.mechanicalarmory.MechanicalArmoryClient;
 import proto.mechanicalarmory.common.entities.block.ArmEntity;
 
 import java.util.function.Consumer;
@@ -21,7 +22,7 @@ public class ArmVisual extends AbstractBlockEntityVisual<ArmEntity> {
 
     public ArmVisual(VisualizationContext ctx, ArmEntity blockEntity, float partialTick) {
         super(ctx, blockEntity, partialTick);
-        base = instancerProvider().instancer(InstanceTypes.TRANSFORMED, Models.block(Blocks.BRICKS.defaultBlockState()))
+        base = instancerProvider().instancer(InstanceTypes.TRANSFORMED, MechanicalArmoryClient.gltfFlywheelModel)
                 .createInstance();
         var msr = TransformStack.of(poseStack);
         msr.translate(getVisualPosition());
