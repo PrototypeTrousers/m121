@@ -4,6 +4,7 @@ import com.google.common.base.Stopwatch;
 import de.javagl.jgltf.model.GltfModel;
 import de.javagl.jgltf.model.io.GltfModelReader;
 import dev.engine_room.flywheel.api.visualization.VisualizerRegistry;
+import dev.engine_room.flywheel.lib.model.part.ModelTree;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.resources.model.ModelResourceLocation;
 import net.minecraft.resources.ResourceLocation;
@@ -17,11 +18,9 @@ import net.neoforged.fml.event.lifecycle.FMLClientSetupEvent;
 import net.neoforged.neoforge.client.event.ModelEvent;
 import net.neoforged.neoforge.client.gui.ConfigurationScreen;
 import net.neoforged.neoforge.client.gui.IConfigScreenFactory;
-import proto.mechanicalarmory.client.gltf.GltfFlywheelModel;
-import proto.mechanicalarmory.client.instances.ArmVisual;
+import proto.mechanicalarmory.client.gltf.GltfFlywheelModelTree;
 import proto.mechanicalarmory.client.instances.ArmVisualiser;
 import proto.mechanicalarmory.common.entities.MAEntities;
-import proto.mechanicalarmory.common.entities.block.ArmEntity;
 
 import java.io.BufferedInputStream;
 import java.io.IOException;
@@ -35,7 +34,7 @@ import static proto.mechanicalarmory.MechanicalArmory.MODID;
 @EventBusSubscriber(modid = MODID, value = Dist.CLIENT)
 public class MechanicalArmoryClient {
     public static ModelResourceLocation arm = ModelResourceLocation.standalone(ResourceLocation.fromNamespaceAndPath(MODID, "models/fullarm.glb"));
-    public static GltfFlywheelModel gltfFlywheelModel;
+    public static ModelTree gltfFlywheelModelTree;
     public MechanicalArmoryClient(ModContainer container) {
         // Allows NeoForge to create a config screen for this mod's configs.
         // The config screen is accessed by going to the Mods screen > clicking on your mod > clicking on config.
@@ -55,7 +54,7 @@ public class MechanicalArmoryClient {
     public static void registerAdditional(ModelEvent.RegisterAdditional event) {
         event.register(arm);
         loadglTFModel(arm);
-        gltfFlywheelModel = new GltfFlywheelModel(loadglTFModel(arm));
+        gltfFlywheelModelTree = GltfFlywheelModelTree.create(loadglTFModel(arm));
     }
 
     public static GltfModel loadglTFModel(ModelResourceLocation modelResourceLocation) {
