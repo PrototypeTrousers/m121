@@ -1,6 +1,7 @@
 package proto.mechanicalarmory.client.gltf;
 
 import de.javagl.jgltf.model.MeshPrimitiveModel;
+import de.javagl.jgltf.model.NodeModel;
 import dev.engine_room.flywheel.api.model.Model;
 import dev.engine_room.flywheel.lib.material.SimpleMaterial;
 import org.joml.Vector4f;
@@ -11,8 +12,7 @@ import java.util.List;
 
 public class GltfFlywheelModel implements Model {
     List<ConfiguredMesh> meshes = new ArrayList<>();
-
-    public GltfFlywheelModel(MeshPrimitiveModel meshPrimitiveModel) {
+    public GltfFlywheelModel(NodeModel nm, MeshPrimitiveModel meshPrimitiveModel) {
         meshes.add(new ConfiguredMesh(SimpleMaterial.builder().build(), new GltfMesh(meshPrimitiveModel)));
     }
 
@@ -23,6 +23,6 @@ public class GltfFlywheelModel implements Model {
 
     @Override
     public Vector4fc boundingSphere() {
-        return new Vector4f(1,1,1,1);
+        return new Vector4f(1, 1, 1, 1);
     }
 }

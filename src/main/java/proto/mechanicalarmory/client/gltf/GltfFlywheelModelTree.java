@@ -1,6 +1,7 @@
 package proto.mechanicalarmory.client.gltf;
 
 import de.javagl.jgltf.model.*;
+import dev.engine_room.flywheel.lib.model.EmptyModel;
 import dev.engine_room.flywheel.lib.model.part.ModelTree;
 import it.unimi.dsi.fastutil.objects.Object2ObjectArrayMap;
 import net.minecraft.client.model.geom.PartPose;
@@ -14,27 +15,26 @@ public class GltfFlywheelModelTree {
         Map<String, ModelTree> children = new Object2ObjectArrayMap<>();
         for (SceneModel sm : gltfModel.getSceneModels()) {
             for (NodeModel nm : sm.getNodeModels()) {
-                addNodeChildren(nm,children);
+                addNodeChildren(nm, children);
             }
         }
-        return new ModelTree(null, PartPose.ZERO, children);
+        return new ModelTree(new EmptyModel(), PartPose.ZERO, children);
     }
 
     static void addNodeChildren(NodeModel nm, Map<String, ModelTree> children) {
-        //Breadth First
         for (MeshModel mm : nm.getMeshModels()) {
             for (MeshPrimitiveModel pm : mm.getMeshPrimitiveModels()) {
-                ModelTree modelTree = new ModelTree(new GltfFlywheelModel(pm), PartPose.ZERO, Collections.EMPTY_MAP);
+                ModelTree modelTree = new ModelTree(new GltfFlywheelModel(nm, pm), PartPose.ZERO, Collections.EMPTY_MAP);
                 children.put(mm.getName(), modelTree);
             }
         }
 
         for (NodeModel mm : nm.getChildren()) {
             Map<String, ModelTree> newChildren = new Object2ObjectArrayMap<>();
+            PartPose pp = PartPose.offset(mm.getTranslation()[0] * 16, mm.getTranslation()[1] * 16, mm.getTranslation()[2] * 16);
             addNodeChildren(mm, newChildren);
-            ModelTree modelTree = new ModelTree(null, PartPose.ZERO, newChildren);
+            ModelTree modelTree = new ModelTree(new EmptyModel(), pp, newChildren);
             children.put(mm.getName(), modelTree);
         }
     }
-
 }
