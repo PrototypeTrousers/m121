@@ -2,10 +2,12 @@ package proto.mechanicalarmory.client.gltf;
 
 import com.fasterxml.jackson.databind.util.ByteBufferBackedInputStream;
 import com.mojang.blaze3d.platform.NativeImage;
+import com.mojang.blaze3d.systems.RenderSystem;
 import de.javagl.jgltf.model.MeshPrimitiveModel;
 import de.javagl.jgltf.model.NodeModel;
 import de.javagl.jgltf.model.TextureModel;
 import de.javagl.jgltf.model.v2.MaterialModelV2;
+import dev.engine_room.flywheel.api.material.CardinalLightingMode;
 import dev.engine_room.flywheel.api.model.Model;
 import dev.engine_room.flywheel.lib.material.SimpleMaterial;
 import net.minecraft.client.Minecraft;
@@ -23,24 +25,29 @@ import static proto.mechanicalarmory.MechanicalArmory.MODID;
 
 public class GltfFlywheelModel implements Model {
     List<ConfiguredMesh> meshes = new ArrayList<>();
+    NativeImage embeddedTexture;
     public GltfFlywheelModel(NodeModel nm, MeshPrimitiveModel meshPrimitiveModel) {
         TextureManager manager = Minecraft.getInstance().getTextureManager();
-        TextureModel tm;
         MaterialModelV2 m = ((MaterialModelV2) meshPrimitiveModel.getMaterialModel());
-        tm = m.getBaseColorTexture();
+        TextureModel tm = m.getBaseColorTexture();
+        ResourceLocation rl = ResourceLocation.fromNamespaceAndPath(MODID, "dynamic/" + tm.getImageModel().getName());
 
-        if (tm != null) {
-            NativeImage embeddedTexture;
+        // DynamicTexture needs to be created on the Render thread otherwise it crashes with pixels being null.. somehow
+        RenderSystem.recordRenderCall(() -> {
             try {
                 embeddedTexture = NativeImage.read(new ByteBufferBackedInputStream(tm.getImageModel().getImageData()));
+                DynamicTexture d = new DynamicTexture(embeddedTexture);
+                manager.register(rl, d);
             } catch (IOException e) {
                 throw new RuntimeException(e);
             }
+        });
 
-            ResourceLocation rl = ResourceLocation.fromNamespaceAndPath(MODID, "dynamic/" + tm.getImageModel().getName());
-            manager.register(rl, new DynamicTexture(embeddedTexture));
-            meshes.add(new ConfiguredMesh(SimpleMaterial.builder().texture(rl).build(), new GltfMesh(meshPrimitiveModel)));
-        }
+        meshes.add(new ConfiguredMesh(SimpleMaterial.builder()
+                .texture(rl)
+                .cardinalLightingMode(CardinalLightingMode.ENTITY)
+                .build(),
+                new GltfMesh(meshPrimitiveModel)));
     }
 
     @Override
