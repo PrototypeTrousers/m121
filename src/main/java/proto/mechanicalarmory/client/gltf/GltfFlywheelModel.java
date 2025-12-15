@@ -4,6 +4,7 @@ import de.javagl.jgltf.model.MeshPrimitiveModel;
 import de.javagl.jgltf.model.NodeModel;
 import dev.engine_room.flywheel.api.model.Model;
 import dev.engine_room.flywheel.lib.material.SimpleMaterial;
+import net.minecraft.client.renderer.texture.TextureManager;
 import org.joml.Vector4f;
 import org.joml.Vector4fc;
 
@@ -13,7 +14,7 @@ import java.util.List;
 public class GltfFlywheelModel implements Model {
     List<ConfiguredMesh> meshes = new ArrayList<>();
     public GltfFlywheelModel(NodeModel nm, MeshPrimitiveModel meshPrimitiveModel) {
-        meshes.add(new ConfiguredMesh(SimpleMaterial.builder().build(), new GltfMesh(meshPrimitiveModel)));
+        meshes.add(new ConfiguredMesh(SimpleMaterial.builder().texture(TextureManager.INTENTIONAL_MISSING_TEXTURE).build(), new GltfMesh(meshPrimitiveModel)));
     }
 
     @Override

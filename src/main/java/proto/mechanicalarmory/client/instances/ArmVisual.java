@@ -20,6 +20,7 @@ public class ArmVisual extends AbstractBlockEntityVisual<ArmEntity> implements S
     private final InstanceTree instanceTree;
     private final @Nullable InstanceTree firstArm;
     private final @Nullable InstanceTree secondArm;
+    private final @Nullable InstanceTree baseMotor;
 
     private final RecyclingPoseStack poseStack = new RecyclingPoseStack();
     private final Matrix4fc initialPose;
@@ -29,7 +30,8 @@ public class ArmVisual extends AbstractBlockEntityVisual<ArmEntity> implements S
         initialPose = new Matrix4f().translate(visualPos.getX() + 0.5f, visualPos.getY(), visualPos.getZ() + 0.5f);
 
         instanceTree = InstanceTree.create(instancerProvider(), modelTree);
-        firstArm = instanceTree.child("FirstArm");
+        baseMotor = instanceTree.child("BaseMotor");
+        firstArm = baseMotor.child("FirstArm");
         secondArm = firstArm.child("SecondArm");
     }
 
@@ -52,7 +54,7 @@ public class ArmVisual extends AbstractBlockEntityVisual<ArmEntity> implements S
         long currentTimeMillis = System.currentTimeMillis();
         // Angle in radians (2 * PI radians per cycle)
 
-        double meaningfulSin = Math.sin(currentTimeMillis / 1000.0 % 10.0 * (2 * Math.PI) / 10.0);
+        double meaningfulSin = Math.sin((currentTimeMillis + 100 * visualPos.getX() - 100 * visualPos.getZ())/ 1000.0 % 10.0 * (2 * Math.PI) / 10.0);
         firstArm.xRot((float) meaningfulSin);
         secondArm.xRot((float) (meaningfulSin - Math.PI/4));
 

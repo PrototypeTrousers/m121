@@ -15,10 +15,14 @@ public class GltfFlywheelModelTree {
         Map<String, ModelTree> children = new Object2ObjectArrayMap<>();
         for (SceneModel sm : gltfModel.getSceneModels()) {
             for (NodeModel nm : sm.getNodeModels()) {
-                addNodeChildren(nm, children);
+                Map<String, ModelTree> newChildren = new Object2ObjectArrayMap<>();
+                PartPose pp = PartPose.offset(nm.getTranslation()[0] * 16, nm.getTranslation()[1] * 16, nm.getTranslation()[2] * 16);
+                addNodeChildren(nm, newChildren);
+                ModelTree modelTree = new ModelTree(null, pp, newChildren);
+                children.put(nm.getName(), modelTree);
             }
         }
-        return new ModelTree(new EmptyModel(), PartPose.ZERO, children);
+        return new ModelTree(null, PartPose.ZERO, children);
     }
 
     static void addNodeChildren(NodeModel nm, Map<String, ModelTree> children) {
@@ -33,7 +37,7 @@ public class GltfFlywheelModelTree {
             Map<String, ModelTree> newChildren = new Object2ObjectArrayMap<>();
             PartPose pp = PartPose.offset(mm.getTranslation()[0] * 16, mm.getTranslation()[1] * 16, mm.getTranslation()[2] * 16);
             addNodeChildren(mm, newChildren);
-            ModelTree modelTree = new ModelTree(new EmptyModel(), pp, newChildren);
+            ModelTree modelTree = new ModelTree(null, pp, newChildren);
             children.put(mm.getName(), modelTree);
         }
     }
