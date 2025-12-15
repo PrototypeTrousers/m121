@@ -2,10 +2,12 @@ package proto.mechanicalarmory;
 
 import com.google.common.base.Stopwatch;
 import de.javagl.jgltf.model.GltfModel;
+import de.javagl.jgltf.model.TextureModel;
 import de.javagl.jgltf.model.io.GltfModelReader;
 import dev.engine_room.flywheel.api.visualization.VisualizerRegistry;
 import dev.engine_room.flywheel.lib.model.part.ModelTree;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.renderer.texture.TextureManager;
 import net.minecraft.client.resources.model.ModelResourceLocation;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.packs.resources.Resource;
@@ -53,7 +55,6 @@ public class MechanicalArmoryClient {
     @SubscribeEvent // on the mod event bus only on the physical client
     public static void registerAdditional(ModelEvent.RegisterAdditional event) {
         event.register(arm);
-        loadglTFModel(arm);
         gltfFlywheelModelTree = GltfFlywheelModelTree.create(loadglTFModel(arm));
     }
 

@@ -45,7 +45,7 @@ public class GltfMesh implements Mesh {
         FloatBuffer texBuffer =
                 texAccessor.getAccessorData().createByteBuffer().asFloatBuffer();
         //float[] colorFactor = material.pbrMetallicRoughness.baseColorFactor;
-        float[] colorFactor = new float[]{1f, 0, 0, 0};
+        float[] colorFactor = new float[]{1f, 1f, 1f, 0};
 
         for (int i = 0; i < vertexCount; i++) {
             vertexList.x(i, positionBuffer.get(i * 3));
