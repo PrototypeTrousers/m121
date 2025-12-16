@@ -46,6 +46,7 @@ public class GltfFlywheelModel implements Model {
         meshes.add(new ConfiguredMesh(SimpleMaterial.builder()
                 .texture(rl)
                 .cardinalLightingMode(CardinalLightingMode.ENTITY)
+                .ambientOcclusion(false)
                 .build(),
                 new GltfMesh(meshPrimitiveModel)));
     }

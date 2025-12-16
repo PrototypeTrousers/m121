@@ -1,12 +1,19 @@
 package proto.mechanicalarmory.client.instances;
 
 import dev.engine_room.flywheel.api.instance.Instance;
+import dev.engine_room.flywheel.api.material.CardinalLightingMode;
+import dev.engine_room.flywheel.api.material.Material;
 import dev.engine_room.flywheel.api.task.Plan;
 import dev.engine_room.flywheel.api.visual.DynamicVisual;
 import dev.engine_room.flywheel.api.visual.LightUpdatedVisual;
 import dev.engine_room.flywheel.api.visualization.VisualizationContext;
 import dev.engine_room.flywheel.lib.instance.InstanceTypes;
 import dev.engine_room.flywheel.lib.instance.TransformedInstance;
+import dev.engine_room.flywheel.lib.material.SimpleMaterial;
+import dev.engine_room.flywheel.lib.model.ModelUtil;
+import dev.engine_room.flywheel.lib.model.Models;
+import dev.engine_room.flywheel.lib.model.baked.BlockModelBuilder;
+import dev.engine_room.flywheel.lib.model.baked.SinglePosVirtualBlockGetter;
 import dev.engine_room.flywheel.lib.model.part.InstanceTree;
 import dev.engine_room.flywheel.lib.model.part.ModelTree;
 import dev.engine_room.flywheel.lib.task.RunnablePlan;
@@ -15,16 +22,23 @@ import dev.engine_room.flywheel.lib.visual.AbstractBlockEntityVisual;
 import dev.engine_room.vanillin.item.ItemModels;
 import it.unimi.dsi.fastutil.longs.LongSet;
 import net.minecraft.client.renderer.LevelRenderer;
+import net.minecraft.core.BlockPos;
 import net.minecraft.core.SectionPos;
 import net.minecraft.world.item.ItemDisplayContext;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
+import net.minecraft.world.level.BlockAndTintGetter;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.entity.BellBlockEntity;
+import net.minecraft.world.level.block.state.BlockState;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Matrix4f;
 import org.joml.Matrix4fc;
 import proto.mechanicalarmory.MechanicalArmoryClient;
 import proto.mechanicalarmory.common.entities.block.ArmEntity;
 
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.function.Consumer;
 
 public class ArmVisual extends AbstractBlockEntityVisual<ArmEntity> implements DynamicVisual, LightUpdatedVisual {
@@ -48,8 +62,27 @@ public class ArmVisual extends AbstractBlockEntityVisual<ArmEntity> implements D
         firstArm = baseMotor.child("FirstArm");
         secondArm = firstArm.child("SecondArm");
 
+        SinglePosVirtualBlockGetter lv = SinglePosVirtualBlockGetter.createFullBright();
+        lv.blockState(Blocks.BELL.defaultBlockState());
+        lv.blockEntity(new BellBlockEntity(pos, Blocks.BELL.defaultBlockState()));
+        lv.pos(pos);
+
+        var model = new BlockModelBuilder(lv, Collections.singleton(pos))
+                .materialFunc((renderType, shaded, ao) -> {
+                    Material material = ModelUtil.getMaterial(renderType, shaded, ao);
+                    if (material != null && material.cardinalLightingMode() == CardinalLightingMode.ENTITY) {
+                        return SimpleMaterial.builderOf(material)
+                                .cardinalLightingMode(CardinalLightingMode.CHUNK)
+                                .build();
+                    } else {
+                        return material;
+                    }
+                })
+                .build();
+
+
         cactus = instancerProvider()
-                .instancer(InstanceTypes.TRANSFORMED, ItemModels.get(blockEntity.getLevel(), new ItemStack(Items.CACTUS), ItemDisplayContext.GROUND))
+                .instancer(InstanceTypes.TRANSFORMED, model)
                 .createInstance();
     }
 
@@ -72,6 +105,7 @@ public class ArmVisual extends AbstractBlockEntityVisual<ArmEntity> implements D
     @Override
     protected void _delete() {
         instanceTree.delete();
+        cactus.delete();
     }
 
     @Override
@@ -88,8 +122,8 @@ public class ArmVisual extends AbstractBlockEntityVisual<ArmEntity> implements D
 
             double meaningfulSin = Math.sin((currentTimeMillis + 100 * visualPos.getX() - 100 * visualPos.getZ())/ 1000.0 % 10.0 * (2 * Math.PI) / 10.0);
 
-            firstArm.xRot((float) meaningfulSin);
-            secondArm.xRot((float) (meaningfulSin - Math.PI/4));
+            firstArm.xRot((float) meaningfulSin /2);
+            secondArm.xRot((float) (meaningfulSin - Math.PI/4)/2);
 
             cactus.setIdentityTransform();
 
