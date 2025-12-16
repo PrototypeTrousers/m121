@@ -7,16 +7,18 @@ import dev.engine_room.flywheel.api.visual.LightUpdatedVisual;
 import dev.engine_room.flywheel.api.visualization.VisualizationContext;
 import dev.engine_room.flywheel.lib.instance.InstanceTypes;
 import dev.engine_room.flywheel.lib.instance.TransformedInstance;
-import dev.engine_room.flywheel.lib.model.Models;
 import dev.engine_room.flywheel.lib.model.part.InstanceTree;
 import dev.engine_room.flywheel.lib.model.part.ModelTree;
 import dev.engine_room.flywheel.lib.task.RunnablePlan;
 import dev.engine_room.flywheel.lib.util.RecyclingPoseStack;
 import dev.engine_room.flywheel.lib.visual.AbstractBlockEntityVisual;
+import dev.engine_room.vanillin.item.ItemModels;
 import it.unimi.dsi.fastutil.longs.LongSet;
 import net.minecraft.client.renderer.LevelRenderer;
 import net.minecraft.core.SectionPos;
-import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.item.ItemDisplayContext;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Matrix4f;
 import org.joml.Matrix4fc;
@@ -46,7 +48,8 @@ public class ArmVisual extends AbstractBlockEntityVisual<ArmEntity> implements D
         firstArm = baseMotor.child("FirstArm");
         secondArm = firstArm.child("SecondArm");
 
-        cactus = instancerProvider().instancer(InstanceTypes.TRANSFORMED, Models.block(Blocks.CACTUS.defaultBlockState()))
+        cactus = instancerProvider()
+                .instancer(InstanceTypes.TRANSFORMED, ItemModels.get(blockEntity.getLevel(), new ItemStack(Items.CACTUS), ItemDisplayContext.GROUND))
                 .createInstance();
     }
 
@@ -91,17 +94,18 @@ public class ArmVisual extends AbstractBlockEntityVisual<ArmEntity> implements D
             cactus.setIdentityTransform();
 
             cactus.translate(visualPos.getX(), visualPos.getY(), visualPos.getZ());
-            cactus.translate(.5f, 0, 0.5f);
+            cactus.translate(0.5, 0, 0.5f);
 
             Matrix4f mx = new Matrix4f();
             baseMotor.translateAndRotate(mx);
             firstArm.translateAndRotate(mx);
             secondArm.translateAndRotate(mx);
 
-            mx.scale(0.5f);
+            //mx.scale(0.5f);
             cactus.mul(mx);
 
-            cactus.translate(-0.5f, secondArm.initialPose().y/16f + 0.75f, - 0.5f);
+            cactus.translate(0, secondArm.initialPose().y/16f, 0);
+
             cactus.setChanged();
 
             instanceTree.updateInstancesStatic(initialPose);
