@@ -5,12 +5,9 @@ import de.javagl.jgltf.model.MeshPrimitiveModel;
 import dev.engine_room.flywheel.api.model.IndexSequence;
 import dev.engine_room.flywheel.api.model.Mesh;
 import dev.engine_room.flywheel.api.vertex.MutableVertexList;
-import net.minecraft.client.renderer.LightTexture;
-import net.minecraft.client.renderer.texture.OverlayTexture;
 import org.joml.Vector4f;
 import org.joml.Vector4fc;
 
-import java.nio.ByteBuffer;
 import java.nio.FloatBuffer;
 
 public class GltfMesh implements Mesh {
