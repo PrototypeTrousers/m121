@@ -38,6 +38,7 @@ import net.minecraft.client.renderer.block.model.BakedQuad;
 import net.minecraft.client.renderer.blockentity.BellRenderer;
 import net.minecraft.client.renderer.texture.TextureAtlas;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
+import net.minecraft.client.resources.model.AtlasSet;
 import net.minecraft.client.resources.model.UnbakedModel;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -50,6 +51,8 @@ import net.minecraft.world.item.Items;
 import net.minecraft.world.item.MilkBucketItem;
 import net.minecraft.world.level.BlockAndTintGetter;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.DirtPathBlock;
+import net.minecraft.world.level.block.entity.BedBlockEntity;
 import net.minecraft.world.level.block.entity.BellBlockEntity;
 import net.minecraft.world.level.block.entity.ChestBlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
@@ -72,6 +75,8 @@ import java.nio.ByteBuffer;
 import java.nio.IntBuffer;
 import java.util.*;
 import java.util.function.Consumer;
+
+import static net.minecraft.client.renderer.Sheets.BED_SHEET;
 
 public class ArmVisual extends AbstractBlockEntityVisual<ArmEntity> implements DynamicVisual, LightUpdatedVisual {
 
@@ -102,16 +107,16 @@ public class ArmVisual extends AbstractBlockEntityVisual<ArmEntity> implements D
 
 
         SinglePosVirtualBlockGetter lv = SinglePosVirtualBlockGetter.createFullBright();
-        lv.blockState(Blocks.CHEST.defaultBlockState());
-        ChestBlockEntity bbe = new ChestBlockEntity(pos, Blocks.CHEST.defaultBlockState());
+        lv.blockState(Blocks.BLACK_BED.defaultBlockState());
+        BedBlockEntity bbe = new BedBlockEntity(pos, Blocks.BLACK_BED.defaultBlockState());
         lv.blockEntity(bbe);
         lv.pos(pos);
         PoseStack pose = new PoseStack();
         pose.pushPose();
         pose.setIdentity();
         //pose.translate(pos.getX(), pos.getY(), pos.getZ());
-        Minecraft.getInstance().getBlockRenderer().renderSingleBlock(Blocks.DIRT.defaultBlockState(), pose, br.bufferSource(), computePackedLight(), 0);
-        //Minecraft.getInstance().getBlockEntityRenderDispatcher().renderItem(bbe, new PoseStack(), br.bufferSource(), computePackedLight(), 0);
+//        Minecraft.getInstance().getBlockRenderer().renderSingleBlock(Blocks.DIRT.defaultBlockState(), pose, br.bufferSource(), computePackedLight(), 0);
+        Minecraft.getInstance().getBlockEntityRenderDispatcher().renderItem(bbe, new PoseStack(), br.bufferSource(), computePackedLight(), 0);
 
         MultiBufferSource.BufferSource bs = br.bufferSource();
         Map<RenderType, BufferBuilder> mp = ((BufferSourceAccessor) bs).getStartedBuilders();
@@ -136,8 +141,8 @@ public class ArmVisual extends AbstractBlockEntityVisual<ArmEntity> implements D
 
                     int color = buffer.getInt();
 
-                    float u = buffer.getFloat();
-                    float v = buffer.getFloat();
+                    int u = buffer.getInt();
+                    int v = buffer.getInt();
 
                     int packedOverlay = buffer.getShort();
                     int packedLight = buffer.getShort();
@@ -148,17 +153,14 @@ public class ArmVisual extends AbstractBlockEntityVisual<ArmEntity> implements D
                     int yInt = Float.floatToRawIntBits(y);
                     int zInt = Float.floatToRawIntBits(z);
 
-                    int intu = Float.floatToRawIntBits(u);
-                    int intv = Float.floatToRawIntBits(v);
-
                     int destIndex = i * 7;
 
                     aint[i * 7] = xInt;
                     aint[i * 7 + 1] = yInt;
                     aint[i * 7 + 2] = zInt;
                     aint[i * 7 + 3] = color;
-                    aint[i * 7 + 4] = intu;
-                    aint[i * 7 + 5] = intv;
+                    aint[i * 7 + 4] = u;
+                    aint[i * 7 + 5] = v;
                     aint[i * 7 + 6] = packedOverlay;
                     aint[i * 7 + 7] = packedLight;
                     aint[i * 7 + 8] = normal;
@@ -168,7 +170,7 @@ public class ArmVisual extends AbstractBlockEntityVisual<ArmEntity> implements D
                 buffer.getInt();
                 buffer.getInt();
 
-                bakedQuadList.add(new BakedQuad(aint.clone(), -1, Direction.UP, Minecraft.getInstance().getTextureAtlas(TextureAtlas.LOCATION_BLOCKS).apply(ResourceLocation.withDefaultNamespace("dirt")), false));
+                bakedQuadList.add(new BakedQuad(aint.clone(), -1, Direction.UP, Minecraft.getInstance().getTextureAtlas(BED_SHEET).apply(ResourceLocation.fromNamespaceAndPath("minecraft","entity/bed/black")), false));
             }
         }
 
