@@ -4,10 +4,12 @@ import com.mojang.blaze3d.vertex.BufferBuilder;
 import com.mojang.blaze3d.vertex.MeshData;
 import com.mojang.blaze3d.vertex.VertexFormat;
 import dev.engine_room.flywheel.api.material.CardinalLightingMode;
+import dev.engine_room.flywheel.api.material.LightShader;
 import dev.engine_room.flywheel.api.model.IndexSequence;
 import dev.engine_room.flywheel.api.model.Mesh;
 import dev.engine_room.flywheel.api.model.Model;
 import dev.engine_room.flywheel.api.vertex.MutableVertexList;
+import dev.engine_room.flywheel.lib.material.LightShaders;
 import dev.engine_room.flywheel.lib.material.SimpleMaterial;
 import dev.engine_room.flywheel.lib.model.QuadIndexSequence;
 import net.minecraft.client.renderer.RenderStateShard;
@@ -34,7 +36,8 @@ public class CapturedModel implements Model {
 
             meshes.add(new Model.ConfiguredMesh(SimpleMaterial.builder()
                     .texture(atlas)
-                    .cardinalLightingMode(CardinalLightingMode.ENTITY)
+                            .light(LightShaders.SMOOTH_WHEN_EMBEDDED)
+                    .cardinalLightingMode(CardinalLightingMode.OFF)
                     .ambientOcclusion(false)
                     .build(),
                     new CapturedMesh(entry)));
@@ -98,6 +101,8 @@ public class CapturedModel implements Model {
 
                 vertexList.u(vIdx, buffer.getFloat(currentVertexOffset + 16));
                 vertexList.v(vIdx, buffer.getFloat(currentVertexOffset + 20));
+
+                //vertexList.light(vIdx, buffer.getInt(currentVertexOffset + 24));
 
                 int packedNormal = buffer.getInt(currentVertexOffset + 28);
 
