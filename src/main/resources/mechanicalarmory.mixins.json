@@ -1,0 +1,13 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "proto.mechanicalarmory.client.mixin",
+  "compatibilityLevel": "JAVA_17",
+  "refmap": "mechanicalarmory.refmap.json",
+  "client": [
+    "BufferSourceAccessor"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}
