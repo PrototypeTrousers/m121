@@ -6,7 +6,9 @@
   "refmap": "mechanicalarmory.refmap.json",
   "client": [
     "BufferSourceAccessor",
-    "RenderTypeAccessor"
+    "CompositeRenderTypeAccessor",
+    "RenderTypeAccessor",
+    "TextureStateShardAccessor"
   ],
   "injectors": {
     "defaultRequire": 1

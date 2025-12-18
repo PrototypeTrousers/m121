@@ -5,7 +5,6 @@ import com.mojang.blaze3d.vertex.*;
 import dev.engine_room.flywheel.api.instance.Instance;
 import dev.engine_room.flywheel.api.material.CardinalLightingMode;
 import dev.engine_room.flywheel.api.material.Material;
-import dev.engine_room.flywheel.api.model.Model;
 import dev.engine_room.flywheel.api.task.Plan;
 import dev.engine_room.flywheel.api.visual.DynamicVisual;
 import dev.engine_room.flywheel.api.visual.LightUpdatedVisual;
@@ -29,6 +28,7 @@ import dev.engine_room.flywheel.lib.visual.AbstractBlockEntityVisual;
 import dev.engine_room.vanillin.item.ItemModels;
 import it.unimi.dsi.fastutil.longs.LongSet;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.model.Model;
 import net.minecraft.client.model.geom.ModelLayers;
 import net.minecraft.client.renderer.*;
 import net.minecraft.client.renderer.block.BlockRenderDispatcher;
@@ -66,6 +66,7 @@ import org.joml.Vector2f;
 import org.joml.Vector3f;
 import proto.mechanicalarmory.MechanicalArmoryClient;
 import proto.mechanicalarmory.client.BERDynamicBakedModel;
+import proto.mechanicalarmory.client.CapturedModel;
 import proto.mechanicalarmory.client.mixin.BufferSourceAccessor;
 import proto.mechanicalarmory.client.mixin.RenderTypeAccessor;
 import proto.mechanicalarmory.client.mixin.TextureStateShardAccessor;
@@ -121,64 +122,10 @@ public class ArmVisual extends AbstractBlockEntityVisual<ArmEntity> implements D
         MultiBufferSource.BufferSource bs = br.bufferSource();
         Map<RenderType, BufferBuilder> mp = ((BufferSourceAccessor) bs).getStartedBuilders();
 
-        List<BakedQuad> bakedQuadList = new ArrayList<>();
-
-        for (Map.Entry<RenderType, BufferBuilder> entry : mp.entrySet()) {
-            MeshData meshData = entry.getValue().build();
-            if (meshData == null) continue;
-
-            VertexFormat format = meshData.drawState().format();
-            ByteBuffer buffer = meshData.vertexBuffer();
-
-            // Calculate how many vertices are in this mesh
-            int vertexCount = meshData.drawState().vertexCount();
-            int vertexSizeInBytes = format.getVertexSize();
-
-            RenderStateShard.EmptyTextureStateShard tss = ((RenderTypeAccessor) entry.getKey()).getTextureState();
-            ResourceLocation atlas = ((TextureStateShardAccessor) tss).getTexture().get();
-
-            // BakedQuads MUST have 4 vertices
-            for (int vIdx = 0; vIdx < vertexCount; vIdx += 4) {
-                int[] quadData = new int[32];
-
-                for (int i = 0; i < 4; i++) {
-                    int currentVertexOffset = (vIdx + i) * vertexSizeInBytes;
-                    int destPos = i * 8; // Each vertex in a BakedQuad is exactly 8 ints
-
-                    // Position (Float to Int bits)
-                    quadData[destPos] = Float.floatToRawIntBits(buffer.getFloat(currentVertexOffset));
-                    quadData[destPos + 1] = Float.floatToRawIntBits(buffer.getFloat(currentVertexOffset + 4));
-                    quadData[destPos + 2] = Float.floatToRawIntBits(buffer.getFloat(currentVertexOffset + 8));
-
-                    // Color (ABGR)
-                    quadData[destPos + 3] = buffer.getInt(currentVertexOffset + 12);
-
-                    // UV (Texture)
-                    quadData[destPos + 4] = Float.floatToRawIntBits(buffer.getFloat(currentVertexOffset + 16));
-                    quadData[destPos + 5] = Float.floatToRawIntBits(buffer.getFloat(currentVertexOffset + 20));
-
-                    // Lightmap / Normal
-                    // BakedQuad format: [P, P, P, C, U, V, L, N]
-                    quadData[destPos + 6] = buffer.getInt(currentVertexOffset + 24); // UV2 (Light)
-                    quadData[destPos + 7] = buffer.getInt(currentVertexOffset + 28); // Normal
-                }
-
-                bakedQuadList.add(new BakedQuad(
-                        quadData,
-                        -1,
-                        Direction.UP,
-                        Minecraft.getInstance().getTextureAtlas(atlas).apply(ResourceLocation.fromNamespaceAndPath("minecraft","entity/bed/black")), // Your Bed Sprite
-                        false
-                ));
-            }
-        }
-
-        BERDynamicBakedModel berDynamicBakedModel = new BERDynamicBakedModel(bakedQuadList);
-        BakedModelBuilder bakedModelBuilder = new BakedModelBuilder(berDynamicBakedModel).materialFunc(
-                (renderType, shaded, ao) -> SimpleMaterial.builder().texture(Sheets.BED_SHEET));
+        CapturedModel model = new CapturedModel(mp);
 
         cactus = instancerProvider()
-                .instancer(InstanceTypes.TRANSFORMED, bakedModelBuilder.build())
+                .instancer(InstanceTypes.TRANSFORMED, model)
                 .createInstance();
     }
 

@@ -6,37 +6,56 @@ import com.mojang.blaze3d.vertex.VertexFormat;
 import dev.engine_room.flywheel.api.material.CardinalLightingMode;
 import dev.engine_room.flywheel.api.model.IndexSequence;
 import dev.engine_room.flywheel.api.model.Mesh;
+import dev.engine_room.flywheel.api.model.Model;
 import dev.engine_room.flywheel.api.vertex.MutableVertexList;
 import dev.engine_room.flywheel.lib.material.SimpleMaterial;
 import dev.engine_room.flywheel.lib.model.QuadIndexSequence;
-import dev.engine_room.flywheel.lib.model.SimpleModel;
+import net.minecraft.client.renderer.RenderStateShard;
 import net.minecraft.client.renderer.RenderType;
+import net.minecraft.resources.ResourceLocation;
+import org.joml.Vector4f;
 import org.joml.Vector4fc;
-import proto.mechanicalarmory.client.gltf.GltfMesh;
+import proto.mechanicalarmory.client.mixin.CompositeRenderTypeAccessor;
+import proto.mechanicalarmory.client.mixin.RenderTypeAccessor;
+import proto.mechanicalarmory.client.mixin.TextureStateShardAccessor;
 
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
-public class CapturedModel extends SimpleModel {
-    public CapturedModel(List<ConfiguredMesh> meshes) {
-        super(meshes);
+public class CapturedModel implements Model {
+    List<ConfiguredMesh> meshes = new ArrayList<>();
+    public CapturedModel(Map<RenderType, BufferBuilder> mp) {
         for (Map.Entry<RenderType, BufferBuilder> entry : mp.entrySet()) {
-            meshes.add(new ConfiguredMesh(SimpleMaterial.builder()
-                    .texture(rl)
+            CompositeRenderTypeAccessor c = ((CompositeRenderTypeAccessor) entry.getKey());
+            RenderStateShard.EmptyTextureStateShard r = ((RenderTypeAccessor) (Object) c.getState()).getTextureState();
+            ResourceLocation atlas = ((TextureStateShardAccessor) r).getTexture().get();
+
+            meshes.add(new Model.ConfiguredMesh(SimpleMaterial.builder()
+                    .texture(atlas)
                     .cardinalLightingMode(CardinalLightingMode.ENTITY)
                     .ambientOcclusion(false)
                     .build(),
                     new CapturedMesh(entry)));
-
         }
+    }
+
+    @Override
+    public List<ConfiguredMesh> meshes() {
+        return meshes;
+    }
+
+    @Override
+    public Vector4fc boundingSphere() {
+        return new Vector4f(1,1,1,1);
     }
 
     static class CapturedMesh implements Mesh {
         MeshData meshData;
 
         CapturedMesh(Map.Entry<RenderType, BufferBuilder> entry) {
-            MeshData meshData = entry.getValue().build();
+            meshData = entry.getValue().build();
         }
 
         Map.Entry<RenderType, BufferBuilder> entry;
@@ -57,42 +76,38 @@ public class CapturedModel extends SimpleModel {
             int vertexSizeInBytes = format.getVertexSize();
 
             // BakedQuads MUST have 4 vertices
-            for (int vIdx = 0; vIdx < vertexCount; vIdx += 4) {
-                for (int i = 0; i < 4; i++) {
-                    int currentVertexOffset = (vIdx + i) * vertexSizeInBytes;
+            for (int vIdx = 0; vIdx < vertexCount; vIdx++) {
 
-                    vertexList.x(vIdx, buffer.getFloat(currentVertexOffset));
-                    vertexList.y(vIdx, buffer.getFloat(currentVertexOffset + 4));
-                    vertexList.z(vIdx, buffer.getFloat(currentVertexOffset + 8));
+                int currentVertexOffset = (vIdx) * vertexSizeInBytes;
 
-                    int packedColor = buffer.getInt(currentVertexOffset + 12);
+                vertexList.x(vIdx, buffer.getFloat(currentVertexOffset));
+                vertexList.y(vIdx, buffer.getFloat(currentVertexOffset + 4));
+                vertexList.z(vIdx, buffer.getFloat(currentVertexOffset + 8));
 
-                    int r = (packedColor) & 0xFF;
-                    int g = (packedColor >> 8) & 0xFF;
-                    int b = (packedColor >> 16) & 0xFF;
-                    int a = (packedColor >> 24) & 0xFF;
+                int packedColor = buffer.getInt(currentVertexOffset + 12);
 
-                    vertexList.r(vIdx, r);
-                    vertexList.g(vIdx, g);
-                    vertexList.b(vIdx, b);
-                    vertexList.a(vIdx, a);
+                int r = (packedColor) & 0xFF;
+                int g = (packedColor >> 8) & 0xFF;
+                int b = (packedColor >> 16) & 0xFF;
+                int a = (packedColor >> 24) & 0xFF;
 
-                    vertexList.u(vIdx, Float.floatToRawIntBits(buffer.getFloat(currentVertexOffset + 16)));
-                    vertexList.v(vIdx, Float.floatToRawIntBits(buffer.getFloat(currentVertexOffset + 20)));
+                vertexList.r(vIdx, r);
+                vertexList.g(vIdx, g);
+                vertexList.b(vIdx, b);
+                vertexList.a(vIdx, a);
 
-                    int packedNormal = buffer.getInt(currentVertexOffset + 28);
+                vertexList.u(vIdx, buffer.getFloat(currentVertexOffset + 16));
+                vertexList.v(vIdx, buffer.getFloat(currentVertexOffset + 20));
 
-                    float x = ((byte) (packedNormal & 0xFF)) / 127.0f;
-                    float y = ((byte) ((packedNormal >> 8) & 0xFF)) / 127.0f;
-                    float z = ((byte) ((packedNormal >> 16) & 0xFF)) / 127.0f;
+                int packedNormal = buffer.getInt(currentVertexOffset + 28);
 
-                    vertexList.normalX(vIdx, x);
-                    vertexList.normalY(vIdx, y);
-                    vertexList.normalZ(vIdx, z);
+                float x = ((byte) (packedNormal & 0xFF)) / 127.0f;
+                float y = ((byte) ((packedNormal >> 8) & 0xFF)) / 127.0f;
+                float z = ((byte) ((packedNormal >> 16) & 0xFF)) / 127.0f;
 
-                    //quadData[destPos + 6] = buffer.getInt(currentVertexOffset + 24); // UV2 (Light)
-                }
-
+                vertexList.normalX(vIdx, x);
+                vertexList.normalY(vIdx, y);
+                vertexList.normalZ(vIdx, z);
             }
         }
 
@@ -108,7 +123,7 @@ public class CapturedModel extends SimpleModel {
 
         @Override
         public Vector4fc boundingSphere() {
-            return null;
+            return new Vector4f(1,1,1,1);
         }
     }
 }
