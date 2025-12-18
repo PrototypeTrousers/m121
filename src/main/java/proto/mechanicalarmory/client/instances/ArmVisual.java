@@ -15,6 +15,7 @@ import dev.engine_room.flywheel.lib.instance.TransformedInstance;
 import dev.engine_room.flywheel.lib.material.SimpleMaterial;
 import dev.engine_room.flywheel.lib.model.ModelUtil;
 import dev.engine_room.flywheel.lib.model.Models;
+import dev.engine_room.flywheel.lib.model.SimpleModel;
 import dev.engine_room.flywheel.lib.model.baked.BakedModelBuilder;
 import dev.engine_room.flywheel.lib.model.baked.BlockModelBuilder;
 import dev.engine_room.flywheel.lib.model.baked.PartialModel;
@@ -29,10 +30,7 @@ import dev.engine_room.vanillin.item.ItemModels;
 import it.unimi.dsi.fastutil.longs.LongSet;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.model.geom.ModelLayers;
-import net.minecraft.client.renderer.LevelRenderer;
-import net.minecraft.client.renderer.MultiBufferSource;
-import net.minecraft.client.renderer.RenderBuffers;
-import net.minecraft.client.renderer.RenderType;
+import net.minecraft.client.renderer.*;
 import net.minecraft.client.renderer.block.BlockRenderDispatcher;
 import net.minecraft.client.renderer.block.model.BakedQuad;
 import net.minecraft.client.renderer.blockentity.BellRenderer;
@@ -69,6 +67,8 @@ import org.joml.Vector3f;
 import proto.mechanicalarmory.MechanicalArmoryClient;
 import proto.mechanicalarmory.client.BERDynamicBakedModel;
 import proto.mechanicalarmory.client.mixin.BufferSourceAccessor;
+import proto.mechanicalarmory.client.mixin.RenderTypeAccessor;
+import proto.mechanicalarmory.client.mixin.TextureStateShardAccessor;
 import proto.mechanicalarmory.common.entities.block.ArmEntity;
 
 import java.nio.ByteBuffer;
@@ -128,73 +128,54 @@ public class ArmVisual extends AbstractBlockEntityVisual<ArmEntity> implements D
             if (meshData == null) continue;
 
             VertexFormat format = meshData.drawState().format();
-            int vertexSizeInBytes = format.getVertexSize();
-            int vertexSizeInInts = vertexSizeInBytes / 4;
-
             ByteBuffer buffer = meshData.vertexBuffer();
-            while (buffer.hasRemaining()) {
-                int[] aint = new int[32];
+
+            // Calculate how many vertices are in this mesh
+            int vertexCount = meshData.drawState().vertexCount();
+            int vertexSizeInBytes = format.getVertexSize();
+
+            RenderStateShard.EmptyTextureStateShard tss = ((RenderTypeAccessor) entry.getKey()).getTextureState();
+            ResourceLocation atlas = ((TextureStateShardAccessor) tss).getTexture().get();
+
+            // BakedQuads MUST have 4 vertices
+            for (int vIdx = 0; vIdx < vertexCount; vIdx += 4) {
+                int[] quadData = new int[32];
+
                 for (int i = 0; i < 4; i++) {
-                    float x = buffer.getFloat();
-                    float y = buffer.getFloat();
-                    float z = buffer.getFloat();
+                    int currentVertexOffset = (vIdx + i) * vertexSizeInBytes;
+                    int destPos = i * 8; // Each vertex in a BakedQuad is exactly 8 ints
 
-                    int color = buffer.getInt();
+                    // Position (Float to Int bits)
+                    quadData[destPos] = Float.floatToRawIntBits(buffer.getFloat(currentVertexOffset));
+                    quadData[destPos + 1] = Float.floatToRawIntBits(buffer.getFloat(currentVertexOffset + 4));
+                    quadData[destPos + 2] = Float.floatToRawIntBits(buffer.getFloat(currentVertexOffset + 8));
 
-                    int u = buffer.getInt();
-                    int v = buffer.getInt();
+                    // Color (ABGR)
+                    quadData[destPos + 3] = buffer.getInt(currentVertexOffset + 12);
 
-                    int packedOverlay = buffer.getShort();
-                    int packedLight = buffer.getShort();
+                    // UV (Texture)
+                    quadData[destPos + 4] = Float.floatToRawIntBits(buffer.getFloat(currentVertexOffset + 16));
+                    quadData[destPos + 5] = Float.floatToRawIntBits(buffer.getFloat(currentVertexOffset + 20));
 
-                    int normal = buffer.getInt();
-
-                    int xInt = Float.floatToRawIntBits(x);
-                    int yInt = Float.floatToRawIntBits(y);
-                    int zInt = Float.floatToRawIntBits(z);
-
-                    int destIndex = i * 7;
-
-                    aint[i * 7] = xInt;
-                    aint[i * 7 + 1] = yInt;
-                    aint[i * 7 + 2] = zInt;
-                    aint[i * 7 + 3] = color;
-                    aint[i * 7 + 4] = u;
-                    aint[i * 7 + 5] = v;
-                    aint[i * 7 + 6] = packedOverlay;
-                    aint[i * 7 + 7] = packedLight;
-                    aint[i * 7 + 8] = normal;
+                    // Lightmap / Normal
+                    // BakedQuad format: [P, P, P, C, U, V, L, N]
+                    quadData[destPos + 6] = buffer.getInt(currentVertexOffset + 24); // UV2 (Light)
+                    quadData[destPos + 7] = buffer.getInt(currentVertexOffset + 28); // Normal
                 }
-                buffer.getInt();
-                buffer.getInt();
-                buffer.getInt();
-                buffer.getInt();
 
-                bakedQuadList.add(new BakedQuad(aint.clone(), -1, Direction.UP, Minecraft.getInstance().getTextureAtlas(BED_SHEET).apply(ResourceLocation.fromNamespaceAndPath("minecraft","entity/bed/black")), false));
+                bakedQuadList.add(new BakedQuad(
+                        quadData,
+                        -1,
+                        Direction.UP,
+                        Minecraft.getInstance().getTextureAtlas(atlas).apply(ResourceLocation.fromNamespaceAndPath("minecraft","entity/bed/black")), // Your Bed Sprite
+                        false
+                ));
             }
         }
 
-//        vertexData[i] = Float.floatToRawIntBits(vector.x());
-//        vertexData[i + 1] = Float.floatToRawIntBits(vector.y());
-//        vertexData[i + 2] = Float.floatToRawIntBits(vector.z());
-//        vertexData[i + 3] = -1;
-//        vertexData[i + 4] = Float.floatToRawIntBits(sprite.getU(blockFaceUV.getU(vertexIndex) / 16.0F));
-//        vertexData[i + 4 + 1] = Float.floatToRawIntBits(sprite.getV(blockFaceUV.getV(vertexIndex) / 16.0F));
-
-//        float x,
-//        float y,
-//        float z,
-//        int color,
-//        float u,
-//        float v,
-//        int packedOverlay,
-//        int packedLight,
-//        float normalX,
-//        float normalY,
-//        float normalZ
-
         BERDynamicBakedModel berDynamicBakedModel = new BERDynamicBakedModel(bakedQuadList);
-        BakedModelBuilder bakedModelBuilder = new BakedModelBuilder(berDynamicBakedModel);
+        BakedModelBuilder bakedModelBuilder = new BakedModelBuilder(berDynamicBakedModel).materialFunc(
+                (renderType, shaded, ao) -> SimpleMaterial.builder().texture(Sheets.BED_SHEET));
 
         cactus = instancerProvider()
                 .instancer(InstanceTypes.TRANSFORMED, bakedModelBuilder.build())
