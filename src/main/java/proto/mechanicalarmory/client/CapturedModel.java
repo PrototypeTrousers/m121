@@ -4,19 +4,22 @@ import com.mojang.blaze3d.vertex.BufferBuilder;
 import com.mojang.blaze3d.vertex.MeshData;
 import com.mojang.blaze3d.vertex.VertexFormat;
 import dev.engine_room.flywheel.api.material.CardinalLightingMode;
-import dev.engine_room.flywheel.api.material.LightShader;
 import dev.engine_room.flywheel.api.model.IndexSequence;
 import dev.engine_room.flywheel.api.model.Mesh;
 import dev.engine_room.flywheel.api.model.Model;
 import dev.engine_room.flywheel.api.vertex.MutableVertexList;
+import dev.engine_room.flywheel.lib.material.CutoutShaders;
 import dev.engine_room.flywheel.lib.material.LightShaders;
 import dev.engine_room.flywheel.lib.material.SimpleMaterial;
 import dev.engine_room.flywheel.lib.model.QuadIndexSequence;
+import net.minecraft.client.renderer.MultiBufferSource;
+import net.minecraft.client.renderer.RenderBuffers;
 import net.minecraft.client.renderer.RenderStateShard;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.resources.ResourceLocation;
 import org.joml.Vector4f;
 import org.joml.Vector4fc;
+import proto.mechanicalarmory.client.mixin.BufferSourceAccessor;
 import proto.mechanicalarmory.client.mixin.CompositeRenderTypeAccessor;
 import proto.mechanicalarmory.client.mixin.RenderTypeAccessor;
 import proto.mechanicalarmory.client.mixin.TextureStateShardAccessor;
@@ -28,7 +31,9 @@ import java.util.Map;
 
 public class CapturedModel implements Model {
     List<ConfiguredMesh> meshes = new ArrayList<>();
-    public CapturedModel(Map<RenderType, BufferBuilder> mp) {
+    public CapturedModel(RenderBuffers rb) {
+        MultiBufferSource.BufferSource bs = rb.bufferSource();
+        Map<RenderType, BufferBuilder> mp = ((BufferSourceAccessor) bs).getStartedBuilders();
         for (Map.Entry<RenderType, BufferBuilder> entry : mp.entrySet()) {
             CompositeRenderTypeAccessor c = ((CompositeRenderTypeAccessor) entry.getKey());
             RenderStateShard.EmptyTextureStateShard r = ((RenderTypeAccessor) (Object) c.getState()).getTextureState();
@@ -36,7 +41,8 @@ public class CapturedModel implements Model {
 
             meshes.add(new Model.ConfiguredMesh(SimpleMaterial.builder()
                     .texture(atlas)
-                            .light(LightShaders.SMOOTH_WHEN_EMBEDDED)
+                    .cutout(CutoutShaders.EPSILON)
+                    .light(LightShaders.SMOOTH_WHEN_EMBEDDED)
                     .cardinalLightingMode(CardinalLightingMode.OFF)
                     .ambientOcclusion(false)
                     .build(),
@@ -55,27 +61,29 @@ public class CapturedModel implements Model {
     }
 
     static class CapturedMesh implements Mesh {
+        int vertexCount;
+        int indexCount;
         MeshData meshData;
 
         CapturedMesh(Map.Entry<RenderType, BufferBuilder> entry) {
             meshData = entry.getValue().build();
+            vertexCount = meshData.drawState().vertexCount();
+            indexCount = meshData.drawState().indexCount();
         }
 
         Map.Entry<RenderType, BufferBuilder> entry;
 
         @Override
         public int vertexCount() {
-            return meshData.drawState().vertexCount();
+            return vertexCount;
         }
 
         @Override
         public void write(MutableVertexList vertexList) {
-
             VertexFormat format = meshData.drawState().format();
             ByteBuffer buffer = meshData.vertexBuffer();
 
             // Calculate how many vertices are in this mesh
-            int vertexCount = meshData.drawState().vertexCount();
             int vertexSizeInBytes = format.getVertexSize();
 
             // BakedQuads MUST have 4 vertices
@@ -123,7 +131,7 @@ public class CapturedModel implements Model {
 
         @Override
         public int indexCount() {
-            return meshData.drawState().indexCount();
+            return indexCount;
         }
 
         @Override

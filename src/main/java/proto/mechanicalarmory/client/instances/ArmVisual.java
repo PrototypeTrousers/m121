@@ -25,6 +25,9 @@ import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.RenderBuffers;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.core.SectionPos;
+import net.minecraft.world.item.BlockItem;
+import net.minecraft.world.item.ItemDisplayContext;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.entity.EnchantingTableBlockEntity;
 import org.jetbrains.annotations.Nullable;
@@ -79,12 +82,11 @@ public class ArmVisual extends AbstractBlockEntityVisual<ArmEntity> implements D
         //pose.translate(pos.getX(), pos.getY(), pos.getZ());
 //        Minecraft.getInstance().getBlockRenderer().renderSingleBlock(Blocks.DIRT.defaultBlockState(), pose, br.bufferSource(), computePackedLight(), 0);
         //Minecraft.getInstance().getBlockEntityRenderDispatcher().render(bbe, partialTick, new PoseStack(), br.bufferSource());
-        Minecraft.getInstance().getBlockEntityRenderDispatcher().renderItem(bbe, new PoseStack(), br.bufferSource(), LevelRenderer.getLightColor(level, pos.above()), 0);
+        //Minecraft.getInstance().getBlockEntityRenderDispatcher().renderItem(bbe, new PoseStack(), br.bufferSource(), LevelRenderer.getLightColor(level, pos.above()), 0);
 
-        MultiBufferSource.BufferSource bs = br.bufferSource();
-        Map<RenderType, BufferBuilder> mp = ((BufferSourceAccessor) bs).getStartedBuilders();
-
-        CapturedModel model = new CapturedModel(mp);
+        Minecraft.getInstance().getItemRenderer().renderStatic(new ItemStack(Blocks.BELL.asItem()), ItemDisplayContext.GROUND, LevelRenderer.getLightColor(level, pos.above()), 0, new PoseStack(), br.bufferSource(), null, 42);
+//        render(new ItemStack(Blocks.ENCHANTING_TABLE.asItem()), ItemDisplayContext.GROUND, false, new PoseStack(), br.bufferSource(), LevelRenderer.getLightColor(level, pos.above()), 0 );
+        CapturedModel model = new CapturedModel(br);
 
         transformedInstance1 = instancerProvider()
                 .instancer(InstanceTypes.TRANSFORMED, model)
