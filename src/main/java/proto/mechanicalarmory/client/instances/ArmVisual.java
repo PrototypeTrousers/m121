@@ -1,5 +1,8 @@
 package proto.mechanicalarmory.client.instances;
 
+import com.fasterxml.jackson.databind.util.ByteBufferBackedInputStream;
+import com.mojang.blaze3d.platform.NativeImage;
+import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.BufferBuilder;
 import com.mojang.blaze3d.vertex.PoseStack;
 import dev.engine_room.flywheel.api.instance.Instance;
@@ -24,6 +27,7 @@ import net.minecraft.client.renderer.LevelRenderer;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.RenderBuffers;
 import net.minecraft.client.renderer.RenderType;
+import net.minecraft.client.renderer.texture.DynamicTexture;
 import net.minecraft.core.SectionPos;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.ItemDisplayContext;
@@ -39,6 +43,7 @@ import proto.mechanicalarmory.client.CapturedModel;
 import proto.mechanicalarmory.client.mixin.BufferSourceAccessor;
 import proto.mechanicalarmory.common.entities.block.ArmEntity;
 
+import java.io.IOException;
 import java.util.Map;
 import java.util.function.Consumer;
 
@@ -49,7 +54,7 @@ public class ArmVisual extends AbstractBlockEntityVisual<ArmEntity> implements D
     private final @Nullable InstanceTree firstArm;
     private final @Nullable InstanceTree secondArm;
     private final @Nullable InstanceTree baseMotor;
-    private final TransformedInstance transformedInstance1;
+    private TransformedInstance transformedInstance1;
     private final TransformedInstance transformedInstance2;
 
     private static final Material MATERIAL = SimpleMaterial.builder()
@@ -80,24 +85,34 @@ public class ArmVisual extends AbstractBlockEntityVisual<ArmEntity> implements D
                 .instancer(InstanceTypes.TRANSFORMED, Models.block(Blocks.AIR.defaultBlockState()))
                 .createInstance();
 
+
+        RenderSystem.recordRenderCall(() -> {
+                Block below = level.getBlockState(pos.below()).getBlock();
+                int packedLight = LevelRenderer.getLightColor(level, pos.above());
+                Minecraft.getInstance().getItemRenderer().renderStatic(new ItemStack(below.asItem()), ItemDisplayContext.GROUND, packedLight, 0, new PoseStack(), br.bufferSource(), null, 42);
+//        render(new ItemStack(Blocks.ENCHANTING_TABLE.asItem()), ItemDisplayContext.GROUND, false, new PoseStack(), br.bufferSource(), LevelRenderer.getLightColor(level, pos.above()), 0 );
+                CapturedModel model = new CapturedModel(br);
+
+                transformedInstance1 = instancerProvider()
+                        .instancer(InstanceTypes.TRANSFORMED, model)
+                        .createInstance();
+            transformedInstance1.light(packedLight);
+
+        });
+
         //pose.translate(pos.getX(), pos.getY(), pos.getZ());
 //        Minecraft.getInstance().getBlockRenderer().renderSingleBlock(Blocks.DIRT.defaultBlockState(), pose, br.bufferSource(), computePackedLight(), 0);
         //Minecraft.getInstance().getBlockEntityRenderDispatcher().render(bbe, partialTick, new PoseStack(), br.bufferSource());
         //Minecraft.getInstance().getBlockEntityRenderDispatcher().renderItem(bbe, new PoseStack(), br.bufferSource(), LevelRenderer.getLightColor(level, pos.above()), 0);
-        Block below = level.getBlockState(pos.below()).getBlock();
-        Minecraft.getInstance().getItemRenderer().renderStatic(new ItemStack(below.asItem()), ItemDisplayContext.GROUND, LevelRenderer.getLightColor(level, pos.above()), 0, new PoseStack(), br.bufferSource(), null, 42);
-//        render(new ItemStack(Blocks.ENCHANTING_TABLE.asItem()), ItemDisplayContext.GROUND, false, new PoseStack(), br.bufferSource(), LevelRenderer.getLightColor(level, pos.above()), 0 );
-        CapturedModel model = new CapturedModel(br);
 
-        transformedInstance1 = instancerProvider()
-                .instancer(InstanceTypes.TRANSFORMED, model)
-                .createInstance();
     }
 
     @Override
     public void collectCrumblingInstances(Consumer<@Nullable Instance> consumer) {
         instanceTree.traverse(consumer);
-        consumer.accept(transformedInstance1);
+        if (transformedInstance1 != null) {
+            consumer.accept(transformedInstance1);
+        }
         consumer.accept(transformedInstance2);
     }
 
@@ -109,14 +124,18 @@ public class ArmVisual extends AbstractBlockEntityVisual<ArmEntity> implements D
             instance.light(packedLight)
                     .setChanged();
         });
-        transformedInstance1.light(packedLight);
+        if (transformedInstance1 != null) {
+            transformedInstance1.light(packedLight);
+        }
         transformedInstance2.light(packedLight);
     }
 
     @Override
     protected void _delete() {
         instanceTree.delete();
-        transformedInstance1.delete();
+        if (transformedInstance1 != null) {
+            transformedInstance1.delete();
+        }
         transformedInstance2.delete();
     }
 
@@ -132,16 +151,22 @@ public class ArmVisual extends AbstractBlockEntityVisual<ArmEntity> implements D
             long currentTimeMillis = System.currentTimeMillis();
             // Angle in radians (2 * PI radians per cycle)
 
-            double meaningfulSin = Math.sin((currentTimeMillis + 100 * visualPos.getX() - 100 * visualPos.getZ())/ 1000.0 % 10.0 * (2 * Math.PI) / 10.0);
+//            double meaningfulSin = Math.sin((currentTimeMillis + 100 * visualPos.getX() - 100 * visualPos.getZ()) / 1000.0 % 10.0 * (2 * Math.PI) / 10.0);
+//
+//            firstArm.xRot((float) meaningfulSin / 2);
+//            secondArm.xRot((float) (meaningfulSin - Math.PI / 4) / 2);
 
-            firstArm.xRot((float) meaningfulSin /2);
-            secondArm.xRot((float) (meaningfulSin - Math.PI/4)/2);
+            firstArm.xRot((float) -Math.PI /4);
+            secondArm.xRot((float) Math.PI/2);
 
-            transformedInstance1.setIdentityTransform();
+            if (transformedInstance1 != null) {
+                transformedInstance1.setIdentityTransform();
+            }
             transformedInstance2.setIdentityTransform();
-
-            transformedInstance1.translate(visualPos.getX(), visualPos.getY(), visualPos.getZ());
-            transformedInstance1.translate(0.5, 0, 0.5f);
+            if (transformedInstance1 != null) {
+                transformedInstance1.translate(visualPos.getX(), visualPos.getY(), visualPos.getZ());
+                transformedInstance1.translate(0.5, 0, 0.5f);
+            }
 
             transformedInstance2.translate(visualPos.getX(), visualPos.getY(), visualPos.getZ());
             transformedInstance2.translate(0.5, 0, 0.5f);
@@ -152,13 +177,16 @@ public class ArmVisual extends AbstractBlockEntityVisual<ArmEntity> implements D
             secondArm.translateAndRotate(mx);
 
             //mx.scale(0.5f);
-            transformedInstance1.mul(mx);
+            if (transformedInstance1 != null) {
+                transformedInstance1.mul(mx);
+                transformedInstance1.translate(0, secondArm.initialPose().y / 16f, 0);
+                transformedInstance1.setChanged();
+            }
+
             transformedInstance2.mul(mx);
 
-            transformedInstance1.translate(0, secondArm.initialPose().y/16f, 0);
-            transformedInstance2.translate(0, secondArm.initialPose().y/16f, 0);
+            transformedInstance2.translate(0, secondArm.initialPose().y / 16f, 0);
 
-            transformedInstance1.setChanged();
             transformedInstance2.setChanged();
 
             instanceTree.updateInstancesStatic(initialPose);
