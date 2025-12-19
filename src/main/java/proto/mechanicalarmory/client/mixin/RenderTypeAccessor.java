@@ -1,10 +1,11 @@
 package proto.mechanicalarmory.client.mixin;
 
 import net.minecraft.client.renderer.RenderStateShard;
+import net.minecraft.client.renderer.RenderType;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.gen.Accessor;
 
-@Mixin(targets = "net.minecraft.client.renderer.RenderType$CompositeState")
+@Mixin(RenderType.CompositeState.class)
 public interface RenderTypeAccessor {
     @Accessor("textureState")
     RenderStateShard.EmptyTextureStateShard getTextureState();

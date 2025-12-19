@@ -28,6 +28,7 @@ import net.minecraft.core.SectionPos;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.ItemDisplayContext;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.entity.EnchantingTableBlockEntity;
 import org.jetbrains.annotations.Nullable;
@@ -76,15 +77,15 @@ public class ArmVisual extends AbstractBlockEntityVisual<ArmEntity> implements D
         bbe.setLevel(level);
 
         transformedInstance2 = instancerProvider()
-                .instancer(InstanceTypes.TRANSFORMED, Models.block(Blocks.ENCHANTING_TABLE.defaultBlockState()))
+                .instancer(InstanceTypes.TRANSFORMED, Models.block(Blocks.AIR.defaultBlockState()))
                 .createInstance();
 
         //pose.translate(pos.getX(), pos.getY(), pos.getZ());
 //        Minecraft.getInstance().getBlockRenderer().renderSingleBlock(Blocks.DIRT.defaultBlockState(), pose, br.bufferSource(), computePackedLight(), 0);
         //Minecraft.getInstance().getBlockEntityRenderDispatcher().render(bbe, partialTick, new PoseStack(), br.bufferSource());
         //Minecraft.getInstance().getBlockEntityRenderDispatcher().renderItem(bbe, new PoseStack(), br.bufferSource(), LevelRenderer.getLightColor(level, pos.above()), 0);
-
-        Minecraft.getInstance().getItemRenderer().renderStatic(new ItemStack(Blocks.BELL.asItem()), ItemDisplayContext.GROUND, LevelRenderer.getLightColor(level, pos.above()), 0, new PoseStack(), br.bufferSource(), null, 42);
+        Block below = level.getBlockState(pos.below()).getBlock();
+        Minecraft.getInstance().getItemRenderer().renderStatic(new ItemStack(below.asItem()), ItemDisplayContext.GROUND, LevelRenderer.getLightColor(level, pos.above()), 0, new PoseStack(), br.bufferSource(), null, 42);
 //        render(new ItemStack(Blocks.ENCHANTING_TABLE.asItem()), ItemDisplayContext.GROUND, false, new PoseStack(), br.bufferSource(), LevelRenderer.getLightColor(level, pos.above()), 0 );
         CapturedModel model = new CapturedModel(br);
 
