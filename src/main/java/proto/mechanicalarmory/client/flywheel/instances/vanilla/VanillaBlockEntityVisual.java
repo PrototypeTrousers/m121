@@ -21,7 +21,7 @@ import net.minecraft.client.renderer.*;
 import net.minecraft.client.renderer.texture.TextureAtlas;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.resources.ResourceLocation;
-import net.minecraft.world.level.block.entity.EnchantingTableBlockEntity;
+import net.minecraft.world.level.block.entity.BlockEntity;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Matrix4f;
 import proto.mechanicalarmory.client.mixin.*;
@@ -30,41 +30,28 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.function.Consumer;
 
-public class EnchantingTableVisual extends AbstractBlockEntityVisual<EnchantingTableBlockEntity>  implements SimpleDynamicVisual {
+public class VanillaBlockEntityVisual extends AbstractBlockEntityVisual<BlockEntity>  implements SimpleDynamicVisual {
     private final Matrix4f initialPose;
-    public static EnchantingTableVisual CURRENT_VISUAL;
     public RenderBuffers rb = new RenderBuffers(1);
     public Map<ModelPart, PoseStack.Pose> modelPartPoseMap = new HashMap<>();
     public Map<TransformedInstance, ModelPart> instanceModelPartMap = new HashMap<>();
     public Map<ModelPart, Material> flwmaterialMap = new HashMap<>();
     public Map<ModelPart, TextureAtlasSprite> atlasSpriteMap = new HashMap<>();
 
-    Material material = SimpleMaterial.builder()
-            .texture(TextureAtlas.LOCATION_BLOCKS)
-            .mipmap(false)
-            .build();
-
-    public EnchantingTableVisual(VisualizationContext ctx, EnchantingTableBlockEntity blockEntity, float partialTick) {
+    public VanillaBlockEntityVisual(VisualizationContext ctx, BlockEntity blockEntity, float partialTick) {
         super(ctx, blockEntity, partialTick);
         initialPose = new Matrix4f().translate(visualPos.getX() + 0.5f, visualPos.getY() + 1.5f, visualPos.getZ() + 0.5f);
 
         RenderSystem.recordRenderCall(() -> {
-            CURRENT_VISUAL = this;
-            Minecraft.getInstance().getBlockEntityRenderDispatcher().render(blockEntity, partialTick, new PoseStack(), rb.bufferSource());
+            Minecraft.getInstance().getBlockEntityRenderDispatcher().render(blockEntity, partialTick, new PoseStackVisual(this), rb.bufferSource());
             modelPartPoseMap.forEach((key, value) ->
                     instanceModelPartMap.put(instancerProvider().instancer(
-                                    InstanceTypes.TRANSFORMED, new VanillaModel(key, material, atlasSpriteMap.get(key)))
+                                    InstanceTypes.TRANSFORMED, VanillaModel.of(key, flwmaterialMap.get(key), atlasSpriteMap.get(key)))
                             .createInstance(), key));
-            CURRENT_VISUAL = null;
         });
-
-
-//        book = InstanceTree.create(instancerProvider(), ModelTrees.of(
-//                ModelLayers.BOOK, EnchantTableRenderer.BOOK_LOCATION, MATERIAL));
-//        book.traverse(transformedInstance ->
-//                transformedInstance.light(15, 15));
-//
-//        book.updateInstancesStatic(initialPose);
+        instanceModelPartMap.forEach((key, value) -> {
+            key.light(LevelRenderer.getLightColor(level, pos.above()));
+        });
     }
 
     @Override
@@ -75,7 +62,7 @@ public class EnchantingTableVisual extends AbstractBlockEntityVisual<EnchantingT
     @Override
     public void updateLight(float partialTick) {
         instanceModelPartMap.forEach((key, value) -> {
-            key.light(255);
+            key.light(LevelRenderer.getLightColor(level, pos.above()));
         });
     }
 
@@ -90,17 +77,16 @@ public class EnchantingTableVisual extends AbstractBlockEntityVisual<EnchantingT
     @Override
     public void beginFrame(Context ctx) {
         RenderSystem.recordRenderCall(() -> {
-            CURRENT_VISUAL = this;
-            Minecraft.getInstance().getBlockEntityRenderDispatcher().render(blockEntity, ctx.partialTick(), new CapturingPoseStack(new CapturedModelTreeBuilder(rb.bufferSource())), rb.bufferSource());
-            CURRENT_VISUAL = null;
+            Minecraft.getInstance().getBlockEntityRenderDispatcher().render(blockEntity, ctx.partialTick(), new PoseStackVisual(this), rb.bufferSource());
             rb.bufferSource().endBatch();
         });
         instanceModelPartMap.forEach((key, value) -> {
-            key.setTransform(modelPartPoseMap.get(value));
-            key.translate(pos.getX(), pos.getY(), pos.getZ());
+            Matrix4f p = modelPartPoseMap.get(value).pose();
+            p.setTranslation(p.m30() + visualPos.getX(), p.m31() + visualPos.getY(), p.m32() + visualPos.getZ());
+            key.setTransform(p);
+
             key.setChanged();
         });
-
     }
 
     public void makeMaterialForPart(ModelPart modelPart, VertexConsumer buffer) {

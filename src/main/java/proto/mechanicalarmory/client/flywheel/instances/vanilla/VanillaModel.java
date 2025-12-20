@@ -8,23 +8,41 @@ import dev.engine_room.flywheel.api.model.Model;
 import dev.engine_room.flywheel.lib.internal.FlwLibLink;
 import dev.engine_room.flywheel.lib.memory.MemoryBlock;
 import dev.engine_room.flywheel.lib.model.SimpleQuadMesh;
+import dev.engine_room.flywheel.lib.model.part.MeshTree;
+import dev.engine_room.flywheel.lib.model.part.ModelTree;
+import dev.engine_room.flywheel.lib.model.part.ModelTrees;
+import dev.engine_room.flywheel.lib.util.RendererReloadCache;
 import dev.engine_room.flywheel.lib.vertex.PosTexNormalVertexView;
 import dev.engine_room.flywheel.lib.vertex.VertexView;
+import net.minecraft.client.model.geom.ModelLayerLocation;
 import net.minecraft.client.model.geom.ModelPart;
 import net.minecraft.client.renderer.LightTexture;
 import net.minecraft.client.renderer.SpriteCoordinateExpander;
 import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
+import org.jetbrains.annotations.Nullable;
 import org.joml.Vector4f;
 import org.joml.Vector4fc;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 
 public class VanillaModel implements Model {
+
+    private static final RendererReloadCache<ModelVanillaKey, VanillaModel> CACHE = new RendererReloadCache<>(modelVanillaKey ->
+            new VanillaModel(modelVanillaKey.part, modelVanillaKey.material, modelVanillaKey.textureAtlasSprite));
+
+    private record ModelVanillaKey(ModelPart part, Material material, TextureAtlasSprite textureAtlasSprite) {
+    }
+
     private static final ThreadLocal<ThreadLocalObjects> THREAD_LOCAL_OBJECTS = ThreadLocal.withInitial(ThreadLocalObjects::new);
     private static final PoseStack.Pose IDENTITY_POSE = new PoseStack().last();
     List<ConfiguredMesh> meshes = new ArrayList<>();
+
+    public static VanillaModel of(ModelPart part, Material material, TextureAtlasSprite textureAtlasSprite) {
+        return CACHE.get(new ModelVanillaKey(part, material, textureAtlasSprite));
+    }
 
     VanillaModel(ModelPart part, Material material, TextureAtlasSprite textureAtlasSprite) {
         Mesh m = fromPart(part, textureAtlasSprite);
@@ -32,7 +50,7 @@ public class VanillaModel implements Model {
             meshes.add(new ConfiguredMesh(material, m));
         }
     }
-//, net.minecraft.client.resources.model.Material material
+
     SimpleQuadMesh fromPart(ModelPart part, TextureAtlasSprite textureAtlasSprite) {
         if (part.isEmpty()) {
             return null;
