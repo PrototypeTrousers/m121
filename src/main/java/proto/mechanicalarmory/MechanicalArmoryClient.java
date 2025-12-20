@@ -9,6 +9,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.resources.model.ModelResourceLocation;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.packs.resources.Resource;
+import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.ModContainer;
@@ -18,8 +19,9 @@ import net.neoforged.fml.event.lifecycle.FMLClientSetupEvent;
 import net.neoforged.neoforge.client.event.ModelEvent;
 import net.neoforged.neoforge.client.gui.ConfigurationScreen;
 import net.neoforged.neoforge.client.gui.IConfigScreenFactory;
-import proto.mechanicalarmory.client.gltf.GltfFlywheelModelTree;
-import proto.mechanicalarmory.client.instances.ArmVisualiser;
+import proto.mechanicalarmory.client.flywheel.gltf.GltfFlywheelModelTree;
+import proto.mechanicalarmory.client.flywheel.instances.arm.ArmVisualiser;
+import proto.mechanicalarmory.client.flywheel.instances.vanilla.EnchantingTableVisualiser;
 import proto.mechanicalarmory.common.entities.MAEntities;
 
 import java.io.BufferedInputStream;
@@ -45,6 +47,7 @@ public class MechanicalArmoryClient {
     @SubscribeEvent
     static void onClientSetup(FMLClientSetupEvent event) {
         VisualizerRegistry.setVisualizer(MAEntities.ARM_ENTITY.get(), ArmVisualiser.ARM_VISUAL);
+        VisualizerRegistry.setVisualizer(BlockEntityType.ENCHANTING_TABLE, EnchantingTableVisualiser.ENCHANTING_TABLE_VISUAL);
         // Some client setup code
         MechanicalArmory.LOGGER.info("HELLO FROM CLIENT SETUP");
         MechanicalArmory.LOGGER.info("MINECRAFT NAME >> {}", Minecraft.getInstance().getUser().getName());

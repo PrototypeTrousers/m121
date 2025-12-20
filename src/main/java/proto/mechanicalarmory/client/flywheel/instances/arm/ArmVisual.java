@@ -1,9 +1,6 @@
-package proto.mechanicalarmory.client.instances;
+package proto.mechanicalarmory.client.flywheel.instances.arm;
 
-import com.fasterxml.jackson.databind.util.ByteBufferBackedInputStream;
-import com.mojang.blaze3d.platform.NativeImage;
 import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.blaze3d.vertex.BufferBuilder;
 import com.mojang.blaze3d.vertex.PoseStack;
 import dev.engine_room.flywheel.api.instance.Instance;
 import dev.engine_room.flywheel.api.material.Material;
@@ -24,12 +21,8 @@ import dev.engine_room.flywheel.lib.visual.AbstractBlockEntityVisual;
 import it.unimi.dsi.fastutil.longs.LongSet;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.LevelRenderer;
-import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.RenderBuffers;
-import net.minecraft.client.renderer.RenderType;
-import net.minecraft.client.renderer.texture.DynamicTexture;
 import net.minecraft.core.SectionPos;
-import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.ItemDisplayContext;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.Block;
@@ -39,12 +32,9 @@ import org.jetbrains.annotations.Nullable;
 import org.joml.Matrix4f;
 import org.joml.Matrix4fc;
 import proto.mechanicalarmory.MechanicalArmoryClient;
-import proto.mechanicalarmory.client.CapturedModel;
-import proto.mechanicalarmory.client.mixin.BufferSourceAccessor;
+import proto.mechanicalarmory.client.flywheel.CapturedModel;
 import proto.mechanicalarmory.common.entities.block.ArmEntity;
 
-import java.io.IOException;
-import java.util.Map;
 import java.util.function.Consumer;
 
 public class ArmVisual extends AbstractBlockEntityVisual<ArmEntity> implements DynamicVisual, LightUpdatedVisual {
@@ -90,7 +80,6 @@ public class ArmVisual extends AbstractBlockEntityVisual<ArmEntity> implements D
                 Block below = level.getBlockState(pos.below()).getBlock();
                 int packedLight = LevelRenderer.getLightColor(level, pos.above());
                 Minecraft.getInstance().getItemRenderer().renderStatic(new ItemStack(below.asItem()), ItemDisplayContext.GROUND, packedLight, 0, new PoseStack(), br.bufferSource(), null, 42);
-//        render(new ItemStack(Blocks.ENCHANTING_TABLE.asItem()), ItemDisplayContext.GROUND, false, new PoseStack(), br.bufferSource(), LevelRenderer.getLightColor(level, pos.above()), 0 );
                 CapturedModel model = new CapturedModel(br);
 
                 transformedInstance1 = instancerProvider()
@@ -102,7 +91,7 @@ public class ArmVisual extends AbstractBlockEntityVisual<ArmEntity> implements D
 
         //pose.translate(pos.getX(), pos.getY(), pos.getZ());
 //        Minecraft.getInstance().getBlockRenderer().renderSingleBlock(Blocks.DIRT.defaultBlockState(), pose, br.bufferSource(), computePackedLight(), 0);
-        //Minecraft.getInstance().getBlockEntityRenderDispatcher().render(bbe, partialTick, new PoseStack(), br.bufferSource());
+        Minecraft.getInstance().getBlockEntityRenderDispatcher().render(bbe, partialTick, new PoseStack(), br.bufferSource());
         //Minecraft.getInstance().getBlockEntityRenderDispatcher().renderItem(bbe, new PoseStack(), br.bufferSource(), LevelRenderer.getLightColor(level, pos.above()), 0);
 
     }

@@ -1,4 +1,4 @@
-package proto.mechanicalarmory.client.gltf;
+package proto.mechanicalarmory.client.flywheel.gltf;
 
 import com.fasterxml.jackson.databind.util.ByteBufferBackedInputStream;
 import com.mojang.blaze3d.platform.NativeImage;

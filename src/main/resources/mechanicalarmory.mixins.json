@@ -5,9 +5,12 @@
   "compatibilityLevel": "JAVA_17",
   "refmap": "mechanicalarmory.refmap.json",
   "client": [
+    "BufferBuilderAccessor",
     "BufferSourceAccessor",
     "CompositeRenderTypeAccessor",
+    "ModelPartMixin",
     "RenderTypeAccessor",
+    "SpriteCoordinateExpanderAccessor",
     "TextureStateShardAccessor"
   ],
   "injectors": {

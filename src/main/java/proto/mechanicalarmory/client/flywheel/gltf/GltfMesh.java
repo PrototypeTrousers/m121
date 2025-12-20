@@ -1,4 +1,4 @@
-package proto.mechanicalarmory.client.gltf;
+package proto.mechanicalarmory.client.flywheel.gltf;
 
 import de.javagl.jgltf.model.AccessorModel;
 import de.javagl.jgltf.model.MeshPrimitiveModel;

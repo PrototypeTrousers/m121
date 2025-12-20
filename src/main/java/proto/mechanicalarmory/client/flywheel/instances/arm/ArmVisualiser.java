@@ -1,4 +1,4 @@
-package proto.mechanicalarmory.client.instances;
+package proto.mechanicalarmory.client.flywheel.instances.arm;
 
 import dev.engine_room.flywheel.api.visual.BlockEntityVisual;
 import dev.engine_room.flywheel.api.visualization.BlockEntityVisualizer;

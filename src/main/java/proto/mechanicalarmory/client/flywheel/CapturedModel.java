@@ -1,4 +1,4 @@
-package proto.mechanicalarmory.client;
+package proto.mechanicalarmory.client.flywheel;
 
 import com.mojang.blaze3d.vertex.BufferBuilder;
 import com.mojang.blaze3d.vertex.MeshData;

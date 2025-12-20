@@ -1,11 +1,9 @@
-package proto.mechanicalarmory.client.gltf;
+package proto.mechanicalarmory.client.flywheel.gltf;
 
 import dev.engine_room.flywheel.api.model.IndexSequence;
 import org.lwjgl.system.MemoryUtil;
 
 import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
-import java.nio.IntBuffer;
 import java.nio.ShortBuffer;
 
 public final class TriIndexSequence implements IndexSequence {

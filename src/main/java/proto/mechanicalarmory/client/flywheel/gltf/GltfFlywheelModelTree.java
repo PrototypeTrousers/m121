@@ -1,7 +1,6 @@
-package proto.mechanicalarmory.client.gltf;
+package proto.mechanicalarmory.client.flywheel.gltf;
 
 import de.javagl.jgltf.model.*;
-import dev.engine_room.flywheel.lib.model.EmptyModel;
 import dev.engine_room.flywheel.lib.model.part.ModelTree;
 import it.unimi.dsi.fastutil.objects.Object2ObjectArrayMap;
 import net.minecraft.client.model.geom.PartPose;
