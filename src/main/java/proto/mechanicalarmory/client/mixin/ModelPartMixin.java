@@ -1,10 +1,10 @@
 package proto.mechanicalarmory.client.mixin;
 
-import com.mojang.blaze3d.vertex.BufferBuilder;
+import com.llamalad7.mixinextras.injector.v2.WrapWithCondition;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import net.minecraft.client.model.geom.ModelPart;
-import net.minecraft.client.renderer.RenderType;
+import net.minecraft.client.resources.model.Material;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -13,31 +13,35 @@ import proto.mechanicalarmory.client.flywheel.instances.vanilla.PoseStackVisual;
 import proto.mechanicalarmory.client.flywheel.instances.vanilla.VanillaBlockEntityVisual;
 
 import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
 
 
 @Mixin(targets = "net.minecraft.client.model.geom.ModelPart")
 public abstract class ModelPartMixin {
 
-    @Inject(method = "render(Lcom/mojang/blaze3d/vertex/PoseStack;Lcom/mojang/blaze3d/vertex/VertexConsumer;III)V", at = @At("TAIL"))
-    public void b(PoseStack poseStack, VertexConsumer buffer, int packedLight, int packedOverlay, int color, CallbackInfo ci) {
-        if (poseStack instanceof PoseStackVisual pv) {
-            VanillaBlockEntityVisual v = pv.getVisual();
-            Map<RenderType, BufferBuilder> sb = ((BufferSourceAccessor) v.rb.bufferSource()).getStartedBuilders();
-            List<RenderType> toRemove = new ArrayList<>(sb.keySet());
-            for (RenderType k : toRemove) {
-                //sb.remove(k);
-            }
-        }
-    }
-
-    @Inject(method = "render(Lcom/mojang/blaze3d/vertex/PoseStack;Lcom/mojang/blaze3d/vertex/VertexConsumer;III)V", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/model/geom/ModelPart;translateAndRotate(Lcom/mojang/blaze3d/vertex/PoseStack;)V"))
+    @Inject(method = "render(Lcom/mojang/blaze3d/vertex/PoseStack;Lcom/mojang/blaze3d/vertex/VertexConsumer;III)V", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/model/geom/ModelPart;translateAndRotate(Lcom/mojang/blaze3d/vertex/PoseStack;)V", shift = At.Shift.AFTER), cancellable = true)
     private void injected(PoseStack poseStack, VertexConsumer buffer, int packedLight, int packedOverlay, int color, CallbackInfo ci) {
         if (poseStack instanceof PoseStackVisual pv) {
             VanillaBlockEntityVisual v = pv.getVisual();
-            v.modelPartPoseMap.put((ModelPart) (Object) this, poseStack.last());
-            v.makeMaterialForPart((ModelPart) (Object) this, buffer);
+            v.posedParts.compute(pv.getDepth(), (integer, value) -> {
+                if (value == null) {
+                    value = new ArrayList<>();
+                }
+                Material mat = pv.getVisual().getBufferSource().getMaterialMap().get(buffer);
+                value.add(new VanillaBlockEntityVisual.M(pv.getDepth(), (ModelPart) (Object) this, mat));
+                return value;
+            });
         }
+    }
+
+    @WrapWithCondition(
+            method = "render(Lcom/mojang/blaze3d/vertex/PoseStack;Lcom/mojang/blaze3d/vertex/VertexConsumer;III)V",
+            at = @At(value = "INVOKE", target = "Lnet/minecraft/client/model/geom/ModelPart;compile(Lcom/mojang/blaze3d/vertex/PoseStack$Pose;Lcom/mojang/blaze3d/vertex/VertexConsumer;III)V")
+    )
+    private boolean onlyRenderIfAllowed(ModelPart instance, PoseStack.Pose pose, VertexConsumer vertexConsumer, int buffer, int packedLight, int packedOverlay, PoseStack poseStack) {
+        if (poseStack instanceof PoseStackVisual pv) {
+            VanillaBlockEntityVisual v = pv.getVisual();
+            return !v.modelPartPoseMap.containsKey((ModelPart) (Object) this);
+        }
+        return true;
     }
 }

@@ -8,6 +8,8 @@
     "BufferBuilderAccessor",
     "BufferSourceAccessor",
     "CompositeRenderTypeAccessor",
+    "MaterialAccessor",
+    "MaterialMixin",
     "ModelPartMixin",
     "RenderTypeAccessor",
     "SpriteCoordinateExpanderAccessor",
