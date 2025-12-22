@@ -21,6 +21,7 @@ repositories {
         name "createmod maven"
         url "https://maven.createmod.net/"
     }
+    maven { url 'https://jitpack.io' }
     // Add here additional repositories if required by some of the dependencies below.
 }
 
@@ -122,6 +123,7 @@ dependencies {
     // implementation files("libs/coolmod-${mc_version}-${coolmod_version}.jar")
 
     jarJar(implementation("de.javagl:jgltf-model:2.0.4"))
+    jarJar(implementation 'com.github.coralblocks:CoralPool:1.4.1')
 
     compileOnly "dev.engine-room.flywheel:flywheel-neoforge-api-${minecraft_version}:${flywheel_version}"
     jarJar(implementation "dev.engine-room.flywheel:flywheel-neoforge-${minecraft_version}:${flywheel_version}")
@@ -144,6 +146,7 @@ runs {
     configureEach {
         dependencies {
             runtime "de.javagl:jgltf-model:2.0.4"
+            runtime 'com.github.coralblocks:CoralPool:1.4.1'
         }
     }
 }

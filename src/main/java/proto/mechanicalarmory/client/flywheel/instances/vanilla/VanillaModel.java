@@ -83,7 +83,7 @@ public class VanillaModel implements Model {
         RenderType rt = ((MaterialAccessor) material).getRenderType();
 
         return SimpleMaterial.builder()
-                .texture(material.texture())
+                .texture(material.atlasLocation())
                 .cutout(CutoutShaders.EPSILON)
                 .light(LightShaders.SMOOTH_WHEN_EMBEDDED)
                 .cardinalLightingMode(CardinalLightingMode.OFF)

@@ -19,7 +19,9 @@ public abstract class MaterialMixin {
     @Inject(method = "buffer(Lnet/minecraft/client/renderer/MultiBufferSource;Ljava/util/function/Function;)Lcom/mojang/blaze3d/vertex/VertexConsumer;", at = @At("RETURN"))
     void a(MultiBufferSource buffer, Function<ResourceLocation, RenderType> renderTypeGetter, CallbackInfoReturnable<VertexConsumer> cir){
         if (buffer instanceof VisualBufferSource vbs) {
-            vbs.getMaterialMap().put(cir.getReturnValue(), (Material) (Object) this);
+            if (!vbs.isRendered()) {
+                vbs.getMaterialMap().put(cir.getReturnValue(), (Material) (Object) this);
+            }
         }
     }
 

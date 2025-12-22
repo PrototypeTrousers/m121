@@ -1,11 +1,12 @@
 package proto.mechanicalarmory.client.flywheel.instances.vanilla;
 
-import dev.engine_room.flywheel.lib.util.RecyclingPoseStack;
+import com.mojang.blaze3d.vertex.PoseStack;
 
-public class PoseStackVisual extends RecyclingPoseStack {
+public class PoseStackVisual extends PoseStack {
 
     private final VanillaBlockEntityVisual visual;
     private int depth;
+    private boolean rendered;
 
     public PoseStackVisual(VanillaBlockEntityVisual visual) {
         super();
@@ -21,7 +22,14 @@ public class PoseStackVisual extends RecyclingPoseStack {
     @Override
     public void popPose() {
         super.popPose();
-        depth++;
+    }
+
+    public boolean isRendered() {
+        return rendered;
+    }
+
+    public void setRendered() {
+        this.rendered = true;
     }
 
     public VanillaBlockEntityVisual getVisual() {
@@ -30,5 +38,9 @@ public class PoseStackVisual extends RecyclingPoseStack {
 
     public int getDepth() {
         return depth;
+    }
+
+    public void setDepth(int depth) {
+        this.depth = depth;
     }
 }

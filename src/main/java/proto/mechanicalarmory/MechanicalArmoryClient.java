@@ -52,6 +52,7 @@ public class MechanicalArmoryClient {
         VisualizerRegistry.setVisualizer(BlockEntityType.BED, VanillaBlockVisualiser.VANILLA_BLOCK_VISUALISER);
         VisualizerRegistry.setVisualizer(BlockEntityType.CHEST, VanillaBlockVisualiser.VANILLA_BLOCK_VISUALISER);
         VisualizerRegistry.setVisualizer(BlockEntityType.CAMPFIRE, VanillaBlockVisualiser.VANILLA_BLOCK_VISUALISER);
+        VisualizerRegistry.setVisualizer(BlockEntityType.SIGN, VanillaBlockVisualiser.VANILLA_BLOCK_VISUALISER);
         // Some client setup code
         MechanicalArmory.LOGGER.info("HELLO FROM CLIENT SETUP");
         MechanicalArmory.LOGGER.info("MINECRAFT NAME >> {}", Minecraft.getInstance().getUser().getName());
