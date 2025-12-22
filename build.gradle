@@ -1,3 +1,7 @@
+import org.apache.tools.ant.taskdefs.condition.Os
+import java.nio.charset.StandardCharsets
+import com.google.common.hash.Hashing
+
 plugins {
     id 'java-library'
     id 'maven-publish'
@@ -150,6 +154,87 @@ runs {
         }
     }
 }
+
+def patchRenderDoc(JavaLauncher javaLauncher) {
+    def wrappedJavaExecutable = javaLauncher.executablePath.asFile.absolutePath
+    assert !wrappedJavaExecutable.contains('"') : "Executable path cannot contain quotes"
+
+    // Generate a unique hash for the path to create a stable directory
+    def hashBytes = Hashing.sha256().hashString(wrappedJavaExecutable, StandardCharsets.UTF_8)
+    def hash = Base64.urlEncoder.encodeToString(hashBytes.asBytes())
+            .replace("=", "")
+
+    def wrapperJavaRoot = rootProject.layout.buildDirectory
+            .dir("binaries/renderdoc-wrapped-java/$hash")
+            .get()
+
+    def isWindows = Os.isFamily(Os.FAMILY_WINDOWS)
+    def wrapperJavaExe = isWindows ? wrapperJavaRoot.file("java.cmd") : wrapperJavaRoot.file("java")
+
+    // Create a proxy object for JavaLauncher
+    return new JavaLauncher() {
+        @Override
+        JavaInstallationMetadata getMetadata() {
+            def originalMetadata = javaLauncher.metadata
+            return new JavaInstallationMetadata() {
+                @Override
+                JavaLanguageVersion getLanguageVersion() { originalMetadata.languageVersion }
+                @Override
+                String getJavaRuntimeVersion() { originalMetadata.javaRuntimeVersion }
+                @Override
+                String getJvmVersion() { originalMetadata.jvmVersion }
+                @Override
+                String getVendor() { originalMetadata.vendor }
+                @Override
+                Directory getInstallationPath() { originalMetadata.installationPath }
+                @Override
+                boolean isCurrentJvm() { false }
+            }
+        }
+
+        @Override
+        RegularFile getExecutablePath() {
+            def fileF = wrapperJavaExe.asFile
+            if (!fileF.exists()) {
+                fileF.parentFile.mkdirs()
+                if (isWindows) {
+                    fileF.text = """@echo off
+setlocal enableextensions
+start "" renderdoccmd.exe capture --opt-hook-children --wait-for-exit --working-dir . "$wrappedJavaExecutable" %*
+endlocal
+"""
+                } else {
+                    fileF.text = """#!/usr/bin/env bash
+exec renderdoccmd capture --opt-hook-children --wait-for-exit --working-dir . "$wrappedJavaExecutable" "\$@"
+"""
+                    fileF.setExecutable(true)
+                }
+            }
+            return wrapperJavaExe
+        }
+    }
+}
+
+afterEvaluate {
+    tasks.named("runClient").configure {
+        javaLauncher.set(javaToolchains.launcherFor(java.toolchain).map { patchRenderDoc(it) })
+//            println "Wrapping ${runTask.name} with RenderDoc..."
+    }
+
+//
+//    def runTask = tasks.findByName('runClient')
+//    if (runTask) {
+//        runTask.doFirst {
+//            java
+
+//        }
+//    } else {
+//        println "Warning: runClient task still not found. Check your plugin configuration."
+//    }
+}
+
+
+
 
 // This block of code expands all declared replace properties in the specified resource targets.
 // A missing property will result in an error. Properties are expanded using ${} Groovy notation.
