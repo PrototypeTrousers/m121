@@ -18,7 +18,6 @@ import proto.mechanicalarmory.client.flywheel.instances.vanilla.VanillaBlockEnti
 import proto.mechanicalarmory.client.flywheel.instances.vanilla.VisualBufferSource;
 
 import java.util.ArrayList;
-import java.util.LinkedList;
 
 
 @Mixin(targets = "net.minecraft.client.model.geom.ModelPart")
@@ -53,10 +52,7 @@ public abstract class ModelPartMixin {
                 });
             }
             v.depthPoseMap.compute(pv.getDepth(), (integer, value) -> {
-                if (value == null) {
-                    value = new LinkedList<>();
-                }
-                value.add(poseStack.last());
+                value = poseStack.last();
                 return value;
             });
         }

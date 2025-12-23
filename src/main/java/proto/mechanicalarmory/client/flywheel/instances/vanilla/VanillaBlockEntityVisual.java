@@ -42,7 +42,7 @@ public class VanillaBlockEntityVisual extends AbstractBlockEntityVisual<BlockEnt
         rendererPool.release(berenderer);
 
         transformedInstances.forEach((i, value) -> {
-            Matrix4f p = depthPoseMap.get(i).pollFirst().pose();
+            Matrix4f p = depthPoseMap.get(i).pose();
             p.setTranslation(p.m30() + visualPos.getX(), p.m31() + visualPos.getY(), p.m32() + visualPos.getZ());
             value.forEach(ti -> {
                 Matrix4f last =lastTransform.computeIfAbsent(ti, k -> new Matrix4f());
@@ -61,7 +61,7 @@ public class VanillaBlockEntityVisual extends AbstractBlockEntityVisual<BlockEnt
     final public Int2ObjectLinkedOpenHashMap<List<M>> posedParts = new Int2ObjectLinkedOpenHashMap<>();
     final public Int2ObjectLinkedOpenHashMap<List<TransformedInstance>> transformedInstances = new Int2ObjectLinkedOpenHashMap<>();
     final private Object2ObjectArrayMap<TransformedInstance, Matrix4f> lastTransform= new Object2ObjectArrayMap<>();
-    final public Int2ObjectLinkedOpenHashMap<LinkedList<PoseStack.Pose>> depthPoseMap = new Int2ObjectLinkedOpenHashMap<>();
+    final public Int2ObjectLinkedOpenHashMap<PoseStack.Pose> depthPoseMap = new Int2ObjectLinkedOpenHashMap<>();
     private final PoseStackVisual poseStackVisual = new PoseStackVisual(this);
 
     public VanillaBlockEntityVisual(VisualizationContext ctx, BlockEntity blockEntity, float partialTick) {
