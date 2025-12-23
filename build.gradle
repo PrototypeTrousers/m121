@@ -217,7 +217,7 @@ exec renderdoccmd capture --opt-hook-children --wait-for-exit --working-dir . "$
 
 afterEvaluate {
     tasks.named("runClient").configure {
-        javaLauncher.set(javaToolchains.launcherFor(java.toolchain).map { patchRenderDoc(it) })
+//        javaLauncher.set(javaToolchains.launcherFor(java.toolchain).map { patchRenderDoc(it) })
 //            println "Wrapping ${runTask.name} with RenderDoc..."
     }
 

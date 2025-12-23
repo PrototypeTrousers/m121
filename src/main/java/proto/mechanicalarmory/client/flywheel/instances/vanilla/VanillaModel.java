@@ -14,36 +14,44 @@ import dev.engine_room.flywheel.lib.model.SimpleQuadMesh;
 import dev.engine_room.flywheel.lib.util.RendererReloadCache;
 import dev.engine_room.flywheel.lib.vertex.PosTexNormalVertexView;
 import dev.engine_room.flywheel.lib.vertex.VertexView;
+import it.unimi.dsi.fastutil.objects.Object2ObjectArrayMap;
 import net.minecraft.client.model.geom.ModelPart;
 import net.minecraft.client.renderer.LightTexture;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.SpriteCoordinateExpander;
 import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.minecraft.client.resources.model.Material;
+import net.minecraft.world.level.block.entity.BlockEntityType;
 import org.joml.Vector4f;
 import org.joml.Vector4fc;
 import proto.mechanicalarmory.client.mixin.MaterialAccessor;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
 public class VanillaModel implements Model {
 
-    private static final RendererReloadCache<ModelVanillaKey, VanillaModel> CACHE = new RendererReloadCache<>(modelVanillaKey ->
-            new VanillaModel(modelVanillaKey.part, modelVanillaKey.material));
+    private static final Object2ObjectArrayMap<VanillaKey, VanillaModel> CACHE = new Object2ObjectArrayMap<>();
 
-    private record ModelVanillaKey(ModelPart part, net.minecraft.client.resources.model.Material material) {
+    private record VanillaKey(BlockEntityType<?> type, int poseDepth, int poseIdx) {
     }
+
 
     private static final ThreadLocal<ThreadLocalObjects> THREAD_LOCAL_OBJECTS = ThreadLocal.withInitial(ThreadLocalObjects::new);
     private static final PoseStack.Pose IDENTITY_POSE = new PoseStack().last();
-    List<ConfiguredMesh> meshes = new ArrayList<>();
 
-    public static VanillaModel of(ModelPart part, net.minecraft.client.resources.model.Material material) {
-        return CACHE.get(new ModelVanillaKey(part, material));
+    List<ConfiguredMesh> meshes = new ArrayList<>();
+    ModelPart modelPart;
+    Material material;
+
+    public static VanillaModel cachedOf(BlockEntityType<?> type, int poseDepth, int poseIdx, VanillaModel vanillaModel) {
+        return CACHE.computeIfAbsent(new VanillaKey(type, poseDepth, poseIdx), k -> vanillaModel);
     }
 
-    VanillaModel(ModelPart part, net.minecraft.client.resources.model.Material material) {
+    public VanillaModel(ModelPart part, net.minecraft.client.resources.model.Material material) {
+        this.modelPart = part;
+        this.material = material;
         Mesh m = fromPart(part, material);
         if (m != null) {
             meshes.add(new ConfiguredMesh(makeFlywheelMaterial(material), m));
@@ -94,5 +102,18 @@ public class VanillaModel implements Model {
                 .cardinalLightingMode(CardinalLightingMode.OFF)
                 .ambientOcclusion(false)
                 .build();
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (o == null || getClass() != o.getClass()) return false;
+        VanillaModel that = (VanillaModel) o;
+        if (this.modelPart != that.modelPart) return false;
+        return material.equals(that.material);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(material);
     }
 }

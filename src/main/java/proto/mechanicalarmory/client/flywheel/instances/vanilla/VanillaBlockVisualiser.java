@@ -3,6 +3,7 @@ package proto.mechanicalarmory.client.flywheel.instances.vanilla;
 import dev.engine_room.flywheel.api.visual.BlockEntityVisual;
 import dev.engine_room.flywheel.api.visualization.BlockEntityVisualizer;
 import dev.engine_room.flywheel.api.visualization.VisualizationContext;
+import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.entity.EnchantingTableBlockEntity;
 
@@ -11,11 +12,17 @@ public class VanillaBlockVisualiser implements BlockEntityVisualizer<BlockEntity
 
     @Override
     public BlockEntityVisual<? super BlockEntity> createVisual(VisualizationContext ctx, BlockEntity blockEntity, float partialTick) {
+        if (blockEntity.getLevel().getBlockState(blockEntity.getBlockPos().below()).is(Blocks.OBSIDIAN)) {
+            return null;
+        }
         return new VanillaBlockEntityVisual(ctx, blockEntity, partialTick);
     }
 
     @Override
     public boolean skipVanillaRender(BlockEntity blockEntity) {
+        if (blockEntity.getLevel().getBlockState(blockEntity.getBlockPos().below()).is(Blocks.OBSIDIAN)) {
+            return false;
+        }
         return true;
     }
 }
