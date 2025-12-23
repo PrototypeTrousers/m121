@@ -4,13 +4,18 @@ import com.llamalad7.mixinextras.injector.v2.WrapWithCondition;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import net.minecraft.client.model.geom.ModelPart;
+import net.minecraft.client.renderer.RenderStateShard;
+import net.minecraft.client.renderer.SpriteCoordinateExpander;
+import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.client.resources.model.Material;
+import net.minecraft.resources.ResourceLocation;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import proto.mechanicalarmory.client.flywheel.instances.vanilla.PoseStackVisual;
 import proto.mechanicalarmory.client.flywheel.instances.vanilla.VanillaBlockEntityVisual;
+import proto.mechanicalarmory.client.flywheel.instances.vanilla.VisualBufferSource;
 
 import java.util.ArrayList;
 import java.util.LinkedList;
@@ -28,7 +33,21 @@ public abstract class ModelPartMixin {
                     if (value == null) {
                         value = new ArrayList<>();
                     }
-                    Material mat = pv.getVisual().getBufferSource().getMaterialMap().get(buffer);
+                    Material mat;
+                    if (buffer instanceof SpriteCoordinateExpander sceb) {
+                        TextureAtlasSprite tas = ((SpriteCoordinateExpanderAccessor) sceb).getSprite();
+                        mat = new Material(tas.atlasLocation(), tas.contents().name());
+                    } else {
+                        mat = pv.getVisual().getBufferSource().getMaterialMap().get(buffer);
+                    }
+
+
+                    if (mat == null) {
+                        CompositeRenderTypeAccessor c = ((CompositeRenderTypeAccessor) ((VisualBufferSource.DummyBuffer) buffer).getRenderType());
+                        RenderStateShard.EmptyTextureStateShard r = ((RenderTypeAccessor) (Object) c.getState()).getTextureState();
+                        ResourceLocation atlas = ((TextureStateShardAccessor) r).getTexture().get();
+                        mat = new Material(atlas, null);
+                    }
                     value.add(new VanillaBlockEntityVisual.M(pv.getDepth(), (ModelPart) (Object) this, mat));
                     return value;
                 });

@@ -13,7 +13,7 @@ import proto.mechanicalarmory.client.mixin.BufferSourceAccessor;
 public class VisualBufferSource extends MultiBufferSource.BufferSource {
     VanillaBlockEntityVisual visual;
     Object2ObjectArrayMap<VertexConsumer, Material> bufferMaterialMap = new Object2ObjectArrayMap<>();
-    private static final VertexConsumer DUMMY_BUFFER = new DummyBuffer();
+    Object2ObjectArrayMap<RenderType,VertexConsumer> DUMMY_BUFFER_MAP = new Object2ObjectArrayMap<>();
     boolean rendered;
 
     public VisualBufferSource(VanillaBlockEntityVisual visual) {
@@ -23,10 +23,19 @@ public class VisualBufferSource extends MultiBufferSource.BufferSource {
 
     @Override
     public VertexConsumer getBuffer(RenderType renderType) {
-        return DUMMY_BUFFER;
+        return DUMMY_BUFFER_MAP.computeIfAbsent(renderType, buffer -> new DummyBuffer(renderType));
     }
 
-    static class DummyBuffer implements VertexConsumer {
+    public static class DummyBuffer implements VertexConsumer {
+        RenderType renderType;
+        DummyBuffer(RenderType renderType) {
+            this.renderType = renderType;
+        }
+
+        public RenderType getRenderType() {
+            return renderType;
+        }
+
         @Override
         public VertexConsumer addVertex(float x, float y, float z) {
             return this;

@@ -56,7 +56,12 @@ public class VanillaModel implements Model {
         }
 
         VanillaVertexWriter vertexWriter = THREAD_LOCAL_OBJECTS.get().vertexWriter;
-        VertexConsumer v = new SpriteCoordinateExpander(vertexWriter, material.sprite());
+        VertexConsumer v;
+        if (material.texture() != null) {
+            v = new SpriteCoordinateExpander(vertexWriter, material.sprite());
+        } else {
+            v = vertexWriter;
+        }
         FlwLibLink.INSTANCE.compileModelPart(part, IDENTITY_POSE, v, LightTexture.FULL_BRIGHT, OverlayTexture.NO_OVERLAY, 0xFFFFFFFF);
         MemoryBlock data = vertexWriter.copyDataAndReset();
 

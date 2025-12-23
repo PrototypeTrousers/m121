@@ -47,12 +47,31 @@ public class MechanicalArmoryClient {
     @SubscribeEvent
     static void onClientSetup(FMLClientSetupEvent event) {
         VisualizerRegistry.setVisualizer(MAEntities.ARM_ENTITY.get(), ArmVisualiser.ARM_VISUAL);
-        VisualizerRegistry.setVisualizer(BlockEntityType.ENCHANTING_TABLE, VanillaBlockVisualiser.VANILLA_BLOCK_VISUALISER);
-        VisualizerRegistry.setVisualizer(BlockEntityType.BEACON, VanillaBlockVisualiser.VANILLA_BLOCK_VISUALISER);
-        VisualizerRegistry.setVisualizer(BlockEntityType.BED, VanillaBlockVisualiser.VANILLA_BLOCK_VISUALISER);
-        VisualizerRegistry.setVisualizer(BlockEntityType.CHEST, VanillaBlockVisualiser.VANILLA_BLOCK_VISUALISER);
-        VisualizerRegistry.setVisualizer(BlockEntityType.CAMPFIRE, VanillaBlockVisualiser.VANILLA_BLOCK_VISUALISER);
         VisualizerRegistry.setVisualizer(BlockEntityType.SIGN, VanillaBlockVisualiser.VANILLA_BLOCK_VISUALISER);
+        VisualizerRegistry.setVisualizer(BlockEntityType.HANGING_SIGN, VanillaBlockVisualiser.VANILLA_BLOCK_VISUALISER);
+        VisualizerRegistry.setVisualizer(BlockEntityType.MOB_SPAWNER, VanillaBlockVisualiser.VANILLA_BLOCK_VISUALISER);
+        VisualizerRegistry.setVisualizer(BlockEntityType.PISTON, VanillaBlockVisualiser.VANILLA_BLOCK_VISUALISER);
+        VisualizerRegistry.setVisualizer(BlockEntityType.CHEST, VanillaBlockVisualiser.VANILLA_BLOCK_VISUALISER);
+        VisualizerRegistry.setVisualizer(BlockEntityType.ENDER_CHEST, VanillaBlockVisualiser.VANILLA_BLOCK_VISUALISER);
+        VisualizerRegistry.setVisualizer(BlockEntityType.TRAPPED_CHEST, VanillaBlockVisualiser.VANILLA_BLOCK_VISUALISER);
+        VisualizerRegistry.setVisualizer(BlockEntityType.ENCHANTING_TABLE, VanillaBlockVisualiser.VANILLA_BLOCK_VISUALISER);
+        VisualizerRegistry.setVisualizer(BlockEntityType.LECTERN, VanillaBlockVisualiser.VANILLA_BLOCK_VISUALISER);
+        VisualizerRegistry.setVisualizer(BlockEntityType.END_PORTAL, VanillaBlockVisualiser.VANILLA_BLOCK_VISUALISER);
+        VisualizerRegistry.setVisualizer(BlockEntityType.END_GATEWAY, VanillaBlockVisualiser.VANILLA_BLOCK_VISUALISER);
+        VisualizerRegistry.setVisualizer(BlockEntityType.BEACON, VanillaBlockVisualiser.VANILLA_BLOCK_VISUALISER);
+        VisualizerRegistry.setVisualizer(BlockEntityType.SKULL, VanillaBlockVisualiser.VANILLA_BLOCK_VISUALISER);
+        VisualizerRegistry.setVisualizer(BlockEntityType.BANNER, VanillaBlockVisualiser.VANILLA_BLOCK_VISUALISER);
+        VisualizerRegistry.setVisualizer(BlockEntityType.STRUCTURE_BLOCK, VanillaBlockVisualiser.VANILLA_BLOCK_VISUALISER);
+        VisualizerRegistry.setVisualizer(BlockEntityType.SHULKER_BOX, VanillaBlockVisualiser.VANILLA_BLOCK_VISUALISER);
+        VisualizerRegistry.setVisualizer(BlockEntityType.BED, VanillaBlockVisualiser.VANILLA_BLOCK_VISUALISER);
+        VisualizerRegistry.setVisualizer(BlockEntityType.CONDUIT, VanillaBlockVisualiser.VANILLA_BLOCK_VISUALISER);
+        VisualizerRegistry.setVisualizer(BlockEntityType.BELL, VanillaBlockVisualiser.VANILLA_BLOCK_VISUALISER);
+        VisualizerRegistry.setVisualizer(BlockEntityType.CAMPFIRE, VanillaBlockVisualiser.VANILLA_BLOCK_VISUALISER);
+        VisualizerRegistry.setVisualizer(BlockEntityType.BRUSHABLE_BLOCK, VanillaBlockVisualiser.VANILLA_BLOCK_VISUALISER);
+        VisualizerRegistry.setVisualizer(BlockEntityType.DECORATED_POT, VanillaBlockVisualiser.VANILLA_BLOCK_VISUALISER);
+        VisualizerRegistry.setVisualizer(BlockEntityType.TRIAL_SPAWNER, VanillaBlockVisualiser.VANILLA_BLOCK_VISUALISER);
+        VisualizerRegistry.setVisualizer(BlockEntityType.VAULT, VanillaBlockVisualiser.VANILLA_BLOCK_VISUALISER);
+
         // Some client setup code
         MechanicalArmory.LOGGER.info("HELLO FROM CLIENT SETUP");
         MechanicalArmory.LOGGER.info("MINECRAFT NAME >> {}", Minecraft.getInstance().getUser().getName());
