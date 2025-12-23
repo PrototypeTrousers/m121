@@ -10,6 +10,7 @@ import dev.engine_room.flywheel.lib.instance.TransformedInstance;
 import dev.engine_room.flywheel.lib.visual.AbstractBlockEntityVisual;
 import dev.engine_room.flywheel.lib.visual.SimpleDynamicVisual;
 import it.unimi.dsi.fastutil.ints.Int2ObjectLinkedOpenHashMap;
+import it.unimi.dsi.fastutil.objects.Object2ObjectArrayMap;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.model.geom.ModelPart;
 import net.minecraft.client.renderer.LevelRenderer;
@@ -38,6 +39,7 @@ public class VanillaBlockEntityVisual extends AbstractBlockEntityVisual<BlockEnt
 
     final public Int2ObjectLinkedOpenHashMap<List<M>> posedParts = new Int2ObjectLinkedOpenHashMap<>();
     final public Int2ObjectLinkedOpenHashMap<List<TransformedInstance>> transformedInstances = new Int2ObjectLinkedOpenHashMap<>();
+    final private Object2ObjectArrayMap<TransformedInstance, Matrix4f> lastTransform= new Object2ObjectArrayMap<>();
     final public Int2ObjectLinkedOpenHashMap<LinkedList<PoseStack.Pose>> depthPoseMap = new Int2ObjectLinkedOpenHashMap<>();
     private final PoseStackVisual poseStackVisual = new PoseStackVisual(this);
 
@@ -106,8 +108,12 @@ public class VanillaBlockEntityVisual extends AbstractBlockEntityVisual<BlockEnt
             Matrix4f p = depthPoseMap.get(i).pollFirst().pose();
             p.setTranslation(p.m30() + visualPos.getX(), p.m31() + visualPos.getY(), p.m32() + visualPos.getZ());
             value.forEach(ti -> {
-                ti.setTransform(p);
-                ti.setChanged();
+                Matrix4f last =lastTransform.computeIfAbsent(ti, k -> new Matrix4f());
+                if (!lastTransform.get(ti).equals(p)) {
+                    ti.setTransform(p);
+                    ti.setChanged();
+                    last.set(p);
+                }
             });
         });
     }
