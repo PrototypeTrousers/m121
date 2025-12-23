@@ -1,8 +1,9 @@
 package proto.mechanicalarmory.client.flywheel.instances.vanilla;
 
 import com.mojang.blaze3d.vertex.PoseStack;
+import dev.engine_room.flywheel.lib.util.RecyclingPoseStack;
 
-public class PoseStackVisual extends PoseStack {
+public class PoseStackVisual extends RecyclingPoseStack {
 
     private final VanillaBlockEntityVisual visual;
     private int depth;

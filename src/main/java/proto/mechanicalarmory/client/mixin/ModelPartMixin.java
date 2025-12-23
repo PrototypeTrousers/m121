@@ -27,7 +27,8 @@ public abstract class ModelPartMixin {
     private void injected(PoseStack poseStack, VertexConsumer buffer, int packedLight, int packedOverlay, int color, CallbackInfo ci) {
         if (poseStack instanceof PoseStackVisual pv) {
             VanillaBlockEntityVisual v = pv.getVisual();
-            if (!pv.isRendered() && !((ModelPart) (Object) this).isEmpty()) {
+            if (((ModelPart) (Object) this).isEmpty()) return;
+            if (!pv.isRendered()) {
                 v.posedParts.compute(pv.getDepth(), (integer, value) -> {
                     if (value == null) {
                         value = new ArrayList<>();
@@ -51,10 +52,9 @@ public abstract class ModelPartMixin {
                     return value;
                 });
             }
-            v.depthPoseMap.compute(pv.getDepth(), (integer, value) -> {
-                value = poseStack.last();
-                return value;
-            });
+            else {
+                v.updateTransforms(pv.getDepth(), poseStack.last().pose());
+            }
         }
     }
 
