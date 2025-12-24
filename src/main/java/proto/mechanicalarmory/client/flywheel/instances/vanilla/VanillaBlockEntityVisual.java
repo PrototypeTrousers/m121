@@ -1,19 +1,15 @@
 package proto.mechanicalarmory.client.flywheel.instances.vanilla;
 
 import com.coralblocks.coralpool.ArrayObjectPool;
-import com.mojang.blaze3d.vertex.PoseStack;
 import dev.engine_room.flywheel.api.instance.Instance;
 import dev.engine_room.flywheel.api.visual.DynamicVisual;
 import dev.engine_room.flywheel.api.visual.TickableVisual;
 import dev.engine_room.flywheel.api.visualization.VisualizationContext;
-import dev.engine_room.flywheel.lib.instance.AbstractInstance;
 import dev.engine_room.flywheel.lib.instance.InstanceTypes;
 import dev.engine_room.flywheel.lib.instance.TransformedInstance;
 import dev.engine_room.flywheel.lib.visual.AbstractBlockEntityVisual;
 import dev.engine_room.flywheel.lib.visual.SimpleDynamicVisual;
 import dev.engine_room.flywheel.lib.visual.SimpleTickableVisual;
-import it.unimi.dsi.fastutil.ints.Int2ObjectLinkedOpenHashMap;
-import it.unimi.dsi.fastutil.objects.Object2ObjectArrayMap;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.model.geom.ModelPart;
 import net.minecraft.client.renderer.LevelRenderer;
@@ -28,32 +24,76 @@ import org.joml.Vector3f;
 
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.function.Consumer;
 
-public class VanillaBlockEntityVisual extends AbstractBlockEntityVisual<BlockEntity>  implements SimpleTickableVisual, SimpleDynamicVisual {
-    private final Matrix4f initialPose;
+public class VanillaBlockEntityVisual extends AbstractBlockEntityVisual<BlockEntity> implements SimpleTickableVisual, SimpleDynamicVisual {
     final public VisualBufferSource visualBufferSource;
+    final public List<List<M>> posedParts = new ArrayList<>();
+    final public List<List<InterpolatedTransformedInstance>> transformedInstances = new ArrayList<>();
+    private final Matrix4f initialPose;
+    private final PoseStackVisual poseStackVisual = new PoseStackVisual(this);
+    private final BlockRendererBuilder<BlockEntity> builder;
+    private final ArrayObjectPool<BlockEntityRenderer<BlockEntity>> rendererPool;
+    private final Matrix4f mutableMatrix4f = new Matrix4f();
 
-    BlockRendererBuilder<BlockEntity> builder;
-    ArrayObjectPool<BlockEntityRenderer<BlockEntity>> rendererPool;
-    Matrix4f mutableMatrix4f = new Matrix4f();
+    public VanillaBlockEntityVisual(VisualizationContext ctx, BlockEntity blockEntity, float partialTick) {
+        super(ctx, blockEntity, partialTick);
+        initialPose = new Matrix4f().translate(visualPos.getX() + 0.5f, visualPos.getY() + 1.5f, visualPos.getZ() + 0.5f);
+        visualBufferSource = new VisualBufferSource(this);
+
+        BlockEntityRendererProvider.Context blockentityrendererprovider$context = new BlockEntityRendererProvider.Context(
+                Minecraft.getInstance().getBlockEntityRenderDispatcher(),
+                Minecraft.getInstance().getBlockRenderer(),
+                Minecraft.getInstance().getItemRenderer(),
+                Minecraft.getInstance().getEntityRenderDispatcher(),
+                Minecraft.getInstance().getEntityModels(),
+                Minecraft.getInstance().font);
+
+        builder = new BlockRendererBuilder(blockEntity.getType(), blockentityrendererprovider$context);
+        rendererPool = new ArrayObjectPool<>(1, builder);
+
+        BlockEntityRenderer<BlockEntity> berenderer = rendererPool.get();
+        berenderer.render(blockEntity, partialTick, poseStackVisual, visualBufferSource, LevelRenderer.getLightColor(level, pos.above()), 0);
+        rendererPool.release(berenderer);
+        visualBufferSource.setRendered(true);
+        for (int i = 0; i < posedParts.size(); i++) {
+            List<M> v = posedParts.get(i);
+            for (int partIdx = 0; partIdx < v.size(); partIdx++) {
+                M m = v.get(partIdx);
+
+                while (transformedInstances.size() <= i) {
+                    transformedInstances.add(Collections.EMPTY_LIST);
+                }
+                if (transformedInstances.get(i) == Collections.EMPTY_LIST) {
+                    transformedInstances.set(i, new ArrayList<>());
+                }
+
+                transformedInstances.get(i).add(new InterpolatedTransformedInstance(instancerProvider().instancer(
+                                InstanceTypes.TRANSFORMED, VanillaModel.cachedOf(blockEntity.getType(), i, partIdx, new VanillaModel(m.part, m.material)))
+                        .createInstance(), new Matrix4f(), new Matrix4f()));
+            }
+        }
+
+        poseStackVisual.setRendered();
+
+        for (List<InterpolatedTransformedInstance> key : transformedInstances) {
+            for (InterpolatedTransformedInstance ti : key) {
+                ti.instance.light(LevelRenderer.getLightColor(level, pos.above()));
+            }
+        }
+    }
 
     public void updateTransforms(int depth, Matrix4f p) {
         p.setTranslation(p.m30() + visualPos.getX(), p.m31() + visualPos.getY(), p.m32() + visualPos.getZ());
         transformedInstances.get(depth).forEach((ti) -> {
-            Matrix4f last = lastTransform.computeIfAbsent(ti, k -> new Matrix4f());
-            Matrix4f current = currentTransform.computeIfAbsent(ti, k -> new Matrix4f());
+            Matrix4f last = ti.previous;
+            Matrix4f current = ti.current;
             last.set(current);
             current.set(p);
-            ti.setTransform(p);
-            ti.setChanged();
         });
         p.setTranslation(p.m30() - visualPos.getX(), p.m31() - visualPos.getY(), p.m32() - visualPos.getZ());
     }
-
-
 
     public Matrix4f interpolate(Matrix4f m1, Matrix4f m2, float t) {
         // 1. Decompose Matrix 1
@@ -94,81 +134,29 @@ public class VanillaBlockEntityVisual extends AbstractBlockEntityVisual<BlockEnt
 
     @Override
     public void beginFrame(DynamicVisual.Context ctx) {
-//        transformedInstances.forEach((list) -> {
-//            list.forEach((ti) -> {
-//                Matrix4f last = lastTransform.computeIfAbsent(ti, k -> new Matrix4f());
-//                Matrix4f current = currentTransform.computeIfAbsent(ti, k -> new Matrix4f());
-//
-//                if (!last.equals(current)) {
-//                    Matrix4f p = interpolate(last, current, ctx.partialTick());
-//                    ti.setTransform(p);
-//                    ti.setChanged();
-//                    last.set(p);
-//                }
-//            });
-//        });
+        for (int i = 0, transformedInstancesSize = transformedInstances.size(); i < transformedInstancesSize; i++) {
+            List<InterpolatedTransformedInstance> list = transformedInstances.get(i);
+            for (int j = 0, listSize = list.size(); j < listSize; j++) {
+                InterpolatedTransformedInstance ti = list.get(j);
+                Matrix4f last = ti.previous;
+                Matrix4f current = ti.current;
+
+                if (!last.equals(current)) {
+                    Matrix4f p = interpolate(last, current, ctx.partialTick());
+                    ti.instance.setTransform(p);
+                    ti.instance.setChanged();
+                    last.set(p);
+                }
+            }
+        }
     }
 
     @Override
     public void tick(TickableVisual.Context context) {
         poseStackVisual.setDepth(0);
         BlockEntityRenderer<BlockEntity> berenderer = rendererPool.get();
-        berenderer.render(blockEntity, 0, poseStackVisual, visualBufferSource,LevelRenderer.getLightColor(level, pos.above()), 0);
+        berenderer.render(blockEntity, 0, poseStackVisual, visualBufferSource, LevelRenderer.getLightColor(level, pos.above()), 0);
         rendererPool.release(berenderer);
-    }
-
-    public record M(int poseDepth, ModelPart part, Material material) {
-    }
-
-    final public List<List<M>> posedParts = new ArrayList<>();
-    final public List<List<TransformedInstance>> transformedInstances = new ArrayList<>();
-    final private Object2ObjectArrayMap<TransformedInstance, Matrix4f> lastTransform = new Object2ObjectArrayMap<>();
-    final private Object2ObjectArrayMap<TransformedInstance, Matrix4f> currentTransform = new Object2ObjectArrayMap<>();
-    private final PoseStackVisual poseStackVisual = new PoseStackVisual(this);
-
-    public VanillaBlockEntityVisual(VisualizationContext ctx, BlockEntity blockEntity, float partialTick) {
-        super(ctx, blockEntity, partialTick);
-        initialPose = new Matrix4f().translate(visualPos.getX() + 0.5f, visualPos.getY() + 1.5f, visualPos.getZ() + 0.5f);
-        visualBufferSource = new VisualBufferSource(this);
-
-        BlockEntityRendererProvider.Context blockentityrendererprovider$context = new BlockEntityRendererProvider.Context(
-                Minecraft.getInstance().getBlockEntityRenderDispatcher(),
-                Minecraft.getInstance().getBlockRenderer(),
-                Minecraft.getInstance().getItemRenderer(),
-                Minecraft.getInstance().getEntityRenderDispatcher(),
-                Minecraft.getInstance().getEntityModels(),
-                Minecraft.getInstance().font);
-
-        builder = new BlockRendererBuilder(blockEntity.getType(), blockentityrendererprovider$context);
-        rendererPool = new ArrayObjectPool<>(1, builder);
-
-        BlockEntityRenderer<BlockEntity> berenderer = rendererPool.get();
-        berenderer.render(blockEntity, partialTick, poseStackVisual, visualBufferSource,LevelRenderer.getLightColor(level, pos.above()), 0);
-        rendererPool.release(berenderer);
-        visualBufferSource.setRendered(true);
-        for (int i = 0; i < posedParts.size(); i++) {
-            List<M> v = posedParts.get(i);
-            for (int partIdx = 0; partIdx < v.size(); partIdx++) {
-                M m = v.get(partIdx);
-
-                while (transformedInstances.size() <= i) {
-                    transformedInstances.add(Collections.EMPTY_LIST);
-                }
-                if (transformedInstances.get(i) == Collections.EMPTY_LIST) {
-                    transformedInstances.set(i, new ArrayList<>());
-                }
-
-                transformedInstances.get(i).add(instancerProvider().instancer(
-                                InstanceTypes.TRANSFORMED, VanillaModel.cachedOf(blockEntity.getType(), i, partIdx, new VanillaModel(m.part, m.material)))
-                        .createInstance());
-            }
-        }
-
-        poseStackVisual.setRendered();
-
-        transformedInstances.forEach((key) -> {
-            key.forEach(ti -> ti.light(LevelRenderer.getLightColor(level, pos.above())));
-        });
     }
 
     @Override
@@ -178,17 +166,26 @@ public class VanillaBlockEntityVisual extends AbstractBlockEntityVisual<BlockEnt
 
     @Override
     public void updateLight(float partialTick) {
-        transformedInstances.forEach((key) -> {
-            key.forEach(ti -> ti.light(LevelRenderer.getLightColor(level, pos.above())));
-        });
+        for (List<InterpolatedTransformedInstance> key : transformedInstances) {
+            key.forEach(ti -> ti.instance.light(LevelRenderer.getLightColor(level, pos.above())));
+        }
     }
 
     @Override
     protected void _delete() {
-        transformedInstances.forEach((v) -> v.forEach(AbstractInstance::delete));
+        for (List<InterpolatedTransformedInstance> v : transformedInstances) {
+            v.forEach(ti -> ti.instance.delete());
+        }
     }
 
     public VisualBufferSource getBufferSource() {
         return visualBufferSource;
+    }
+
+    public record M(int poseDepth, ModelPart part, Material material) {
+    }
+
+    public record InterpolatedTransformedInstance(TransformedInstance instance, Matrix4f current, Matrix4f previous) {
+
     }
 }
