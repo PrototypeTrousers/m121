@@ -18,6 +18,7 @@ import proto.mechanicalarmory.client.flywheel.instances.vanilla.VanillaBlockEnti
 import proto.mechanicalarmory.client.flywheel.instances.vanilla.VisualBufferSource;
 
 import java.util.ArrayList;
+import java.util.Collections;
 
 
 @Mixin(targets = "net.minecraft.client.model.geom.ModelPart")
@@ -29,30 +30,28 @@ public abstract class ModelPartMixin {
             VanillaBlockEntityVisual v = pv.getVisual();
             if (((ModelPart) (Object) this).isEmpty()) return;
             if (!pv.isRendered()) {
-                v.posedParts.compute(pv.getDepth(), (integer, value) -> {
-                    if (value == null) {
-                        value = new ArrayList<>();
-                    }
-                    Material mat;
-                    if (buffer instanceof SpriteCoordinateExpander sceb) {
-                        TextureAtlasSprite tas = ((SpriteCoordinateExpanderAccessor) sceb).getSprite();
-                        mat = new Material(tas.atlasLocation(), tas.contents().name());
-                    } else {
-                        mat = pv.getVisual().getBufferSource().getMaterialMap().get(buffer);
-                    }
+                while (v.posedParts.size() <= pv.getDepth()) {
+                    v.posedParts.add(Collections.EMPTY_LIST);
+                }
+                if (v.posedParts.get(pv.getDepth()) == Collections.EMPTY_LIST) {
+                    v.posedParts.set(pv.getDepth(), new ArrayList<>());
+                }
+                Material mat;
+                if (buffer instanceof SpriteCoordinateExpander sceb) {
+                    TextureAtlasSprite tas = ((SpriteCoordinateExpanderAccessor) sceb).getSprite();
+                    mat = new Material(tas.atlasLocation(), tas.contents().name());
+                } else {
+                    mat = pv.getVisual().getBufferSource().getMaterialMap().get(buffer);
+                }
 
-
-                    if (mat == null) {
-                        CompositeRenderTypeAccessor c = ((CompositeRenderTypeAccessor) ((VisualBufferSource.DummyBuffer) buffer).getRenderType());
-                        RenderStateShard.EmptyTextureStateShard r = ((RenderTypeAccessor) (Object) c.getState()).getTextureState();
-                        ResourceLocation atlas = ((TextureStateShardAccessor) r).getTexture().get();
-                        mat = new Material(atlas, null);
-                    }
-                    value.add(new VanillaBlockEntityVisual.M(pv.getDepth(), (ModelPart) (Object) this, mat));
-                    return value;
-                });
-            }
-            else {
+                if (mat == null) {
+                    CompositeRenderTypeAccessor c = ((CompositeRenderTypeAccessor) ((VisualBufferSource.DummyBuffer) buffer).getRenderType());
+                    RenderStateShard.EmptyTextureStateShard r = ((RenderTypeAccessor) (Object) c.getState()).getTextureState();
+                    ResourceLocation atlas = ((TextureStateShardAccessor) r).getTexture().get();
+                    mat = new Material(atlas, null);
+                }
+                v.posedParts.get(pv.getDepth()).add(new VanillaBlockEntityVisual.M(pv.getDepth(), (ModelPart) (Object) this, mat));
+            } else {
                 v.updateTransforms(pv.getDepth(), poseStack.last().pose());
             }
         }

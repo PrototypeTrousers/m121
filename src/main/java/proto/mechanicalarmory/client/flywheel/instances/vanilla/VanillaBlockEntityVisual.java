@@ -27,6 +27,7 @@ import org.joml.Quaternionf;
 import org.joml.Vector3f;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.function.Consumer;
@@ -46,6 +47,8 @@ public class VanillaBlockEntityVisual extends AbstractBlockEntityVisual<BlockEnt
             Matrix4f current = currentTransform.computeIfAbsent(ti, k -> new Matrix4f());
             last.set(current);
             current.set(p);
+            ti.setTransform(p);
+            ti.setChanged();
         });
         p.setTranslation(p.m30() - visualPos.getX(), p.m31() - visualPos.getY(), p.m32() - visualPos.getZ());
     }
@@ -91,19 +94,19 @@ public class VanillaBlockEntityVisual extends AbstractBlockEntityVisual<BlockEnt
 
     @Override
     public void beginFrame(DynamicVisual.Context ctx) {
-        transformedInstances.forEach((tii, list) -> {
-            list.forEach((ti) -> {
-                Matrix4f last = lastTransform.computeIfAbsent(ti, k -> new Matrix4f());
-                Matrix4f current = currentTransform.computeIfAbsent(ti, k -> new Matrix4f());
-
-                if (!last.equals(current)) {
-                    Matrix4f p = interpolate(last, current, ctx.partialTick());
-                    ti.setTransform(p);
-                    ti.setChanged();
-                    last.set(p);
-                }
-            });
-        });
+//        transformedInstances.forEach((list) -> {
+//            list.forEach((ti) -> {
+//                Matrix4f last = lastTransform.computeIfAbsent(ti, k -> new Matrix4f());
+//                Matrix4f current = currentTransform.computeIfAbsent(ti, k -> new Matrix4f());
+//
+//                if (!last.equals(current)) {
+//                    Matrix4f p = interpolate(last, current, ctx.partialTick());
+//                    ti.setTransform(p);
+//                    ti.setChanged();
+//                    last.set(p);
+//                }
+//            });
+//        });
     }
 
     @Override
@@ -117,8 +120,8 @@ public class VanillaBlockEntityVisual extends AbstractBlockEntityVisual<BlockEnt
     public record M(int poseDepth, ModelPart part, Material material) {
     }
 
-    final public Int2ObjectLinkedOpenHashMap<List<M>> posedParts = new Int2ObjectLinkedOpenHashMap<>();
-    final public Int2ObjectLinkedOpenHashMap<List<TransformedInstance>> transformedInstances = new Int2ObjectLinkedOpenHashMap<>();
+    final public List<List<M>> posedParts = new ArrayList<>();
+    final public List<List<TransformedInstance>> transformedInstances = new ArrayList<>();
     final private Object2ObjectArrayMap<TransformedInstance, Matrix4f> lastTransform = new Object2ObjectArrayMap<>();
     final private Object2ObjectArrayMap<TransformedInstance, Matrix4f> currentTransform = new Object2ObjectArrayMap<>();
     private final PoseStackVisual poseStackVisual = new PoseStackVisual(this);
@@ -143,24 +146,28 @@ public class VanillaBlockEntityVisual extends AbstractBlockEntityVisual<BlockEnt
         berenderer.render(blockEntity, partialTick, poseStackVisual, visualBufferSource,LevelRenderer.getLightColor(level, pos.above()), 0);
         rendererPool.release(berenderer);
         visualBufferSource.setRendered(true);
-        posedParts.forEach((poseDepth, v) -> {
+        for (int i = 0; i < posedParts.size(); i++) {
+            List<M> v = posedParts.get(i);
             for (int partIdx = 0; partIdx < v.size(); partIdx++) {
                 M m = v.get(partIdx);
-                int finalPartIdx = partIdx;
-                transformedInstances.compute(poseDepth, (key, value) -> {
-                    if (value == null) value = new ArrayList<>();
-                    value.add(instancerProvider().instancer(
-                                    InstanceTypes.TRANSFORMED, VanillaModel.cachedOf(blockEntity.getType(), poseDepth, finalPartIdx, new VanillaModel(m.part, m.material)))
-                            .createInstance());
-                    return value;
-                });
+
+                while (transformedInstances.size() <= i) {
+                    transformedInstances.add(Collections.EMPTY_LIST);
+                }
+                if (transformedInstances.get(i) == Collections.EMPTY_LIST) {
+                    transformedInstances.set(i, new ArrayList<>());
+                }
+
+                transformedInstances.get(i).add(instancerProvider().instancer(
+                                InstanceTypes.TRANSFORMED, VanillaModel.cachedOf(blockEntity.getType(), i, partIdx, new VanillaModel(m.part, m.material)))
+                        .createInstance());
             }
-        });
+        }
 
         poseStackVisual.setRendered();
 
-        transformedInstances.forEach((key, value) -> {
-            value.forEach(ti -> ti.light(LevelRenderer.getLightColor(level, pos.above())));
+        transformedInstances.forEach((key) -> {
+            key.forEach(ti -> ti.light(LevelRenderer.getLightColor(level, pos.above())));
         });
     }
 
@@ -171,14 +178,14 @@ public class VanillaBlockEntityVisual extends AbstractBlockEntityVisual<BlockEnt
 
     @Override
     public void updateLight(float partialTick) {
-        transformedInstances.forEach((i, value) -> {
-            value.forEach(ti -> ti.light(LevelRenderer.getLightColor(level, pos.above())));
+        transformedInstances.forEach((key) -> {
+            key.forEach(ti -> ti.light(LevelRenderer.getLightColor(level, pos.above())));
         });
     }
 
     @Override
     protected void _delete() {
-        transformedInstances.forEach((i, v) -> v.forEach(AbstractInstance::delete));
+        transformedInstances.forEach((v) -> v.forEach(AbstractInstance::delete));
     }
 
     public VisualBufferSource getBufferSource() {
