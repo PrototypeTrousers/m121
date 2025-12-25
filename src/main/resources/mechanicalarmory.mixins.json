@@ -9,6 +9,7 @@
     "BufferBuilderAccessor",
     "BufferSourceAccessor",
     "CompositeRenderTypeAccessor",
+    "ItemRendererMixin",
     "MaterialAccessor",
     "MaterialMixin",
     "ModelPartAccessor",

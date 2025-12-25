@@ -1,22 +1,42 @@
 package proto.mechanicalarmory.client.flywheel.instances.vanilla;
 
 import com.coralblocks.coralpool.ArrayObjectPool;
+import com.mojang.blaze3d.vertex.PoseStack;
 import dev.engine_room.flywheel.api.instance.Instance;
+import dev.engine_room.flywheel.api.material.Transparency;
+import dev.engine_room.flywheel.api.model.Model;
 import dev.engine_room.flywheel.api.visual.DynamicVisual;
 import dev.engine_room.flywheel.api.visual.TickableVisual;
 import dev.engine_room.flywheel.api.visualization.VisualizationContext;
 import dev.engine_room.flywheel.lib.instance.InstanceTypes;
 import dev.engine_room.flywheel.lib.instance.TransformedInstance;
+import dev.engine_room.flywheel.lib.material.Materials;
+import dev.engine_room.flywheel.lib.material.SimpleMaterial;
+import dev.engine_room.flywheel.lib.model.ModelUtil;
+import dev.engine_room.flywheel.lib.model.SimpleModel;
+import dev.engine_room.flywheel.lib.model.baked.BakedModelBuilder;
 import dev.engine_room.flywheel.lib.visual.AbstractBlockEntityVisual;
 import dev.engine_room.flywheel.lib.visual.SimpleDynamicVisual;
 import dev.engine_room.flywheel.lib.visual.SimpleTickableVisual;
+import dev.engine_room.vanillin.item.ItemModels;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.model.geom.ModelPart;
+import net.minecraft.client.multiplayer.ClientLevel;
+import net.minecraft.client.renderer.ItemBlockRenderTypes;
 import net.minecraft.client.renderer.LevelRenderer;
 import net.minecraft.client.renderer.blockentity.BlockEntityRenderer;
 import net.minecraft.client.renderer.blockentity.BlockEntityRendererProvider;
+import net.minecraft.client.resources.model.BakedModel;
 import net.minecraft.client.resources.model.Material;
+import net.minecraft.world.item.BlockItem;
+import net.minecraft.world.item.ItemDisplayContext;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.HalfTransparentBlock;
+import net.minecraft.world.level.block.StainedGlassPaneBlock;
 import net.minecraft.world.level.block.entity.BlockEntity;
+import net.neoforged.neoforge.client.ClientHooks;
+import net.neoforged.neoforge.client.extensions.common.IClientItemExtensions;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Matrix4f;
 import org.joml.Quaternionf;
@@ -26,6 +46,8 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.function.Consumer;
+
+import static dev.engine_room.vanillin.item.ItemModels.getActualBakedModel;
 
 public class VanillaBlockEntityVisual extends AbstractBlockEntityVisual<BlockEntity> implements SimpleTickableVisual, SimpleDynamicVisual {
     final public VisualBufferSource visualBufferSource;
@@ -60,6 +82,7 @@ public class VanillaBlockEntityVisual extends AbstractBlockEntityVisual<BlockEnt
         rendererPool = new ArrayObjectPool<>(1, builder);
 
         BlockEntityRenderer<BlockEntity> berenderer = rendererPool.get();
+        poseStackVisual.last().pose().translate(visualPos.getX(), visualPos.getY(), visualPos.getZ());
         berenderer.render(blockEntity, partialTick, poseStackVisual, visualBufferSource, LevelRenderer.getLightColor(level, pos.above()), 0);
         rendererPool.release(berenderer);
         visualBufferSource.setRendered(true);
@@ -89,8 +112,39 @@ public class VanillaBlockEntityVisual extends AbstractBlockEntityVisual<BlockEnt
         partIdx++;
     }
 
+    public void addInterpolatedItemTransformedInstance(int depth, ItemStack itemStack) {
+        while (transformedInstances.size() <= depth) {
+            transformedInstances.add(Collections.EMPTY_LIST);
+        }
+        if (transformedInstances.get(depth) == Collections.EMPTY_LIST) {
+            transformedInstances.set(depth, new ArrayList<>());
+        }
+
+        boolean cull = !(itemStack.getItem() instanceof BlockItem block) || !(block.getBlock() instanceof HalfTransparentBlock) && !(block.getBlock() instanceof StainedGlassPaneBlock);
+        var material = ModelUtil.getItemMaterial(ItemBlockRenderTypes.getRenderType(itemStack, cull));
+
+        if (material == null) {
+            material = Materials.TRANSLUCENT_ENTITY;
+        }
+
+        if (itemStack.getItem() instanceof BlockItem && material.transparency() == Transparency.TRANSLUCENT) {
+            material = SimpleMaterial.builderOf(material)
+                    .transparency(Transparency.ORDER_INDEPENDENT)
+                    .build();
+        }
+
+        BakedModel bm = Minecraft.getInstance().getItemRenderer().getModel(itemStack, null, null, 42);
+        //BakedModel p_model = ClientHooks.handleCameraTransforms(new PoseStack(), bm, ItemDisplayContext.GUI, false);
+
+        Model model = ItemModels.bakeModel(bm, ItemDisplayContext.FIXED, material,itemStack.hasFoil());
+
+        transformedInstances.get(depth).add(new InterpolatedTransformedInstance(instancerProvider().instancer(
+                        InstanceTypes.TRANSFORMED, model)
+                .createInstance(), new Matrix4f(), new Matrix4f()));
+        partIdx++;
+    }
+
     public void updateTransforms(int depth, Matrix4f p) {
-        p.setTranslation(p.m30() + visualPos.getX(), p.m31() + visualPos.getY(), p.m32() + visualPos.getZ());
         List<InterpolatedTransformedInstance> get = transformedInstances.get(depth);
         for (int i = 0; i < get.size(); i++) {
             InterpolatedTransformedInstance ti = get.get(i);
@@ -98,7 +152,21 @@ public class VanillaBlockEntityVisual extends AbstractBlockEntityVisual<BlockEnt
             ti.current.set(p);
             ti.instance.setTransform(ti.current).setChanged();
         }
-        p.setTranslation(p.m30() - visualPos.getX(), p.m31() - visualPos.getY(), p.m32() - visualPos.getZ());
+    }
+
+    public void updateItemTransforms(int depth, Matrix4f p) {
+        //WHY????????
+        p.rotate((float) (Math.PI/2), new Vector3f(0,0,1));
+        p.translate(new Vector3f(0.5f,-0.5f,0));
+        p.translate(new Vector3f(0,0,0.5f));
+        //???????????
+        List<InterpolatedTransformedInstance> get = transformedInstances.get(depth);
+        for (int i = 0; i < get.size(); i++) {
+            InterpolatedTransformedInstance ti = get.get(i);
+            ti.previous.set(ti.current);
+            ti.current.set(p);
+            ti.instance.setTransform(ti.current).setChanged();
+        }
     }
 
     public Matrix4f interpolate(Matrix4f m1, Matrix4f m2, float t) {
@@ -118,7 +186,7 @@ public class VanillaBlockEntityVisual extends AbstractBlockEntityVisual<BlockEnt
         // Scale: Linear Interpolation (Lerp)
         Vector3f lerpScale = scale1.lerp(scale2, t);
         // Rotation: Spherical Linear Interpolation (Slerp)
-        Quaternionf slerpRotation = rotation1.slerp(rotation2, t);
+        Quaternionf slerpRotation = rotation1.nlerp(rotation2, t);
 
         // 4. Recompose into a new Matrix
         mutableInterpolationMatrix4f.translationRotateScale(lerpTranslation, slerpRotation, lerpScale);
@@ -128,6 +196,10 @@ public class VanillaBlockEntityVisual extends AbstractBlockEntityVisual<BlockEnt
 
     @Override
     public void beginFrame(DynamicVisual.Context ctx) {
+        if (doDistanceLimitThisFrame(ctx) || !isVisible(ctx.frustum())) {
+            return;
+        }
+
         float pt = ctx.partialTick();
 
         for (List<InterpolatedTransformedInstance> list : transformedInstances) {
