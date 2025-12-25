@@ -91,12 +91,13 @@ public class VanillaBlockEntityVisual extends AbstractBlockEntityVisual<BlockEnt
 
     public void updateTransforms(int depth, Matrix4f p) {
         p.setTranslation(p.m30() + visualPos.getX(), p.m31() + visualPos.getY(), p.m32() + visualPos.getZ());
-        transformedInstances.get(depth).forEach((ti) -> {
-            Matrix4f last = ti.previous;
-            Matrix4f current = ti.current;
-            last.set(current);
-            current.set(p);
-        });
+        List<InterpolatedTransformedInstance> get = transformedInstances.get(depth);
+        for (int i = 0; i < get.size(); i++) {
+            InterpolatedTransformedInstance ti = get.get(i);
+            ti.previous.set(ti.current);
+            ti.current.set(p);
+            ti.instance.setTransform(ti.current).setChanged();
+        }
         p.setTranslation(p.m30() - visualPos.getX(), p.m31() - visualPos.getY(), p.m32() - visualPos.getZ());
     }
 
@@ -127,16 +128,20 @@ public class VanillaBlockEntityVisual extends AbstractBlockEntityVisual<BlockEnt
 
     @Override
     public void beginFrame(DynamicVisual.Context ctx) {
-        for (int i = 0, transformedInstancesSize = transformedInstances.size(); i < transformedInstancesSize; i++) {
-            List<InterpolatedTransformedInstance> list = transformedInstances.get(i);
-            for (int j = 0, listSize = list.size(); j < listSize; j++) {
-                InterpolatedTransformedInstance ti = list.get(j);
-                Matrix4f last = ti.previous;
-                Matrix4f current = ti.current;
+        float pt = ctx.partialTick();
 
-                if (!last.equals(current)) {
-                    Matrix4f p = interpolate(last, current, ctx.partialTick());
-                    ti.instance.setTransform(p);
+        for (List<InterpolatedTransformedInstance> list : transformedInstances) {
+            for (InterpolatedTransformedInstance ti : list) {
+                // 1. Check if an update is even needed
+                // Only update if the transformation has actually changed between ticks
+                if (!ti.previous.equals(ti.current)) {
+
+                    // 2. Interpolate into a temporary matrix
+                    // Do NOT modify ti.current or ti.previous here!
+                    Matrix4f interpolated = interpolate(ti.previous, ti.current, pt);
+
+                    // 3. Apply to the rendering instance
+                    ti.instance.setTransform(interpolated);
                     ti.instance.setChanged();
                 }
             }
