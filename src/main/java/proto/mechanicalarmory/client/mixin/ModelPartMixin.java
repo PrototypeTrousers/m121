@@ -30,12 +30,6 @@ public abstract class ModelPartMixin {
             VanillaBlockEntityVisual v = pv.getVisual();
             if (((ModelPart) (Object) this).isEmpty()) return;
             if (!pv.isRendered()) {
-                while (v.posedParts.size() <= pv.getDepth()) {
-                    v.posedParts.add(Collections.EMPTY_LIST);
-                }
-                if (v.posedParts.get(pv.getDepth()) == Collections.EMPTY_LIST) {
-                    v.posedParts.set(pv.getDepth(), new ArrayList<>());
-                }
                 Material mat;
                 if (buffer instanceof SpriteCoordinateExpander sceb) {
                     TextureAtlasSprite tas = ((SpriteCoordinateExpanderAccessor) sceb).getSprite();
@@ -50,7 +44,8 @@ public abstract class ModelPartMixin {
                     ResourceLocation atlas = ((TextureStateShardAccessor) r).getTexture().get();
                     mat = new Material(atlas, null);
                 }
-                v.posedParts.get(pv.getDepth()).add(new VanillaBlockEntityVisual.M(pv.getDepth(), (ModelPart) (Object) this, mat));
+                v.addInterpolatedTransformedInstance(pv.getDepth(), (ModelPart) (Object) this, mat);
+
             } else {
                 v.updateTransforms(pv.getDepth(), poseStack.last().pose());
             }

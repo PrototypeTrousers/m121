@@ -11,6 +11,7 @@
     "CompositeRenderTypeAccessor",
     "MaterialAccessor",
     "MaterialMixin",
+    "ModelPartAccessor",
     "ModelPartMixin",
     "RenderTypeAccessor",
     "SpriteCoordinateExpanderAccessor",

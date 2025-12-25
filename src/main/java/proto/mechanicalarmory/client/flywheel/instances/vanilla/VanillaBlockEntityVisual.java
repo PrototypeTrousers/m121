@@ -29,13 +29,19 @@ import java.util.function.Consumer;
 
 public class VanillaBlockEntityVisual extends AbstractBlockEntityVisual<BlockEntity> implements SimpleTickableVisual, SimpleDynamicVisual {
     final public VisualBufferSource visualBufferSource;
-    final public List<List<M>> posedParts = new ArrayList<>();
     final public List<List<InterpolatedTransformedInstance>> transformedInstances = new ArrayList<>();
     private final Matrix4f initialPose;
     private final PoseStackVisual poseStackVisual = new PoseStackVisual(this);
     private final BlockRendererBuilder<BlockEntity> builder;
     private final ArrayObjectPool<BlockEntityRenderer<BlockEntity>> rendererPool;
-    private final Matrix4f mutableMatrix4f = new Matrix4f();
+    private final Matrix4f mutableInterpolationMatrix4f = new Matrix4f();
+    Vector3f translation1 = new Vector3f();
+    Quaternionf rotation1 = new Quaternionf();
+    Vector3f scale1 = new Vector3f();
+    Vector3f translation2 = new Vector3f();
+    Quaternionf rotation2 = new Quaternionf();
+    Vector3f scale2 = new Vector3f();
+    int partIdx;
 
     public VanillaBlockEntityVisual(VisualizationContext ctx, BlockEntity blockEntity, float partialTick) {
         super(ctx, blockEntity, partialTick);
@@ -57,31 +63,30 @@ public class VanillaBlockEntityVisual extends AbstractBlockEntityVisual<BlockEnt
         berenderer.render(blockEntity, partialTick, poseStackVisual, visualBufferSource, LevelRenderer.getLightColor(level, pos.above()), 0);
         rendererPool.release(berenderer);
         visualBufferSource.setRendered(true);
-        for (int i = 0; i < posedParts.size(); i++) {
-            List<M> v = posedParts.get(i);
-            for (int partIdx = 0; partIdx < v.size(); partIdx++) {
-                M m = v.get(partIdx);
-
-                while (transformedInstances.size() <= i) {
-                    transformedInstances.add(Collections.EMPTY_LIST);
-                }
-                if (transformedInstances.get(i) == Collections.EMPTY_LIST) {
-                    transformedInstances.set(i, new ArrayList<>());
-                }
-
-                transformedInstances.get(i).add(new InterpolatedTransformedInstance(instancerProvider().instancer(
-                                InstanceTypes.TRANSFORMED, VanillaModel.cachedOf(blockEntity.getType(), i, partIdx, new VanillaModel(m.part, m.material)))
-                        .createInstance(), new Matrix4f(), new Matrix4f()));
-            }
-        }
-
         poseStackVisual.setRendered();
 
         for (List<InterpolatedTransformedInstance> key : transformedInstances) {
             for (InterpolatedTransformedInstance ti : key) {
                 ti.instance.light(LevelRenderer.getLightColor(level, pos.above()));
+                ti.current.setTranslation(ti.current.m30() + visualPos.getX(), ti.current.m31() + visualPos.getY(), ti.current.m32() + visualPos.getZ());
+                ti.instance.setTransform(ti.current).setChanged();
+                ti.current.setTranslation(ti.current.m30() - visualPos.getX(), ti.current.m31() - visualPos.getY(), ti.current.m32() - visualPos.getZ());
             }
         }
+    }
+
+    public void addInterpolatedTransformedInstance(int depth, ModelPart modelPart, Material material) {
+        while (transformedInstances.size() <= depth) {
+            transformedInstances.add(Collections.EMPTY_LIST);
+        }
+        if (transformedInstances.get(depth) == Collections.EMPTY_LIST) {
+            transformedInstances.set(depth, new ArrayList<>());
+        }
+
+        transformedInstances.get(depth).add(new InterpolatedTransformedInstance(instancerProvider().instancer(
+                        InstanceTypes.TRANSFORMED, VanillaModel.cachedOf(modelPart, material))
+                .createInstance(), new Matrix4f(), new Matrix4f()));
+        partIdx++;
     }
 
     public void updateTransforms(int depth, Matrix4f p) {
@@ -97,39 +102,27 @@ public class VanillaBlockEntityVisual extends AbstractBlockEntityVisual<BlockEnt
 
     public Matrix4f interpolate(Matrix4f m1, Matrix4f m2, float t) {
         // 1. Decompose Matrix 1
-        Vector3f translation1 = new Vector3f();
         m1.getTranslation(translation1);
-
-        Quaternionf rotation1 = new Quaternionf();
         m1.getUnnormalizedRotation(rotation1);
-
-        Vector3f scale1 = new Vector3f();
         m1.getScale(scale1);
-
         // 2. Decompose Matrix 2
-        Vector3f translation2 = new Vector3f();
+
         m2.getTranslation(translation2);
-
-        Quaternionf rotation2 = new Quaternionf();
         m2.getUnnormalizedRotation(rotation2);
-
-        Vector3f scale2 = new Vector3f();
         m2.getScale(scale2);
 
         // 3. Interpolate components
         // Translation: Linear Interpolation (Lerp)
-        Vector3f lerpTranslation = new Vector3f(translation1).lerp(translation2, t);
-
+        Vector3f lerpTranslation = translation1.lerp(translation2, t);
         // Scale: Linear Interpolation (Lerp)
-        Vector3f lerpScale = new Vector3f(scale1).lerp(scale2, t);
-
+        Vector3f lerpScale = scale1.lerp(scale2, t);
         // Rotation: Spherical Linear Interpolation (Slerp)
-        Quaternionf slerpRotation = new Quaternionf(rotation1).slerp(rotation2, t);
+        Quaternionf slerpRotation = rotation1.slerp(rotation2, t);
 
         // 4. Recompose into a new Matrix
-        mutableMatrix4f.translationRotateScale(lerpTranslation, slerpRotation, lerpScale);
+        mutableInterpolationMatrix4f.translationRotateScale(lerpTranslation, slerpRotation, lerpScale);
 
-        return mutableMatrix4f;
+        return mutableInterpolationMatrix4f;
     }
 
     @Override
@@ -145,7 +138,6 @@ public class VanillaBlockEntityVisual extends AbstractBlockEntityVisual<BlockEnt
                     Matrix4f p = interpolate(last, current, ctx.partialTick());
                     ti.instance.setTransform(p);
                     ti.instance.setChanged();
-                    last.set(p);
                 }
             }
         }
@@ -180,9 +172,6 @@ public class VanillaBlockEntityVisual extends AbstractBlockEntityVisual<BlockEnt
 
     public VisualBufferSource getBufferSource() {
         return visualBufferSource;
-    }
-
-    public record M(int poseDepth, ModelPart part, Material material) {
     }
 
     public record InterpolatedTransformedInstance(TransformedInstance instance, Matrix4f current, Matrix4f previous) {
