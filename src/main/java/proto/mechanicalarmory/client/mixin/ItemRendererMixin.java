@@ -18,14 +18,9 @@ public abstract class ItemRendererMixin {
     public void ma$renderStatic(BakedModel model, ItemStack stack, int combinedLight, int combinedOverlay, PoseStack poseStack, VertexConsumer buffer, CallbackInfo ci) {
         if (poseStack instanceof PoseStackVisual psv) {
             VanillaBlockEntityVisual v = psv.getVisual();
-            if (!psv.isRendered()) {
-                v.addInterpolatedItemTransformedInstance(psv.getDepth(), stack);
-                ci.cancel();
-            } else {
-                v.updateItemTransforms(psv.getDepth(), poseStack.last().pose());
-                ci.cancel();
-            }
+            v.addInterpolatedItemTransformedInstance(psv.getDepth(), stack);
+            v.updateItemTransforms(psv.getDepth(), poseStack.last().pose());
+            ci.cancel();
         }
     }
-
 }
