@@ -42,7 +42,7 @@ public abstract class ModelPartMixin {
                     CompositeRenderTypeAccessor c = ((CompositeRenderTypeAccessor) ((VisualBufferSource.DummyBuffer) buffer).getRenderType());
                     RenderStateShard.EmptyTextureStateShard r = ((RenderTypeAccessor) (Object) c.getState()).getTextureState();
                     ResourceLocation atlas = ((TextureStateShardAccessor) r).getTexture().get();
-                    mat = new Material(atlas, null);
+                    mat = new Material(atlas, atlas);
                 }
                 v.addInterpolatedTransformedInstance(pv.getDepth(), (ModelPart) (Object) this, mat);
 

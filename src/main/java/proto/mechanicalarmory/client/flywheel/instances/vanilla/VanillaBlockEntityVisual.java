@@ -2,33 +2,23 @@ package proto.mechanicalarmory.client.flywheel.instances.vanilla;
 
 import com.coralblocks.coralpool.ArrayObjectPool;
 import dev.engine_room.flywheel.api.instance.Instance;
-import dev.engine_room.flywheel.api.material.Transparency;
-import dev.engine_room.flywheel.api.model.Model;
 import dev.engine_room.flywheel.api.visual.DynamicVisual;
 import dev.engine_room.flywheel.api.visual.TickableVisual;
 import dev.engine_room.flywheel.api.visualization.VisualizationContext;
 import dev.engine_room.flywheel.lib.instance.InstanceTypes;
 import dev.engine_room.flywheel.lib.instance.TransformedInstance;
-import dev.engine_room.flywheel.lib.material.Materials;
-import dev.engine_room.flywheel.lib.material.SimpleMaterial;
-import dev.engine_room.flywheel.lib.model.ModelUtil;
 import dev.engine_room.flywheel.lib.visual.AbstractBlockEntityVisual;
 import dev.engine_room.flywheel.lib.visual.SimpleDynamicVisual;
 import dev.engine_room.flywheel.lib.visual.SimpleTickableVisual;
 import dev.engine_room.vanillin.item.ItemModels;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.model.geom.ModelPart;
-import net.minecraft.client.renderer.ItemBlockRenderTypes;
 import net.minecraft.client.renderer.LevelRenderer;
 import net.minecraft.client.renderer.blockentity.BlockEntityRenderer;
 import net.minecraft.client.renderer.blockentity.BlockEntityRendererProvider;
-import net.minecraft.client.resources.model.BakedModel;
 import net.minecraft.client.resources.model.Material;
-import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.ItemDisplayContext;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.level.block.HalfTransparentBlock;
-import net.minecraft.world.level.block.StainedGlassPaneBlock;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Matrix4f;
@@ -202,7 +192,7 @@ public class VanillaBlockEntityVisual extends AbstractBlockEntityVisual<BlockEnt
         long lastTick = level.getGameTime();
         poseStackVisual.setDepth(0);
         BlockEntityRenderer<BlockEntity> berenderer = rendererPool.get();
-        berenderer.render(blockEntity, 0, poseStackVisual, visualBufferSource, light, 0);
+        berenderer.render(blockEntity, 1, poseStackVisual, visualBufferSource, light, 0);
         rendererPool.release(berenderer);
         for (List<InterpolatedTransformedInstance> list : transformedInstances) {
             for (Iterator<InterpolatedTransformedInstance> iterator = list.iterator(); iterator.hasNext(); ) {

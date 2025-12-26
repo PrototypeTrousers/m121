@@ -54,7 +54,7 @@ public class VanillaModel implements Model {
 
         VanillaVertexWriter vertexWriter = THREAD_LOCAL_OBJECTS.get().vertexWriter;
         VertexConsumer v;
-        if (material.texture() != null) {
+        if (!material.texture().equals(material.atlasLocation())) {
             v = new SpriteCoordinateExpander(vertexWriter, material.sprite());
         } else {
             v = vertexWriter;
