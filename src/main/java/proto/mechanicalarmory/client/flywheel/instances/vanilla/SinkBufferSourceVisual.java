@@ -1,7 +1,9 @@
 package proto.mechanicalarmory.client.flywheel.instances.vanilla;
 
 import net.minecraft.client.model.geom.ModelPart;
+import net.minecraft.client.resources.model.BakedModel;
 import net.minecraft.client.resources.model.Material;
+import net.minecraft.world.item.ItemDisplayContext;
 import net.minecraft.world.item.ItemStack;
 import org.joml.Matrix4f;
 
@@ -12,7 +14,7 @@ public interface SinkBufferSourceVisual {
 
     void updateTransforms(int depth, Matrix4f pose);
 
-    void addInterpolatedItemTransformedInstance(int depth, ItemStack stack);
+    void addInterpolatedItemTransformedInstance(int depth, ItemStack itemStack, BakedModel model, ItemDisplayContext itemDisplayContext);
 
     void updateItemTransforms(int depth, Matrix4f pose);
 }

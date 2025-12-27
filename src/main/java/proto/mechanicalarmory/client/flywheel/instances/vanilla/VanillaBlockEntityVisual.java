@@ -6,7 +6,6 @@ import dev.engine_room.flywheel.api.visual.DynamicVisual;
 import dev.engine_room.flywheel.api.visual.TickableVisual;
 import dev.engine_room.flywheel.api.visualization.VisualizationContext;
 import dev.engine_room.flywheel.lib.instance.InstanceTypes;
-import dev.engine_room.flywheel.lib.instance.TransformedInstance;
 import dev.engine_room.flywheel.lib.visual.AbstractBlockEntityVisual;
 import dev.engine_room.flywheel.lib.visual.SimpleDynamicVisual;
 import dev.engine_room.flywheel.lib.visual.SimpleTickableVisual;
@@ -16,6 +15,7 @@ import net.minecraft.client.model.geom.ModelPart;
 import net.minecraft.client.renderer.LevelRenderer;
 import net.minecraft.client.renderer.blockentity.BlockEntityRenderer;
 import net.minecraft.client.renderer.blockentity.BlockEntityRendererProvider;
+import net.minecraft.client.resources.model.BakedModel;
 import net.minecraft.client.resources.model.Material;
 import net.minecraft.world.item.ItemDisplayContext;
 import net.minecraft.world.item.ItemStack;
@@ -89,7 +89,7 @@ public class VanillaBlockEntityVisual extends AbstractBlockEntityVisual<BlockEnt
                 .createInstance(), new Matrix4f(), new Matrix4f()));
     }
 
-    public void addInterpolatedItemTransformedInstance(int depth, ItemStack itemStack) {
+    public void addInterpolatedItemTransformedInstance(int depth, ItemStack itemStack, BakedModel model, ItemDisplayContext itemDisplayContext) {
         while (transformedInstances.size() <= depth) {
             transformedInstances.add(Collections.EMPTY_LIST);
         }
@@ -102,7 +102,7 @@ public class VanillaBlockEntityVisual extends AbstractBlockEntityVisual<BlockEnt
         }
 
         InterpolatedTransformedInstance newInstance = new InterpolatedTransformedInstance(instancerProvider().instancer(
-                        InstanceTypes.TRANSFORMED, ItemModels.get(level, itemStack, ItemDisplayContext.FIXED))
+                        InstanceTypes.TRANSFORMED, ItemModels.get(level, itemStack, ItemDisplayContext.NONE))
                 .createInstance(), new Matrix4f(), new Matrix4f());
         newInstance.instance.light(light);
         transformedInstances.get(depth).add(newInstance);
@@ -122,7 +122,6 @@ public class VanillaBlockEntityVisual extends AbstractBlockEntityVisual<BlockEnt
     public void updateItemTransforms(int depth, Matrix4f p) {
         //WHY????????
         p.translate(+0.5f, +0.5f, +0.5f);
-        p.rotateZ((float)Math.PI/2);
         //???????????
         List<InterpolatedTransformedInstance> get = transformedInstances.get(depth);
 

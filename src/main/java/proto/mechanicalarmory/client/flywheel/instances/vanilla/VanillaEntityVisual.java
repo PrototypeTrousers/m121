@@ -13,6 +13,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.model.geom.ModelPart;
 import net.minecraft.client.renderer.entity.EntityRenderer;
 import net.minecraft.client.renderer.entity.EntityRendererProvider;
+import net.minecraft.client.resources.model.BakedModel;
 import net.minecraft.client.resources.model.Material;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.item.ItemDisplayContext;
@@ -93,7 +94,7 @@ public class VanillaEntityVisual extends AbstractEntityVisual<Entity> implements
                 .createInstance(), new Matrix4f(), new Matrix4f()));
     }
 
-    public void addInterpolatedItemTransformedInstance(int depth, ItemStack itemStack) {
+    public void addInterpolatedItemTransformedInstance(int depth, ItemStack itemStack, BakedModel model, ItemDisplayContext itemDisplayContext) {
         while (transformedInstances.size() <= depth) {
             transformedInstances.add(Collections.EMPTY_LIST);
         }
@@ -106,7 +107,7 @@ public class VanillaEntityVisual extends AbstractEntityVisual<Entity> implements
         }
 
         InterpolatedTransformedInstance newInstance = new InterpolatedTransformedInstance(instancerProvider().instancer(
-                        InstanceTypes.TRANSFORMED, ItemModels.get(level, itemStack, ItemDisplayContext.FIXED))
+                        InstanceTypes.TRANSFORMED, ItemModels.get(level, itemStack, ItemDisplayContext.NONE))
                 .createInstance(), new Matrix4f(), new Matrix4f());
         newInstance.instance.light(light);
         transformedInstances.get(depth).add(newInstance);
@@ -127,7 +128,6 @@ public class VanillaEntityVisual extends AbstractEntityVisual<Entity> implements
     public void updateItemTransforms(int depth, Matrix4f p) {
         //WHY????????
         p.translate(+0.5f, +0.5f, +0.5f);
-        p.rotateZ((float)-Math.PI/2);
         //???????????
         List<InterpolatedTransformedInstance> get = transformedInstances.get(depth);
 
