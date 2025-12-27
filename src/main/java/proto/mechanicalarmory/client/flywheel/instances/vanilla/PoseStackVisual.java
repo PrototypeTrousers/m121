@@ -4,11 +4,11 @@ import dev.engine_room.flywheel.lib.util.RecyclingPoseStack;
 
 public class PoseStackVisual extends RecyclingPoseStack {
 
-    private final VanillaBlockEntityVisual visual;
+    private final SinkBufferSourceVisual visual;
     private int depth;
     private boolean rendered;
 
-    public PoseStackVisual(VanillaBlockEntityVisual visual) {
+    public PoseStackVisual(SinkBufferSourceVisual visual) {
         super();
         this.visual = visual;
     }
@@ -32,7 +32,7 @@ public class PoseStackVisual extends RecyclingPoseStack {
         this.rendered = true;
     }
 
-    public VanillaBlockEntityVisual getVisual() {
+    public SinkBufferSourceVisual getVisual() {
         return visual;
     }
 

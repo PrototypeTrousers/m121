@@ -1,7 +1,5 @@
 package proto.mechanicalarmory.client.flywheel.instances.vanilla;
 
-import com.mojang.blaze3d.vertex.BufferBuilder;
-import com.mojang.blaze3d.vertex.ByteBufferBuilder;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import it.unimi.dsi.fastutil.objects.Object2ObjectArrayMap;
 import net.minecraft.client.Minecraft;
@@ -11,12 +9,12 @@ import net.minecraft.client.resources.model.Material;
 import proto.mechanicalarmory.client.mixin.BufferSourceAccessor;
 
 public class VisualBufferSource extends MultiBufferSource.BufferSource {
-    VanillaBlockEntityVisual visual;
+    SinkBufferSourceVisual visual;
     Object2ObjectArrayMap<VertexConsumer, Material> bufferMaterialMap = new Object2ObjectArrayMap<>();
     Object2ObjectArrayMap<RenderType,VertexConsumer> DUMMY_BUFFER_MAP = new Object2ObjectArrayMap<>();
     boolean rendered;
 
-    public VisualBufferSource(VanillaBlockEntityVisual visual) {
+    public VisualBufferSource(SinkBufferSourceVisual visual) {
         super(null, ((BufferSourceAccessor) Minecraft.getInstance().renderBuffers().bufferSource()).getFixedBuffers());
         this.visual = visual;
     }
@@ -65,10 +63,6 @@ public class VisualBufferSource extends MultiBufferSource.BufferSource {
         public VertexConsumer setNormal(float normalX, float normalY, float normalZ) {
             return this;
         }
-    }
-
-    public VanillaBlockEntityVisual getVisual() {
-        return visual;
     }
 
     public void setRendered(boolean rendered) {

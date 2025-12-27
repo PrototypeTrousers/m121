@@ -9,6 +9,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.resources.model.ModelResourceLocation;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.packs.resources.Resource;
+import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
@@ -22,6 +23,7 @@ import net.neoforged.neoforge.client.gui.IConfigScreenFactory;
 import proto.mechanicalarmory.client.flywheel.gltf.GltfFlywheelModelTree;
 import proto.mechanicalarmory.client.flywheel.instances.arm.ArmVisualiser;
 import proto.mechanicalarmory.client.flywheel.instances.vanilla.VanillaBlockVisualiser;
+import proto.mechanicalarmory.client.flywheel.instances.vanilla.VanillaEntityVisualiser;
 import proto.mechanicalarmory.common.entities.MAEntities;
 
 import java.io.BufferedInputStream;
@@ -71,6 +73,7 @@ public class MechanicalArmoryClient {
         VisualizerRegistry.setVisualizer(BlockEntityType.DECORATED_POT, VanillaBlockVisualiser.VANILLA_BLOCK_VISUALISER);
         VisualizerRegistry.setVisualizer(BlockEntityType.TRIAL_SPAWNER, VanillaBlockVisualiser.VANILLA_BLOCK_VISUALISER);
         VisualizerRegistry.setVisualizer(BlockEntityType.VAULT, VanillaBlockVisualiser.VANILLA_BLOCK_VISUALISER);
+        VisualizerRegistry.setVisualizer(EntityType.VILLAGER, VanillaEntityVisualiser.VANILLA_ENTITY_VISUALISER);
 
         // Some client setup code
         MechanicalArmory.LOGGER.info("HELLO FROM CLIENT SETUP");

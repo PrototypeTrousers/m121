@@ -1,39 +1,37 @@
 package proto.mechanicalarmory.client.flywheel.instances.vanilla;
 
 import com.coralblocks.coralpool.ArrayObjectPool;
-import dev.engine_room.flywheel.api.instance.Instance;
 import dev.engine_room.flywheel.api.visual.DynamicVisual;
 import dev.engine_room.flywheel.api.visual.TickableVisual;
 import dev.engine_room.flywheel.api.visualization.VisualizationContext;
 import dev.engine_room.flywheel.lib.instance.InstanceTypes;
-import dev.engine_room.flywheel.lib.instance.TransformedInstance;
-import dev.engine_room.flywheel.lib.visual.AbstractBlockEntityVisual;
+import dev.engine_room.flywheel.lib.visual.AbstractEntityVisual;
 import dev.engine_room.flywheel.lib.visual.SimpleDynamicVisual;
 import dev.engine_room.flywheel.lib.visual.SimpleTickableVisual;
 import dev.engine_room.vanillin.item.ItemModels;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.model.geom.ModelPart;
-import net.minecraft.client.renderer.LevelRenderer;
-import net.minecraft.client.renderer.blockentity.BlockEntityRenderer;
-import net.minecraft.client.renderer.blockentity.BlockEntityRendererProvider;
+import net.minecraft.client.renderer.entity.EntityRenderer;
+import net.minecraft.client.renderer.entity.EntityRendererProvider;
 import net.minecraft.client.resources.model.Material;
+import net.minecraft.world.entity.Entity;
 import net.minecraft.world.item.ItemDisplayContext;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.level.block.entity.BlockEntity;
-import org.jetbrains.annotations.Nullable;
 import org.joml.Matrix4f;
 import org.joml.Quaternionf;
 import org.joml.Vector3f;
 
-import java.util.*;
-import java.util.function.Consumer;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Iterator;
+import java.util.List;
 
-public class VanillaBlockEntityVisual extends AbstractBlockEntityVisual<BlockEntity> implements SimpleTickableVisual, SimpleDynamicVisual, SinkBufferSourceVisual {
+public class VanillaEntityVisual extends AbstractEntityVisual<Entity> implements SimpleTickableVisual, SimpleDynamicVisual, SinkBufferSourceVisual {
     final public VisualBufferSource visualBufferSource;
     final public List<List<InterpolatedTransformedInstance>> transformedInstances = new ArrayList<>();
     private final PoseStackVisual poseStackVisual = new PoseStackVisual(this);
-    private final BlockRendererBuilder<BlockEntity> builder;
-    private final ArrayObjectPool<BlockEntityRenderer<BlockEntity>> rendererPool;
+    private final EntityRendererBuilder<Entity> builder;
+    private final ArrayObjectPool<EntityRenderer<Entity>> rendererPool;
     private final Matrix4f mutableInterpolationMatrix4f = new Matrix4f();
     Vector3f translation1 = new Vector3f();
     Quaternionf rotation1 = new Quaternionf();
@@ -43,25 +41,26 @@ public class VanillaBlockEntityVisual extends AbstractBlockEntityVisual<BlockEnt
     Vector3f scale2 = new Vector3f();
     private int light;
 
-    public VanillaBlockEntityVisual(VisualizationContext ctx, BlockEntity blockEntity, float partialTick) {
-        super(ctx, blockEntity, partialTick);
-        light = LevelRenderer.getLightColor(level, pos.above());
+    public VanillaEntityVisual(VisualizationContext ctx, Entity entity, float partialTick) {
+        super(ctx, entity, partialTick);
+        light = computePackedLight(partialTick);
         visualBufferSource = new VisualBufferSource(this);
 
-        BlockEntityRendererProvider.Context blockentityrendererprovider$context = new BlockEntityRendererProvider.Context(
-                Minecraft.getInstance().getBlockEntityRenderDispatcher(),
-                Minecraft.getInstance().getBlockRenderer(),
-                Minecraft.getInstance().getItemRenderer(),
+        EntityRendererProvider.Context entityrendererprovider$context = new EntityRendererProvider.Context(
                 Minecraft.getInstance().getEntityRenderDispatcher(),
+                Minecraft.getInstance().getItemRenderer(),
+                Minecraft.getInstance().getBlockRenderer(),
+                Minecraft.getInstance().getEntityRenderDispatcher().getItemInHandRenderer(),
+                Minecraft.getInstance().getResourceManager(),
                 Minecraft.getInstance().getEntityModels(),
                 Minecraft.getInstance().font);
 
-        builder = new BlockRendererBuilder(blockEntity.getType(), blockentityrendererprovider$context);
+        builder = new EntityRendererBuilder(entity.getType(), entityrendererprovider$context);
         rendererPool = new ArrayObjectPool<>(1, builder);
 
-        BlockEntityRenderer<BlockEntity> berenderer = rendererPool.get();
-        poseStackVisual.last().pose().setTranslation(visualPos.getX(), visualPos.getY(), visualPos.getZ());
-        berenderer.render(blockEntity, partialTick, poseStackVisual, visualBufferSource, light, 0);
+        EntityRenderer<Entity> berenderer = rendererPool.get();
+        poseStackVisual.last().pose().setTranslation(getVisualPosition().x(), getVisualPosition().y(), getVisualPosition().z());
+        berenderer.render(entity, entity.getYHeadRot(), partialTick, poseStackVisual, visualBufferSource, light);
         rendererPool.release(berenderer);
         visualBufferSource.setRendered(true);
         poseStackVisual.setRendered();
@@ -69,11 +68,16 @@ public class VanillaBlockEntityVisual extends AbstractBlockEntityVisual<BlockEnt
         for (List<InterpolatedTransformedInstance> key : transformedInstances) {
             for (InterpolatedTransformedInstance ti : key) {
                 ti.instance.light(light);
-                ti.current.setTranslation(ti.current.m30() + visualPos.getX(), ti.current.m31() + visualPos.getY(), ti.current.m32() + visualPos.getZ());
+                ti.current.setTranslation(ti.current.m30() + getVisualPosition().x, ti.current.m31() + getVisualPosition().y, ti.current.m32() + getVisualPosition().z);
                 ti.instance.setTransform(ti.current).setChanged();
-                ti.current.setTranslation(ti.current.m30() - visualPos.getX(), ti.current.m31() - visualPos.getY(), ti.current.m32() - visualPos.getZ());
+                ti.current.setTranslation(ti.current.m30() - getVisualPosition().x, ti.current.m31() - getVisualPosition().y, ti.current.m32() - getVisualPosition().z);
             }
         }
+    }
+
+    @Override
+    public VisualBufferSource getBufferSource() {
+        return visualBufferSource;
     }
 
     public void addInterpolatedTransformedInstance(int depth, ModelPart modelPart, Material material) {
@@ -110,6 +114,7 @@ public class VanillaBlockEntityVisual extends AbstractBlockEntityVisual<BlockEnt
 
     public void updateTransforms(int depth, Matrix4f p) {
         List<InterpolatedTransformedInstance> get = transformedInstances.get(depth);
+
         for (int i = 0; i < get.size(); i++) {
             InterpolatedTransformedInstance ti = get.get(i);
             ti.previous.set(ti.current);
@@ -162,7 +167,7 @@ public class VanillaBlockEntityVisual extends AbstractBlockEntityVisual<BlockEnt
 
     @Override
     public void beginFrame(DynamicVisual.Context ctx) {
-        if (doDistanceLimitThisFrame(ctx) || !isVisible(ctx.frustum())) {
+        if (!isVisible(ctx.frustum())) {
             return;
         }
 
@@ -190,8 +195,9 @@ public class VanillaBlockEntityVisual extends AbstractBlockEntityVisual<BlockEnt
     public void tick(TickableVisual.Context context) {
         long lastTick = level.getGameTime();
         poseStackVisual.setDepth(0);
-        BlockEntityRenderer<BlockEntity> berenderer = rendererPool.get();
-        berenderer.render(blockEntity, 1, poseStackVisual, visualBufferSource, light, 0);
+        EntityRenderer<Entity> berenderer = rendererPool.get();
+        poseStackVisual.last().pose().setTranslation(getVisualPosition().x(), getVisualPosition().y(), getVisualPosition().z());
+        berenderer.render(entity, entity.getYHeadRot(), Minecraft.getInstance().getTimer().getGameTimeDeltaPartialTick(false) , poseStackVisual, visualBufferSource, light);
         rendererPool.release(berenderer);
         for (List<InterpolatedTransformedInstance> list : transformedInstances) {
             for (Iterator<InterpolatedTransformedInstance> iterator = list.iterator(); iterator.hasNext(); ) {
@@ -205,26 +211,9 @@ public class VanillaBlockEntityVisual extends AbstractBlockEntityVisual<BlockEnt
     }
 
     @Override
-    public void collectCrumblingInstances(Consumer<@Nullable Instance> consumer) {
-
-    }
-
-    @Override
-    public void updateLight(float partialTick) {
-        for (List<InterpolatedTransformedInstance> key : transformedInstances) {
-            key.forEach(ti -> ti.instance.light(light));
-        }
-    }
-
-    @Override
     protected void _delete() {
         for (List<InterpolatedTransformedInstance> v : transformedInstances) {
             v.forEach(ti -> ti.instance.delete());
         }
-    }
-
-    @Override
-    public VisualBufferSource getBufferSource() {
-        return visualBufferSource;
     }
 }

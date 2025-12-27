@@ -14,6 +14,7 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import proto.mechanicalarmory.client.flywheel.instances.vanilla.PoseStackVisual;
+import proto.mechanicalarmory.client.flywheel.instances.vanilla.SinkBufferSourceVisual;
 import proto.mechanicalarmory.client.flywheel.instances.vanilla.VanillaBlockEntityVisual;
 import proto.mechanicalarmory.client.flywheel.instances.vanilla.VisualBufferSource;
 
@@ -27,7 +28,7 @@ public abstract class ModelPartMixin {
     @Inject(method = "render(Lcom/mojang/blaze3d/vertex/PoseStack;Lcom/mojang/blaze3d/vertex/VertexConsumer;III)V", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/model/geom/ModelPart;translateAndRotate(Lcom/mojang/blaze3d/vertex/PoseStack;)V", shift = At.Shift.AFTER), cancellable = true)
     private void injected(PoseStack poseStack, VertexConsumer buffer, int packedLight, int packedOverlay, int color, CallbackInfo ci) {
         if (poseStack instanceof PoseStackVisual pv) {
-            VanillaBlockEntityVisual v = pv.getVisual();
+            SinkBufferSourceVisual v = pv.getVisual();
             if (((ModelPart) (Object) this).isEmpty()) return;
             if (!pv.isRendered()) {
                 Material mat;
