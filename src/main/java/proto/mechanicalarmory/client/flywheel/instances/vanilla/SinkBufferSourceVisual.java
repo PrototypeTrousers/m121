@@ -15,6 +15,7 @@ import net.neoforged.neoforge.common.NeoForge;
 import org.joml.Matrix4f;
 import org.joml.Quaternionf;
 import org.joml.Vector3f;
+import software.bernie.geckolib.cache.object.GeoBone;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -87,6 +88,20 @@ public interface SinkBufferSourceVisual {
 
         transformedInstances.get(depth).add(new InterpolatedTransformedInstance(getInstanceProvider().instancer(
                         InstanceTypes.TRANSFORMED, VanillaModel.cachedOf(modelPart, material))
+                .createInstance(), new Matrix4f(), new Matrix4f()));
+    }
+
+    default void addInterpolatedTransformedInstance(int depth, GeoBone geoBone, Material material) {
+        List<List<InterpolatedTransformedInstance>> transformedInstances = getTransformedInstances();
+        while (transformedInstances.size() <= depth) {
+            transformedInstances.add(Collections.EMPTY_LIST);
+        }
+        if (transformedInstances.get(depth) == Collections.EMPTY_LIST) {
+            transformedInstances.set(depth, new ArrayList<>());
+        }
+
+        transformedInstances.get(depth).add(new InterpolatedTransformedInstance(getInstanceProvider().instancer(
+                        InstanceTypes.TRANSFORMED, GeckoModel.cachedOf(geoBone, material))
                 .createInstance(), new Matrix4f(), new Matrix4f()));
     }
 

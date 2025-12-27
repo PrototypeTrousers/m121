@@ -24,6 +24,9 @@
     "defaultRequire": 1
   },
   "mixins": [
-    "ItemModelsMixin"
+    "AutoPlayingSoundKeyframeHandlerMixin",
+    "GeoRenderMixin",
+    "ItemModelsMixin",
+    "LegacyRandomSourceMixin"
   ]
 }
