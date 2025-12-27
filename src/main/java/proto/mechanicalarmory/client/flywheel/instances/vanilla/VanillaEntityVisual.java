@@ -127,7 +127,7 @@ public class VanillaEntityVisual extends AbstractEntityVisual<Entity> implements
     public void updateItemTransforms(int depth, Matrix4f p) {
         //WHY????????
         p.translate(+0.5f, +0.5f, +0.5f);
-        p.rotateZ((float)Math.PI/2);
+        p.rotateZ((float)-Math.PI/2);
         //???????????
         List<InterpolatedTransformedInstance> get = transformedInstances.get(depth);
 

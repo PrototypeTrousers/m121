@@ -7,6 +7,7 @@ import dev.engine_room.flywheel.api.visualization.VisualizerRegistry;
 import dev.engine_room.flywheel.lib.model.part.ModelTree;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.resources.model.ModelResourceLocation;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.packs.resources.Resource;
 import net.minecraft.world.entity.EntityType;
@@ -73,6 +74,7 @@ public class MechanicalArmoryClient {
         VisualizerRegistry.setVisualizer(BlockEntityType.DECORATED_POT, VanillaBlockVisualiser.VANILLA_BLOCK_VISUALISER);
         VisualizerRegistry.setVisualizer(BlockEntityType.TRIAL_SPAWNER, VanillaBlockVisualiser.VANILLA_BLOCK_VISUALISER);
         VisualizerRegistry.setVisualizer(BlockEntityType.VAULT, VanillaBlockVisualiser.VANILLA_BLOCK_VISUALISER);
+        BuiltInRegistries.ENTITY_TYPE.forEach(c -> VisualizerRegistry.setVisualizer(c, VanillaEntityVisualiser.VANILLA_ENTITY_VISUALISER));
         VisualizerRegistry.setVisualizer(EntityType.VILLAGER, VanillaEntityVisualiser.VANILLA_ENTITY_VISUALISER);
 
         // Some client setup code
