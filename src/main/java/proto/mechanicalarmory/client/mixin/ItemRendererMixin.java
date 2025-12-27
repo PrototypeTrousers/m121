@@ -22,7 +22,7 @@ public abstract class ItemRendererMixin {
     public void ma$renderStatic(ItemStack itemStack, ItemDisplayContext displayContext, boolean leftHand, PoseStack poseStack, MultiBufferSource bufferSource, int combinedLight, int combinedOverlay, BakedModel p_model, CallbackInfo ci) {
         if (poseStack instanceof PoseStackVisual psv) {
             SinkBufferSourceVisual v = psv.getVisual();
-            v.addInterpolatedItemTransformedInstance(psv.getDepth(), itemStack, p_model, displayContext);
+            v.addInterpolatedItemTransformedInstance(psv.getDepth(), itemStack, displayContext);
             v.updateItemTransforms(psv.getDepth(), poseStack.last().pose());
             //ci.cancel();
         }

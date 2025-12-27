@@ -2,30 +2,27 @@ package proto.mechanicalarmory.client.flywheel.instances.vanilla;
 
 import com.coralblocks.coralpool.ArrayObjectPool;
 import dev.engine_room.flywheel.api.instance.Instance;
+import dev.engine_room.flywheel.api.instance.InstancerProvider;
 import dev.engine_room.flywheel.api.visual.DynamicVisual;
 import dev.engine_room.flywheel.api.visual.TickableVisual;
 import dev.engine_room.flywheel.api.visualization.VisualizationContext;
-import dev.engine_room.flywheel.lib.instance.InstanceTypes;
 import dev.engine_room.flywheel.lib.visual.AbstractBlockEntityVisual;
 import dev.engine_room.flywheel.lib.visual.SimpleDynamicVisual;
 import dev.engine_room.flywheel.lib.visual.SimpleTickableVisual;
-import dev.engine_room.vanillin.item.ItemModels;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.model.geom.ModelPart;
 import net.minecraft.client.renderer.LevelRenderer;
 import net.minecraft.client.renderer.blockentity.BlockEntityRenderer;
 import net.minecraft.client.renderer.blockentity.BlockEntityRendererProvider;
-import net.minecraft.client.resources.model.BakedModel;
-import net.minecraft.client.resources.model.Material;
-import net.minecraft.world.item.ItemDisplayContext;
-import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.LevelAccessor;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Matrix4f;
 import org.joml.Quaternionf;
 import org.joml.Vector3f;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
 import java.util.function.Consumer;
 
 public class VanillaBlockEntityVisual extends AbstractBlockEntityVisual<BlockEntity> implements SimpleTickableVisual, SimpleDynamicVisual, SinkBufferSourceVisual {
@@ -35,13 +32,9 @@ public class VanillaBlockEntityVisual extends AbstractBlockEntityVisual<BlockEnt
     private final BlockRendererBuilder<BlockEntity> builder;
     private final ArrayObjectPool<BlockEntityRenderer<BlockEntity>> rendererPool;
     private final Matrix4f mutableInterpolationMatrix4f = new Matrix4f();
-    Vector3f translation1 = new Vector3f();
-    Quaternionf rotation1 = new Quaternionf();
-    Vector3f scale1 = new Vector3f();
-    Vector3f translation2 = new Vector3f();
-    Quaternionf rotation2 = new Quaternionf();
-    Vector3f scale2 = new Vector3f();
-    private int light;
+    Vector3f[] interpolationVecs = new Vector3f[]{new Vector3f(), new Vector3f(), new Vector3f(), new Vector3f()};
+    Quaternionf[] interpolationQuats = new Quaternionf[]{new Quaternionf(), new Quaternionf()};
+    private final int light;
 
     public VanillaBlockEntityVisual(VisualizationContext ctx, BlockEntity blockEntity, float partialTick) {
         super(ctx, blockEntity, partialTick);
@@ -76,87 +69,27 @@ public class VanillaBlockEntityVisual extends AbstractBlockEntityVisual<BlockEnt
         }
     }
 
-    public void addInterpolatedTransformedInstance(int depth, ModelPart modelPart, Material material) {
-        while (transformedInstances.size() <= depth) {
-            transformedInstances.add(Collections.EMPTY_LIST);
-        }
-        if (transformedInstances.get(depth) == Collections.EMPTY_LIST) {
-            transformedInstances.set(depth, new ArrayList<>());
-        }
-
-        transformedInstances.get(depth).add(new InterpolatedTransformedInstance(instancerProvider().instancer(
-                        InstanceTypes.TRANSFORMED, VanillaModel.cachedOf(modelPart, material))
-                .createInstance(), new Matrix4f(), new Matrix4f()));
+    @Override
+    public LevelAccessor getLevel() {
+        return this.level;
     }
 
-    public void addInterpolatedItemTransformedInstance(int depth, ItemStack itemStack, BakedModel model, ItemDisplayContext itemDisplayContext) {
-        while (transformedInstances.size() <= depth) {
-            transformedInstances.add(Collections.EMPTY_LIST);
-        }
-        if (transformedInstances.get(depth) == Collections.EMPTY_LIST) {
-            transformedInstances.set(depth, new ArrayList<>());
-        }
-
-        if (!transformedInstances.get(depth).isEmpty()) {
-            return;
-        }
-
-        InterpolatedTransformedInstance newInstance = new InterpolatedTransformedInstance(instancerProvider().instancer(
-                        InstanceTypes.TRANSFORMED, ItemModels.get(level, itemStack, ItemDisplayContext.NONE))
-                .createInstance(), new Matrix4f(), new Matrix4f());
-        newInstance.instance.light(light);
-        transformedInstances.get(depth).add(newInstance);
-    }
-
-    public void updateTransforms(int depth, Matrix4f p) {
-        List<InterpolatedTransformedInstance> get = transformedInstances.get(depth);
-        for (int i = 0; i < get.size(); i++) {
-            InterpolatedTransformedInstance ti = get.get(i);
-            ti.previous.set(ti.current);
-            ti.current.set(p);
-            ti.instance.setTransform(ti.current).setChanged();
-            ti.lastTick = level.getGameTime();
-        }
-    }
-
-    public void updateItemTransforms(int depth, Matrix4f p) {
-        //WHY????????
-        p.translate(+0.5f, +0.5f, +0.5f);
-        //???????????
-        List<InterpolatedTransformedInstance> get = transformedInstances.get(depth);
-
-        for (int i = 0; i < get.size(); i++) {
-            InterpolatedTransformedInstance ti = get.get(i);
-            ti.previous.set(ti.current);
-            ti.current.set(p);
-            ti.instance.setTransform(ti.current).setChanged();
-            ti.lastTick = level.getGameTime();
-        }
-    }
-
-    public Matrix4f interpolate(Matrix4f m1, Matrix4f m2, float t) {
-        // 1. Decompose Matrix 1
-        m1.getTranslation(translation1);
-        m1.getUnnormalizedRotation(rotation1);
-        m1.getScale(scale1);
-        // 2. Decompose Matrix 2
-
-        m2.getTranslation(translation2);
-        m2.getUnnormalizedRotation(rotation2);
-        m2.getScale(scale2);
-
-        // 3. Interpolate components
-        // Translation: Linear Interpolation (Lerp)
-        Vector3f lerpTranslation = translation1.lerp(translation2, t);
-        // Scale: Linear Interpolation (Lerp)
-        Vector3f lerpScale = scale1.lerp(scale2, t);
-        // Rotation: Spherical Linear Interpolation (Slerp)
-        Quaternionf slerpRotation = rotation1.nlerp(rotation2, t);
-
-        // 4. Recompose into a new Matrix
-        mutableInterpolationMatrix4f.translationRotateScale(lerpTranslation, slerpRotation, lerpScale);
-
+    @Override
+    public Matrix4f getMutableInterpolationMatrix4f() {
         return mutableInterpolationMatrix4f;
+    }
+
+    public Vector3f[] getInterpolationVecs() {
+        return interpolationVecs;
+    }
+
+    public Quaternionf[] getInterpolationQuats() {
+        return interpolationQuats;
+    }
+
+    @Override
+    public int getLight() {
+        return light;
     }
 
     @Override
@@ -205,7 +138,9 @@ public class VanillaBlockEntityVisual extends AbstractBlockEntityVisual<BlockEnt
 
     @Override
     public void collectCrumblingInstances(Consumer<@Nullable Instance> consumer) {
-
+        for (List<InterpolatedTransformedInstance> key : transformedInstances) {
+            key.forEach(ti -> consumer.accept(ti.instance));
+        }
     }
 
     @Override
@@ -220,6 +155,16 @@ public class VanillaBlockEntityVisual extends AbstractBlockEntityVisual<BlockEnt
         for (List<InterpolatedTransformedInstance> v : transformedInstances) {
             v.forEach(ti -> ti.instance.delete());
         }
+    }
+
+    @Override
+    public List<List<InterpolatedTransformedInstance>> getTransformedInstances() {
+        return transformedInstances;
+    }
+
+    @Override
+    public InstancerProvider getInstanceProvider() {
+        return instancerProvider();
     }
 
     @Override

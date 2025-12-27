@@ -6,6 +6,7 @@ import de.javagl.jgltf.model.io.GltfModelReader;
 import dev.engine_room.flywheel.api.visualization.VisualizerRegistry;
 import dev.engine_room.flywheel.lib.model.part.ModelTree;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.renderer.blockentity.BlockEntityRenderers;
 import net.minecraft.client.resources.model.ModelResourceLocation;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
@@ -26,6 +27,8 @@ import proto.mechanicalarmory.client.flywheel.instances.arm.ArmVisualiser;
 import proto.mechanicalarmory.client.flywheel.instances.vanilla.VanillaBlockVisualiser;
 import proto.mechanicalarmory.client.flywheel.instances.vanilla.VanillaEntityVisualiser;
 import proto.mechanicalarmory.common.entities.MAEntities;
+import rearth.oritech.client.renderers.MachineRenderer;
+import rearth.oritech.init.BlockEntitiesContent;
 
 import java.io.BufferedInputStream;
 import java.io.IOException;
@@ -49,6 +52,7 @@ public class MechanicalArmoryClient {
 
     @SubscribeEvent
     static void onClientSetup(FMLClientSetupEvent event) {
+        VisualizerRegistry.setVisualizer(BlockEntitiesContent.CENTRIFUGE_ENTITY,VanillaBlockVisualiser.VANILLA_BLOCK_VISUALISER);
         VisualizerRegistry.setVisualizer(MAEntities.ARM_ENTITY.get(), ArmVisualiser.ARM_VISUAL);
         VisualizerRegistry.setVisualizer(BlockEntityType.SIGN, VanillaBlockVisualiser.VANILLA_BLOCK_VISUALISER);
         VisualizerRegistry.setVisualizer(BlockEntityType.HANGING_SIGN, VanillaBlockVisualiser.VANILLA_BLOCK_VISUALISER);
