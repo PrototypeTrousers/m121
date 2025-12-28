@@ -1,6 +1,5 @@
 package proto.mechanicalarmory.client.flywheel.instances.vanilla;
 
-import com.coralblocks.coralpool.ArrayObjectPool;
 import dev.engine_room.flywheel.api.instance.Instance;
 import dev.engine_room.flywheel.api.instance.InstancerProvider;
 import dev.engine_room.flywheel.api.visual.DynamicVisual;
@@ -9,10 +8,8 @@ import dev.engine_room.flywheel.api.visualization.VisualizationContext;
 import dev.engine_room.flywheel.lib.visual.AbstractBlockEntityVisual;
 import dev.engine_room.flywheel.lib.visual.SimpleDynamicVisual;
 import dev.engine_room.flywheel.lib.visual.SimpleTickableVisual;
-import net.minecraft.client.Minecraft;
+import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.renderer.LevelRenderer;
-import net.minecraft.client.renderer.blockentity.BlockEntityRenderer;
-import net.minecraft.client.renderer.blockentity.BlockEntityRendererProvider;
 import net.minecraft.world.level.LevelAccessor;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import org.jetbrains.annotations.Nullable;
@@ -21,52 +18,29 @@ import org.joml.Quaternionf;
 import org.joml.Vector3f;
 
 import java.util.ArrayList;
-import java.util.Iterator;
 import java.util.List;
 import java.util.function.Consumer;
 
 public class VanillaBlockEntityVisual extends AbstractBlockEntityVisual<BlockEntity> implements SimpleTickableVisual, SimpleDynamicVisual, SinkBufferSourceVisual {
     final public VisualBufferSource visualBufferSource;
     final public List<List<InterpolatedTransformedInstance>> transformedInstances = new ArrayList<>();
-    private final PoseStackVisual poseStackVisual = new PoseStackVisual(this);
-    private final BlockRendererBuilder<BlockEntity> builder;
-    private final ArrayObjectPool<BlockEntityRenderer<BlockEntity>> rendererPool;
+    public final PoseStackVisual poseStackVisual = new PoseStackVisual(this);
     private final Matrix4f mutableInterpolationMatrix4f = new Matrix4f();
     Vector3f[] interpolationVecs = new Vector3f[]{new Vector3f(), new Vector3f(), new Vector3f(), new Vector3f()};
     Quaternionf[] interpolationQuats = new Quaternionf[]{new Quaternionf(), new Quaternionf()};
+
+    @Override
+    public List<Matrix4f> getMatrix4fs() {
+        return matrix4fs;
+    }
+
+    List<Matrix4f> matrix4fs = new ArrayList<>();
     private final int light;
 
     public VanillaBlockEntityVisual(VisualizationContext ctx, BlockEntity blockEntity, float partialTick) {
         super(ctx, blockEntity, partialTick);
         light = LevelRenderer.getLightColor(level, pos.above());
         visualBufferSource = new VisualBufferSource(this);
-
-        BlockEntityRendererProvider.Context blockentityrendererprovider$context = new BlockEntityRendererProvider.Context(
-                Minecraft.getInstance().getBlockEntityRenderDispatcher(),
-                Minecraft.getInstance().getBlockRenderer(),
-                Minecraft.getInstance().getItemRenderer(),
-                Minecraft.getInstance().getEntityRenderDispatcher(),
-                Minecraft.getInstance().getEntityModels(),
-                Minecraft.getInstance().font);
-
-        builder = new BlockRendererBuilder(blockEntity.getType(), blockentityrendererprovider$context);
-        rendererPool = new ArrayObjectPool<>(1, builder);
-
-        BlockEntityRenderer<BlockEntity> berenderer = rendererPool.get();
-        poseStackVisual.last().pose().setTranslation(visualPos.getX(), visualPos.getY(), visualPos.getZ());
-        berenderer.render(blockEntity, partialTick, poseStackVisual, visualBufferSource, light, 0);
-        rendererPool.release(berenderer);
-        visualBufferSource.setRendered(true);
-        poseStackVisual.setRendered();
-
-        for (List<InterpolatedTransformedInstance> key : transformedInstances) {
-            for (InterpolatedTransformedInstance ti : key) {
-                ti.instance.light(light);
-                ti.current.setTranslation(ti.current.m30() + visualPos.getX(), ti.current.m31() + visualPos.getY(), ti.current.m32() + visualPos.getZ());
-                ti.instance.setTransform(ti.current).setChanged();
-                ti.current.setTranslation(ti.current.m30() - visualPos.getX(), ti.current.m31() - visualPos.getY(), ti.current.m32() - visualPos.getZ());
-            }
-        }
     }
 
     @Override
@@ -120,20 +94,35 @@ public class VanillaBlockEntityVisual extends AbstractBlockEntityVisual<BlockEnt
 
     @Override
     public void tick(TickableVisual.Context context) {
-        long lastTick = level.getGameTime();
-        poseStackVisual.setDepth(0);
-        BlockEntityRenderer<BlockEntity> berenderer = rendererPool.get();
-        berenderer.render(blockEntity, 1, poseStackVisual, visualBufferSource, light, 0);
-        rendererPool.release(berenderer);
-        for (List<InterpolatedTransformedInstance> list : transformedInstances) {
-            for (Iterator<InterpolatedTransformedInstance> iterator = list.iterator(); iterator.hasNext(); ) {
-                InterpolatedTransformedInstance ti = iterator.next();
-                if (ti.lastTick != lastTick) {
-                    ti.instance.delete();
-                    iterator.remove();
-                }
+
+        List<List<InterpolatedTransformedInstance>> transformedInstances = getTransformedInstances();
+
+        for (int depth = 0; depth < transformedInstances.size(); depth++) {
+            Matrix4f p = matrix4fs.get(depth);
+            List<InterpolatedTransformedInstance> get = transformedInstances.get(depth);
+            for (int i = 0; i < get.size(); i++) {
+                InterpolatedTransformedInstance ti = get.get(i);
+                ti.previous.set(ti.current);
+                ti.current.set(p);
+                ti.instance.setTransform(ti.current).setChanged();
+                ti.lastTick = ((ClientLevel) getLevel()).getGameTime();
             }
         }
+
+//        long lastTick = level.getGameTime();
+//        poseStackVisual.setDepth(0);
+//        BlockEntityRenderer<BlockEntity> berenderer = rendererPool.get();
+//        berenderer.render(blockEntity, 1, poseStackVisual, visualBufferSource, light, 0);
+//        rendererPool.release(berenderer);
+//        for (List<InterpolatedTransformedInstance> list : transformedInstances) {
+//            for (Iterator<InterpolatedTransformedInstance> iterator = list.iterator(); iterator.hasNext(); ) {
+//                InterpolatedTransformedInstance ti = iterator.next();
+//                if (ti.lastTick != lastTick) {
+//                    ti.instance.delete();
+//                    iterator.remove();
+//                }
+//            }
+//        }
     }
 
     @Override

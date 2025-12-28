@@ -155,4 +155,9 @@ public class VanillaEntityVisual extends AbstractEntityVisual<Entity> implements
     public InstancerProvider getInstanceProvider() {
         return instancerProvider();
     }
+
+    @Override
+    public List<Matrix4f> getMatrix4fs() {
+        return List.of();
+    }
 }

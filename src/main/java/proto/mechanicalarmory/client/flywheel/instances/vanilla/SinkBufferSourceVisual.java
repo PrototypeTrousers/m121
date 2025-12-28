@@ -29,6 +29,8 @@ public interface SinkBufferSourceVisual {
 
     InstancerProvider getInstanceProvider();
 
+    List<Matrix4f> getMatrix4fs();
+
     LevelAccessor getLevel();
 
     Matrix4f getMutableInterpolationMatrix4f();
@@ -86,9 +88,11 @@ public interface SinkBufferSourceVisual {
             transformedInstances.set(depth, new ArrayList<>());
         }
 
-        transformedInstances.get(depth).add(new InterpolatedTransformedInstance(getInstanceProvider().instancer(
+        InterpolatedTransformedInstance newIns = new InterpolatedTransformedInstance(getInstanceProvider().instancer(
                         InstanceTypes.TRANSFORMED, VanillaModel.cachedOf(modelPart, material))
-                .createInstance(), new Matrix4f(), new Matrix4f()));
+                .createInstance(), new Matrix4f(), new Matrix4f());
+        newIns.instance.light(getLight());
+        transformedInstances.get(depth).add(newIns);
     }
 
     default void addInterpolatedTransformedInstance(int depth, GeoBone geoBone, Material material) {
@@ -100,22 +104,21 @@ public interface SinkBufferSourceVisual {
             transformedInstances.set(depth, new ArrayList<>());
         }
 
-        transformedInstances.get(depth).add(new InterpolatedTransformedInstance(getInstanceProvider().instancer(
+        InterpolatedTransformedInstance newIns = new InterpolatedTransformedInstance(getInstanceProvider().instancer(
                         InstanceTypes.TRANSFORMED, GeckoModel.cachedOf(geoBone, material))
-                .createInstance(), new Matrix4f(), new Matrix4f()));
+                .createInstance(), new Matrix4f(), new Matrix4f());
+        transformedInstances.get(depth).add(newIns);
+
+        newIns.instance.light(getLight());
     }
 
     default void updateTransforms(int depth, Matrix4f p) {
-        List<List<InterpolatedTransformedInstance>> transformedInstances = getTransformedInstances();
-
-        List<InterpolatedTransformedInstance> get = transformedInstances.get(depth);
-        for (int i = 0; i < get.size(); i++) {
-            InterpolatedTransformedInstance ti = get.get(i);
-            ti.previous.set(ti.current);
-            ti.current.set(p);
-            ti.instance.setTransform(ti.current).setChanged();
-            ti.lastTick = ((ClientLevel) getLevel()).getGameTime();
+        List<Matrix4f> matrices = getMatrix4fs();
+        while (matrices.size() <= depth) {
+            matrices.add(new Matrix4f());
         }
+        //AVOID THIS INSTANTIATION
+        matrices.set(depth, new Matrix4f(p));
     }
 
     default void addInterpolatedItemTransformedInstance(int depth, ItemStack itemStack, ItemDisplayContext itemDisplayContext) {

@@ -20,9 +20,6 @@ public class VanillaBlockVisualiser implements BlockEntityVisualizer<BlockEntity
 
     @Override
     public boolean skipVanillaRender(BlockEntity blockEntity) {
-        if (blockEntity.getLevel().getBlockState(blockEntity.getBlockPos().below()).is(Blocks.OBSIDIAN)) {
-            return false;
-        }
-        return true;
+        return false;
     }
 }
