@@ -20,17 +20,20 @@ public class LevelRendererMixin implements LastRenderTimeTracker {
 
     @Unique
     private static long lastRenderTime;
+    private static long currentRenderTime;
 
     @Shadow
     private ClientLevel level;
 
     @Inject(method = "renderLevel", at = @At("TAIL"))
     void updateLastRenderedTick(DeltaTracker deltaTracker, boolean renderBlockOutline, Camera camera, GameRenderer gameRenderer, LightTexture lightTexture, Matrix4f frustumMatrix, Matrix4f projectionMatrix, CallbackInfo ci){
-        lastRenderTime = level.getGameTime();
+
+        lastRenderTime = currentRenderTime;
+        currentRenderTime = level.getGameTime();
     }
 
     @Override
-    public long m121$getLastRenderTime() {
-        return lastRenderTime;
+    public boolean m121$isFirstFrameOfRenderTick() {
+        return lastRenderTime != currentRenderTime;
     }
 }

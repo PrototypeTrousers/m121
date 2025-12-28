@@ -74,14 +74,7 @@ public class BlockEntityRenderDispatcherMixin {
                             }
                         }
                     }
-                    long curr = Minecraft.getInstance().level.getGameTime();
-                    long last = ((LastRenderTimeTracker) Minecraft.getInstance().levelRenderer).m121$getLastRenderTime();
-
-                    if (curr <= last) {
-                        return false;
-                    }
-                    return true;
-
+                    return ((LastRenderTimeTracker) Minecraft.getInstance().levelRenderer).m121$isFirstFrameOfRenderTick();
                 }
             }
             return false;

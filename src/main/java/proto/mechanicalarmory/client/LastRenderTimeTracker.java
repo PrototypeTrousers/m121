@@ -1,5 +1,5 @@
 package proto.mechanicalarmory.client;
 
 public interface LastRenderTimeTracker {
-    long m121$getLastRenderTime();
+    boolean m121$isFirstFrameOfRenderTick();
 }
