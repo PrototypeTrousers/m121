@@ -96,16 +96,17 @@ public class VanillaBlockEntityVisual extends AbstractBlockEntityVisual<BlockEnt
     public void tick(TickableVisual.Context context) {
 
         List<List<InterpolatedTransformedInstance>> transformedInstances = getTransformedInstances();
-
-        for (int depth = 0; depth < transformedInstances.size(); depth++) {
-            Matrix4f p = matrix4fs.get(depth);
-            List<InterpolatedTransformedInstance> get = transformedInstances.get(depth);
-            for (int i = 0; i < get.size(); i++) {
-                InterpolatedTransformedInstance ti = get.get(i);
-                ti.previous.set(ti.current);
-                ti.current.set(p);
-                ti.instance.setTransform(ti.current).setChanged();
-                ti.lastTick = ((ClientLevel) getLevel()).getGameTime();
+        if (matrix4fs.size() == transformedInstances.size()) {
+            for (int depth = 0; depth < transformedInstances.size(); depth++) {
+                Matrix4f p = matrix4fs.get(depth);
+                List<InterpolatedTransformedInstance> get = transformedInstances.get(depth);
+                for (int i = 0; i < get.size(); i++) {
+                    InterpolatedTransformedInstance ti = get.get(i);
+                    ti.previous.set(ti.current);
+                    ti.current.set(p);
+                    ti.instance.setTransform(ti.current).setChanged();
+                    ti.lastTick = ((ClientLevel) getLevel()).getGameTime();
+                }
             }
         }
 

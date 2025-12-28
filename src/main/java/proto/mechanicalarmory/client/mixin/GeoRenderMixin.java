@@ -40,8 +40,8 @@ public interface GeoRenderMixin {
                     ResourceLocation atlas = ((TextureStateShardAccessor) r).getTexture().get();
                     mat = new Material(atlas, atlas);
                 }
+                v.updateTransforms(pv.getDepth(), poseStack.last().pose());
                 v.addInterpolatedTransformedInstance(pv.getDepth(), bone, mat);
-
             } else {
                 v.updateTransforms(pv.getDepth(), poseStack.last().pose());
             }

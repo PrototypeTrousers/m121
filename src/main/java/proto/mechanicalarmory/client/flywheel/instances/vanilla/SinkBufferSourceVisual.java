@@ -92,6 +92,9 @@ public interface SinkBufferSourceVisual {
                         InstanceTypes.TRANSFORMED, VanillaModel.cachedOf(modelPart, material))
                 .createInstance(), new Matrix4f(), new Matrix4f());
         newIns.instance.light(getLight());
+        newIns.previous.set(getMatrix4fs().get(depth));
+        newIns.instance.setTransform(getMatrix4fs().get(depth));
+        newIns.instance.setChanged();
         transformedInstances.get(depth).add(newIns);
     }
 
@@ -108,8 +111,10 @@ public interface SinkBufferSourceVisual {
                         InstanceTypes.TRANSFORMED, GeckoModel.cachedOf(geoBone, material))
                 .createInstance(), new Matrix4f(), new Matrix4f());
         transformedInstances.get(depth).add(newIns);
-
+        newIns.previous.set(getMatrix4fs().get(depth));
+        newIns.instance.setTransform(getMatrix4fs().get(depth));
         newIns.instance.light(getLight());
+        newIns.instance.setChanged();
     }
 
     default void updateTransforms(int depth, Matrix4f p) {
@@ -118,7 +123,9 @@ public interface SinkBufferSourceVisual {
             matrices.add(new Matrix4f());
         }
         //AVOID THIS INSTANTIATION
-        matrices.set(depth, new Matrix4f(p));
+        if (!matrices.get(depth).equals(p)) {
+            matrices.set(depth, new Matrix4f(p));
+        }
     }
 
     default void addInterpolatedItemTransformedInstance(int depth, ItemStack itemStack, ItemDisplayContext itemDisplayContext) {

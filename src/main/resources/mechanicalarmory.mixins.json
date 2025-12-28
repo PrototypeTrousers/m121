@@ -28,6 +28,7 @@
     "AutoPlayingSoundKeyframeHandlerMixin",
     "GeoRenderMixin",
     "ItemModelsMixin",
-    "LegacyRandomSourceMixin"
+    "LegacyRandomSourceMixin",
+    "LevelRendererMixin"
   ]
 }
