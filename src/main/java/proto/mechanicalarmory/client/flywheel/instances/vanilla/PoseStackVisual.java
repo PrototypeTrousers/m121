@@ -1,12 +1,22 @@
 package proto.mechanicalarmory.client.flywheel.instances.vanilla;
 
+
+import com.mojang.blaze3d.vertex.PoseStack;
+import dev.engine_room.flywheel.lib.internal.FlwLibLink;
 import dev.engine_room.flywheel.lib.util.RecyclingPoseStack;
 
-public class PoseStackVisual extends RecyclingPoseStack {
+import java.util.ArrayDeque;
+import java.util.Deque;
+import java.util.List;
+
+public class PoseStackVisual extends PoseStack {
 
     private final SinkBufferSourceVisual visual;
     private int depth;
     private boolean rendered;
+    private final Deque<Pose> recycleBin = new ArrayDeque<>();
+    private final Deque<Pose> stash = new ArrayDeque<>();
+
 
     public PoseStackVisual(SinkBufferSourceVisual visual) {
         super();
@@ -15,13 +25,29 @@ public class PoseStackVisual extends RecyclingPoseStack {
 
     @Override
     public void pushPose() {
-        super.pushPose();
+        if (depth == 0) {
+            recycleBin.addAll(stash);
+            stash.clear();
+        }
+        if (recycleBin.isEmpty()) {
+            super.pushPose();
+        } else {
+            var last = last();
+            var recycle = recycleBin.removeLast();
+            recycle.pose()
+                    .set(last.pose());
+            recycle.normal()
+                    .set(last.normal());
+            FlwLibLink.INSTANCE.getPoseStack(this)
+                    .addLast(recycle);
+        }
         depth++;
     }
 
     @Override
     public void popPose() {
-        super.popPose();
+        stash.addLast(FlwLibLink.INSTANCE.getPoseStack(this)
+                .removeLast());
     }
 
     public boolean isRendered() {

@@ -1,6 +1,7 @@
 package proto.mechanicalarmory.client.flywheel.instances.vanilla;
 
 import com.coralblocks.coralpool.ArrayObjectPool;
+import com.mojang.blaze3d.vertex.PoseStack;
 import dev.engine_room.flywheel.api.instance.InstancerProvider;
 import dev.engine_room.flywheel.api.visual.DynamicVisual;
 import dev.engine_room.flywheel.api.visual.TickableVisual;
@@ -31,6 +32,14 @@ public class VanillaEntityVisual extends AbstractEntityVisual<Entity> implements
     Vector3f[] interpolationVecs = new Vector3f[]{new Vector3f(), new Vector3f(), new Vector3f(), new Vector3f()};
     Quaternionf[] interpolationQuats = new Quaternionf[]{new Quaternionf(), new Quaternionf()};
     private final int light;
+
+    @Override
+    public List<PoseStack.Pose> getPoses() {
+        return poses;
+    }
+
+    List<PoseStack.Pose> poses = new ArrayList<>();
+
 
     public VanillaEntityVisual(VisualizationContext ctx, Entity entity, float partialTick) {
         super(ctx, entity, partialTick);
@@ -157,7 +166,7 @@ public class VanillaEntityVisual extends AbstractEntityVisual<Entity> implements
     }
 
     @Override
-    public List<Matrix4f> getMatrix4fs() {
-        return List.of();
+    public PoseStackVisual getPoseStackVisual() {
+        return poseStackVisual;
     }
 }
