@@ -2,6 +2,7 @@ package proto.mechanicalarmory.client.mixin;
 
 import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
 import com.llamalad7.mixinextras.injector.v2.WrapWithCondition;
+import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
@@ -32,6 +33,9 @@ public abstract class ModelPartMixin {
     @Shadow
     public boolean skipDraw;
 
+    @Shadow
+    public boolean visible;
+
     @Inject(method = "render(Lcom/mojang/blaze3d/vertex/PoseStack;Lcom/mojang/blaze3d/vertex/VertexConsumer;III)V", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/model/geom/ModelPart;translateAndRotate(Lcom/mojang/blaze3d/vertex/PoseStack;)V", shift = At.Shift.AFTER), cancellable = true)
     private void injected(PoseStack poseStack, VertexConsumer buffer, int packedLight, int packedOverlay, int color, CallbackInfo ci) {
         if (poseStack instanceof PoseStackVisual pv) {
@@ -55,12 +59,18 @@ public abstract class ModelPartMixin {
                 v.updateTransforms(pv.getDepth(), poseStack.last());
                 v.addInterpolatedTransformedInstance(pv.getDepth(), (ModelPart) (Object) this, mat);
             } else {
-                if (skipDraw) {
+                if (!visible || skipDraw) {
                     poseStack.last().pose().zero();
                 }
                 v.updateTransforms(pv.getDepth(), poseStack.last());
             }
         }
+    }
+
+    @WrapOperation(method = "render(Lcom/mojang/blaze3d/vertex/PoseStack;Lcom/mojang/blaze3d/vertex/VertexConsumer;III)V",
+    at = @At(value = "FIELD", target = "Lnet/minecraft/client/model/geom/ModelPart;visible:Z", opcode = Opcodes.GETFIELD))
+    private boolean forceRender(ModelPart instance, Operation<Boolean> original, PoseStack poseStack){
+        return (poseStack instanceof PoseStackVisual) || original.call(instance);
     }
 
     @WrapWithCondition(

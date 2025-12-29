@@ -115,7 +115,6 @@ public class VanillaEntityVisual extends AbstractEntityVisual<Entity> implements
                 for (int i = 0; i < get.size(); i++) {
                     InterpolatedTransformedInstance ti = get.get(i);
                     ti.previous.set(ti.current);
-
                     ti.instance.setVisible(!p.pose().equals(PoseStackVisual.ZERO));
 
 
