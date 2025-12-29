@@ -5,12 +5,12 @@
   "compatibilityLevel": "JAVA_17",
   "refmap": "mechanicalarmory.refmap.json",
   "client": [
-    "AnimatableTextureMixin",
     "BlockEntityRenderDispatcherMixin",
     "BlockEntityRenderersAccessor",
     "BufferBuilderAccessor",
     "BufferSourceAccessor",
     "CompositeRenderTypeAccessor",
+    "EntityRenderDispatcherMixin",
     "EntityRenderersAccessor",
     "ItemRendererMixin",
     "MaterialAccessor",
@@ -25,10 +25,9 @@
     "defaultRequire": 1
   },
   "mixins": [
-    "AutoPlayingSoundKeyframeHandlerMixin",
     "GeoRenderMixin",
     "ItemModelsMixin",
-    "LegacyRandomSourceMixin",
-    "LevelRendererMixin"
+    "LevelRendererMixin",
+    "StorageMixinAccessor"
   ]
 }

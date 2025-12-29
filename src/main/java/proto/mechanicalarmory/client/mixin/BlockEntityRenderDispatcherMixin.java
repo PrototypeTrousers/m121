@@ -3,7 +3,6 @@ package proto.mechanicalarmory.client.mixin;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.mojang.blaze3d.vertex.PoseStack;
-import dev.engine_room.flywheel.api.backend.Backend;
 import dev.engine_room.flywheel.impl.BackendManagerImpl;
 import dev.engine_room.flywheel.impl.visualization.VisualManagerImpl;
 import dev.engine_room.flywheel.impl.visualization.VisualizationManagerImpl;
@@ -25,7 +24,6 @@ import org.spongepowered.asm.mixin.injection.ModifyArgs;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.invoke.arg.Args;
 import proto.mechanicalarmory.client.LastRenderTimeTracker;
-import proto.mechanicalarmory.client.flywheel.instances.vanilla.PoseStackVisual;
 import proto.mechanicalarmory.client.flywheel.instances.vanilla.VanillaBlockEntityVisual;
 
 @Mixin(BlockEntityRenderDispatcher.class)
@@ -38,7 +36,6 @@ public class BlockEntityRenderDispatcherMixin {
 
     @ModifyArgs(method = "setupAndRender", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/blockentity/BlockEntityRenderer;render(Lnet/minecraft/world/level/block/entity/BlockEntity;FLcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/MultiBufferSource;II)V"))
     private static void injected(Args args) {
-
         if (v != null) {
             v.poseStackVisual.last().pose().setTranslation(v.getVisualPosition().getX(), v.getVisualPosition().getY(), v.getVisualPosition().getZ());
             v.poseStackVisual.setDepth(0);

@@ -15,6 +15,6 @@ public class VanillaEntityVisualiser implements EntityVisualizer<Entity> {
 
     @Override
     public boolean skipVanillaRender(Entity entity) {
-        return true;
+        return false;
     }
 }

@@ -3,11 +3,10 @@ package proto.mechanicalarmory.client.flywheel.instances.vanilla;
 
 import com.mojang.blaze3d.vertex.PoseStack;
 import dev.engine_room.flywheel.lib.internal.FlwLibLink;
-import dev.engine_room.flywheel.lib.util.RecyclingPoseStack;
+import org.joml.Matrix4f;
 
 import java.util.ArrayDeque;
 import java.util.Deque;
-import java.util.List;
 
 public class PoseStackVisual extends PoseStack {
 
@@ -16,7 +15,7 @@ public class PoseStackVisual extends PoseStack {
     private boolean rendered;
     private final Deque<Pose> recycleBin = new ArrayDeque<>();
     private final Deque<Pose> stash = new ArrayDeque<>();
-
+    public static Matrix4f ZERO = new Matrix4f().zero();
 
     public PoseStackVisual(SinkBufferSourceVisual visual) {
         super();

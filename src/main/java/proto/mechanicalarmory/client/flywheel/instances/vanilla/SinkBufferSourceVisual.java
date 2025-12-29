@@ -40,6 +40,7 @@ public interface SinkBufferSourceVisual {
     Quaternionf[] getInterpolationQuats();
 
     default Matrix4f interpolate(Matrix4f m1, Matrix4f m2, float t) {
+        m1.lerp(m2, t);
         Vector3f[] v = getInterpolationVecs();
         Vector3f translation1 = v[0];
         Vector3f translation2 = v[1];
