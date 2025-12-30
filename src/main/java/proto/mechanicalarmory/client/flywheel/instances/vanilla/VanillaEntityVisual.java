@@ -41,14 +41,6 @@ public class VanillaEntityVisual extends AbstractEntityVisual<Entity> implements
         super(ctx, entity, partialTick);
         light = computePackedLight(partialTick);
         visualBufferSource = new VisualBufferSource(this);
-        for (List<InterpolatedTransformedInstance> key : transformedInstances) {
-            for (InterpolatedTransformedInstance ti : key) {
-                ti.instance.light(light);
-                ti.current.setTranslation(ti.current.m30() + getVisualPosition().x, ti.current.m31() + getVisualPosition().y, ti.current.m32() + getVisualPosition().z);
-                ti.instance.setTransform(ti.current).setChanged();
-                ti.current.setTranslation(ti.current.m30() - getVisualPosition().x, ti.current.m31() - getVisualPosition().y, ti.current.m32() - getVisualPosition().z);
-            }
-        }
     }
 
     @Override
@@ -81,28 +73,31 @@ public class VanillaEntityVisual extends AbstractEntityVisual<Entity> implements
 
     @Override
     public void beginFrame(DynamicVisual.Context ctx) {
-//        if (!isVisible(ctx.frustum())) {
-//            return;
-//        }
-//
-//        float pt = ctx.partialTick();
-//
-//        for (List<InterpolatedTransformedInstance> list : transformedInstances) {
-//            for (InterpolatedTransformedInstance ti : list) {
-//                // 1. Check if an update is even needed
-//                // Only update if the transformation has actually changed between ticks
-//                if (!ti.previous.equals(ti.current)) {
-//
-//                    // 2. Interpolate into a temporary matrix
-//                    // Do NOT modify ti.current or ti.previous here!
-//                    Matrix4f interpolated = interpolate(ti.previous, ti.current, pt);
-//
-//                    // 3. Apply to the rendering instance
-//                    ti.instance.setTransform(interpolated);
-//                    ti.instance.setChanged();
-//                }
-//            }
-//        }
+        if(!hasPoseToInterpolate) {
+            return;
+        }
+        if (!isVisible(ctx.frustum())) {
+            return;
+        }
+
+        float pt = ctx.partialTick();
+        hasPoseToInterpolate = false;
+        for (List<InterpolatedTransformedInstance> list : transformedInstances) {
+            for (InterpolatedTransformedInstance ti : list) {
+                // 1. Check if an update is even needed
+                // Only update if the transformation has actually changed between ticks
+                if (!ti.previous.equals(ti.current)) {
+                    hasPoseToInterpolate = true;
+                    // 2. Interpolate into a temporary matrix
+                    // Do NOT modify ti.current or ti.previous here!
+                    Matrix4f interpolated = interpolate(ti.previous, ti.current, pt);
+
+                    // 3. Apply to the rendering instance
+                    ti.instance.setTransform(interpolated);
+                    ti.instance.setChanged();
+                }
+            }
+        }
     }
 
     @Override
@@ -116,12 +111,9 @@ public class VanillaEntityVisual extends AbstractEntityVisual<Entity> implements
                     InterpolatedTransformedInstance ti = get.get(i);
                     ti.previous.set(ti.current);
                     ti.instance.setVisible(!p.pose().equals(PoseStackVisual.ZERO));
-
-
                     hasPoseToInterpolate = true;
                     ti.current.set(p.pose());
                     ti.instance.setTransform(ti.current).setChanged();
-                    ti.lastTick = ((ClientLevel) getLevel()).getGameTime();
                 }
             }
         }

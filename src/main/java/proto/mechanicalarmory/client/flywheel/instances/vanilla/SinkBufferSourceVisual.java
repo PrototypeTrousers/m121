@@ -69,7 +69,7 @@ public interface SinkBufferSourceVisual {
         // Scale: Linear Interpolation (Lerp)
         Vector3f lerpScale = scale1.lerp(scale2, t);
         // Rotation: Spherical Linear Interpolation (Slerp)
-        Quaternionf slerpRotation = rotation1.nlerp(rotation2, t);
+        Quaternionf slerpRotation = rotation1.slerp(rotation2, t);
 
         // 4. Recompose into a new Matrix
         Matrix4f mutableInterpolationMatrix4f = getMutableInterpolationMatrix4f();

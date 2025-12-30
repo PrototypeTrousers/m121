@@ -27,7 +27,6 @@
   "mixins": [
     "GeoRenderMixin",
     "ItemModelsMixin",
-    "LevelRendererMixin",
     "StorageMixinAccessor"
   ]
 }

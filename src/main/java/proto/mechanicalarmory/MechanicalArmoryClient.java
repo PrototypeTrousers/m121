@@ -19,7 +19,9 @@ import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.event.lifecycle.FMLClientSetupEvent;
+import net.neoforged.neoforge.client.event.ClientTickEvent;
 import net.neoforged.neoforge.client.event.ModelEvent;
+import net.neoforged.neoforge.client.event.RenderFrameEvent;
 import net.neoforged.neoforge.client.gui.ConfigurationScreen;
 import net.neoforged.neoforge.client.gui.IConfigScreenFactory;
 import proto.mechanicalarmory.client.flywheel.gltf.GltfFlywheelModelTree;
@@ -43,6 +45,10 @@ import static proto.mechanicalarmory.MechanicalArmory.MODID;
 public class MechanicalArmoryClient {
     public static ModelResourceLocation arm = ModelResourceLocation.standalone(ResourceLocation.fromNamespaceAndPath(MODID, "models/fullarm.glb"));
     public static ModelTree gltfFlywheelModelTree;
+
+    private static boolean worldTickJustFinished;
+    public  static boolean firstFrameOfTick;
+
     public MechanicalArmoryClient(ModContainer container) {
         // Allows NeoForge to create a config screen for this mod's configs.
         // The config screen is accessed by going to the Mods screen > clicking on your mod > clicking on config.
@@ -90,6 +96,24 @@ public class MechanicalArmoryClient {
     public static void registerAdditional(ModelEvent.RegisterAdditional event) {
         event.register(arm);
         gltfFlywheelModelTree = GltfFlywheelModelTree.create(loadglTFModel(arm));
+    }
+
+    @SubscribeEvent
+    public static void onRenderFrame(RenderFrameEvent.Pre event) {
+        if (worldTickJustFinished) {
+            firstFrameOfTick = true;
+            worldTickJustFinished = false; // Reset the flag
+        }
+    }
+
+    @SubscribeEvent
+    public static void onRenderFrame(RenderFrameEvent.Post event) {
+        firstFrameOfTick = false;
+    }
+
+    @SubscribeEvent
+    public static void onClientTickPost(ClientTickEvent.Post event) {
+        worldTickJustFinished = true;
     }
 
     public static GltfModel loadglTFModel(ModelResourceLocation modelResourceLocation) {

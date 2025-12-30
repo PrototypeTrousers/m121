@@ -6,18 +6,14 @@ import com.mojang.blaze3d.vertex.PoseStack;
 import dev.engine_room.flywheel.impl.BackendManagerImpl;
 import dev.engine_room.flywheel.impl.visualization.VisualManagerImpl;
 import dev.engine_room.flywheel.impl.visualization.VisualizationManagerImpl;
-import dev.engine_room.flywheel.impl.visualization.storage.BlockEntityStorage;
 import dev.engine_room.flywheel.impl.visualization.storage.EntityStorage;
 import dev.engine_room.flywheel.lib.visualization.VisualizationHelper;
-import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.MultiBufferSource;
-import net.minecraft.client.renderer.blockentity.BlockEntityRenderer;
 import net.minecraft.client.renderer.culling.Frustum;
 import net.minecraft.client.renderer.entity.EntityRenderDispatcher;
 import net.minecraft.client.renderer.entity.EntityRenderer;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.level.Level;
-import net.minecraft.world.level.block.entity.BlockEntity;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
@@ -26,7 +22,7 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.ModifyArgs;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.invoke.arg.Args;
-import proto.mechanicalarmory.client.LastRenderTimeTracker;
+import proto.mechanicalarmory.MechanicalArmoryClient;
 import proto.mechanicalarmory.client.flywheel.instances.vanilla.VanillaEntityVisual;
 
 @Mixin(EntityRenderDispatcher.class)
@@ -72,9 +68,10 @@ public class EntityRenderDispatcherMixin {
                             if (!visual.visualBufferSource.isRendered()) {
                                 return true;
                             }
+                            return MechanicalArmoryClient.firstFrameOfTick;
                         }
+                        return true;
                     }
-                    return ((LastRenderTimeTracker) Minecraft.getInstance().levelRenderer).m121$isFirstFrameOfRenderTick();
                 }
             }
             return false;
