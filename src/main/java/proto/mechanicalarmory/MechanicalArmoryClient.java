@@ -6,6 +6,7 @@ import de.javagl.jgltf.model.io.GltfModelReader;
 import dev.engine_room.flywheel.api.visualization.VisualizerRegistry;
 import dev.engine_room.flywheel.lib.model.part.ModelTree;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.renderer.blockentity.BlockEntityRenderers;
 import net.minecraft.client.resources.model.ModelResourceLocation;
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -24,6 +25,7 @@ import net.neoforged.neoforge.client.event.ModelEvent;
 import net.neoforged.neoforge.client.event.RenderFrameEvent;
 import net.neoforged.neoforge.client.gui.ConfigurationScreen;
 import net.neoforged.neoforge.client.gui.IConfigScreenFactory;
+import net.neoforged.neoforge.event.tick.LevelTickEvent;
 import proto.mechanicalarmory.client.flywheel.gltf.GltfFlywheelModelTree;
 import proto.mechanicalarmory.client.flywheel.instances.arm.ArmVisualiser;
 import proto.mechanicalarmory.client.flywheel.instances.vanilla.VanillaBlockVisualiser;
@@ -112,8 +114,10 @@ public class MechanicalArmoryClient {
     }
 
     @SubscribeEvent
-    public static void onClientTickPost(ClientTickEvent.Post event) {
-        worldTickJustFinished = true;
+    public static void onClientTickPost(LevelTickEvent.Post event) {
+        if (event.getLevel() instanceof ClientLevel) {
+            worldTickJustFinished = true;
+        }
     }
 
     public static GltfModel loadglTFModel(ModelResourceLocation modelResourceLocation) {

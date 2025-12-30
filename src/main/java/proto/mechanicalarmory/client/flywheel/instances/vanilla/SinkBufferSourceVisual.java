@@ -129,7 +129,10 @@ public interface SinkBufferSourceVisual {
         if (!matrices.get(depth).equals(p)) {
             matrices.set(depth, p);
         }
+        dirtyTransforms();
     }
+
+    void dirtyTransforms();
 
     List<PoseStack.Pose> getPoses();
 

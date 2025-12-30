@@ -14,6 +14,7 @@ import net.minecraft.world.level.LevelAccessor;
 import org.joml.Matrix4f;
 import org.joml.Quaternionf;
 import org.joml.Vector3f;
+import proto.mechanicalarmory.MechanicalArmoryClient;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -27,6 +28,7 @@ public class VanillaEntityVisual extends AbstractEntityVisual<Entity> implements
     Quaternionf[] interpolationQuats = new Quaternionf[]{new Quaternionf(), new Quaternionf()};
     private final int light;
     boolean hasPoseToInterpolate;
+    private boolean updateTransforms;
 
 
     @Override
@@ -74,7 +76,7 @@ public class VanillaEntityVisual extends AbstractEntityVisual<Entity> implements
     @Override
     public void beginFrame(DynamicVisual.Context ctx) {
         if(!hasPoseToInterpolate) {
-            return;
+           // return;
         }
         if (!isVisible(ctx.frustum())) {
             return;
@@ -86,7 +88,6 @@ public class VanillaEntityVisual extends AbstractEntityVisual<Entity> implements
             for (InterpolatedTransformedInstance ti : list) {
                 // 1. Check if an update is even needed
                 // Only update if the transformation has actually changed between ticks
-                if (!ti.previous.equals(ti.current)) {
                     hasPoseToInterpolate = true;
                     // 2. Interpolate into a temporary matrix
                     // Do NOT modify ti.current or ti.previous here!
@@ -95,14 +96,20 @@ public class VanillaEntityVisual extends AbstractEntityVisual<Entity> implements
                     // 3. Apply to the rendering instance
                     ti.instance.setTransform(interpolated);
                     ti.instance.setChanged();
-                }
+
             }
         }
     }
 
+    public void dirtyTransforms() {
+        this.updateTransforms = true;
+    }
+
     @Override
     public void tick(TickableVisual.Context context) {
-        List<List<InterpolatedTransformedInstance>> transformedInstances = getTransformedInstances();
+        if (!updateTransforms) {
+            return;
+        }
         if (poses.size() == transformedInstances.size()) {
             for (int depth = 0; depth < transformedInstances.size(); depth++) {
                 PoseStack.Pose p = poses.get(depth);
@@ -113,7 +120,6 @@ public class VanillaEntityVisual extends AbstractEntityVisual<Entity> implements
                     ti.instance.setVisible(!p.pose().equals(PoseStackVisual.ZERO));
                     hasPoseToInterpolate = true;
                     ti.current.set(p.pose());
-                    ti.instance.setTransform(ti.current).setChanged();
                 }
             }
         }
