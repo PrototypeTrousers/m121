@@ -76,7 +76,7 @@ public class VanillaEntityVisual extends AbstractEntityVisual<Entity> implements
     @Override
     public void beginFrame(DynamicVisual.Context ctx) {
         if(!hasPoseToInterpolate) {
-           // return;
+            return;
         }
         if (!isVisible(ctx.frustum())) {
             return;

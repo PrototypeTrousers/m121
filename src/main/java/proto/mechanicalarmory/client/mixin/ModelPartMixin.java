@@ -56,6 +56,9 @@ public abstract class ModelPartMixin {
                     ResourceLocation atlas = ((TextureStateShardAccessor) r).getTexture().get();
                     mat = new Material(atlas, atlas);
                 }
+                if (!visible || skipDraw) {
+                    poseStack.last().pose().zero();
+                }
                 v.updateTransforms(pv.getDepth(), poseStack.last());
                 v.addInterpolatedTransformedInstance(pv.getDepth(), (ModelPart) (Object) this, mat);
             } else {

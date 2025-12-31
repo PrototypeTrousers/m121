@@ -96,6 +96,7 @@ public interface SinkBufferSourceVisual {
                 .createInstance(), new Matrix4f(pose), new Matrix4f(pose));
         newIns.instance.light(getLight());
         newIns.instance.setTransform(pose);
+        newIns.instance.setVisible(!pose.equals(PoseStackVisual.ZERO));
         newIns.instance.setChanged();
         transformedInstances.get(depth).add(newIns);
     }
@@ -117,6 +118,7 @@ public interface SinkBufferSourceVisual {
         transformedInstances.get(depth).add(newIns);
         newIns.instance.light(getLight());
         newIns.instance.setTransform(pose);
+        newIns.instance.setVisible(!pose.equals(PoseStackVisual.ZERO));
         newIns.instance.setChanged();
     }
 
