@@ -35,28 +35,28 @@ public class GeckoModel implements Model {
     private static final PoseStack.Pose IDENTITY_POSE = new PoseStack().last();
     List<ConfiguredMesh> meshes = new ArrayList<>();
     GeoBone geoBone;
-    Material material;
-    public GeckoModel(GeoBone geoBone, Material material) {
+    SinkBufferSourceVisual.InstanceMaterialKey material;
+    public GeckoModel(GeoBone geoBone, SinkBufferSourceVisual.InstanceMaterialKey material) {
         this.geoBone = geoBone;
         this.material = material;
         Mesh m = fromBone(geoBone, material);
         if (m != null) {
-            meshes.add(new ConfiguredMesh(makeFlywheelMaterial(material), m));
+            meshes.add(new ConfiguredMesh(material.material(), m));
         }
     }
 
-    public static GeckoModel cachedOf(GeoBone geoBone, Material material) {
+    public static GeckoModel cachedOf(GeoBone geoBone, SinkBufferSourceVisual.InstanceMaterialKey material) {
         return CACHE.get(new GeckoKey(geoBone, material));
     }
 
-    SimpleQuadMesh fromBone(GeoBone geoBone, Material material) {
+    SimpleQuadMesh fromBone(GeoBone geoBone, SinkBufferSourceVisual.InstanceMaterialKey material) {
         if (geoBone.getCubes().isEmpty()){
             return null;
         }
 
         VanillaVertexWriter vertexWriter = THREAD_LOCAL_OBJECTS.get().vertexWriter;
         VertexConsumer v;
-        if (!material.texture().equals(material.atlasLocation())) {
+        if (material.sprite() != null) {
             v = new SpriteCoordinateExpander(vertexWriter, material.sprite());
         } else {
             v = vertexWriter;
@@ -119,16 +119,6 @@ public class GeckoModel implements Model {
         return new Vector4f(1, 1, 1, 1);
     }
 
-    public dev.engine_room.flywheel.api.material.Material makeFlywheelMaterial(Material material) {
-        return SimpleMaterial.builder()
-                .texture(material.atlasLocation())
-                .cutout(CutoutShaders.EPSILON)
-                .light(LightShaders.SMOOTH_WHEN_EMBEDDED)
-                .cardinalLightingMode(CardinalLightingMode.OFF)
-                .ambientOcclusion(false)
-                .build();
-    }
-
     @Override
     public boolean equals(Object o) {
         if (o == null || getClass() != o.getClass()) return false;
@@ -142,7 +132,7 @@ public class GeckoModel implements Model {
         return Objects.hash(material);
     }
 
-    private record GeckoKey(GeoBone geoBone, Material material) {
+    private record GeckoKey(GeoBone geoBone, SinkBufferSourceVisual.InstanceMaterialKey material) {
 //        @Override
 //        public boolean equals(Object o) {
 //            if (o == null) return false;

@@ -1,17 +1,14 @@
 package proto.mechanicalarmory.client.mixin;
 
-import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
 import com.llamalad7.mixinextras.injector.v2.WrapWithCondition;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
+import dev.engine_room.flywheel.api.material.Material;
 import net.minecraft.client.model.geom.ModelPart;
-import net.minecraft.client.renderer.RenderStateShard;
 import net.minecraft.client.renderer.SpriteCoordinateExpander;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
-import net.minecraft.client.resources.model.Material;
-import net.minecraft.resources.ResourceLocation;
 import org.objectweb.asm.Opcodes;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
@@ -20,11 +17,8 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import proto.mechanicalarmory.client.flywheel.instances.vanilla.PoseStackVisual;
 import proto.mechanicalarmory.client.flywheel.instances.vanilla.SinkBufferSourceVisual;
-import proto.mechanicalarmory.client.flywheel.instances.vanilla.VanillaBlockEntityVisual;
+import proto.mechanicalarmory.client.flywheel.instances.vanilla.VanillaModel;
 import proto.mechanicalarmory.client.flywheel.instances.vanilla.VisualBufferSource;
-
-import java.util.ArrayList;
-import java.util.Collections;
 
 
 @Mixin(targets = "net.minecraft.client.model.geom.ModelPart")
@@ -42,25 +36,21 @@ public abstract class ModelPartMixin {
             SinkBufferSourceVisual v = pv.getVisual();
             if (((ModelPart) (Object) this).isEmpty()) return;
             if (!pv.isRendered()) {
-                Material mat;
-                if (buffer instanceof SpriteCoordinateExpander sceb) {
-                    TextureAtlasSprite tas = ((SpriteCoordinateExpanderAccessor) sceb).getSprite();
-                    mat = new Material(tas.atlasLocation(), tas.contents().name());
-                } else {
-                    mat = pv.getVisual().getBufferSource().getMaterialMap().get(buffer);
+                TextureAtlasSprite tas = null;
+                Material m;
+                if (buffer instanceof SpriteCoordinateExpanderAccessor sceb) {
+                    tas = sceb.getSprite();
+                    m = VanillaModel.makeFlywheelMaterial(((VisualBufferSource.DummyBuffer) sceb.getDelegate()).getRenderType());
+                } else  {
+                    m = VanillaModel.makeFlywheelMaterial(((VisualBufferSource.DummyBuffer) buffer).getRenderType());
                 }
+                SinkBufferSourceVisual.InstanceMaterialKey key = new SinkBufferSourceVisual.InstanceMaterialKey(m, tas);
 
-                if (mat == null) {
-                    CompositeRenderTypeAccessor c = ((CompositeRenderTypeAccessor) ((VisualBufferSource.DummyBuffer) buffer).getRenderType());
-                    RenderStateShard.EmptyTextureStateShard r = ((RenderTypeAccessor) (Object) c.getState()).getTextureState();
-                    ResourceLocation atlas = ((TextureStateShardAccessor) r).getTexture().get();
-                    mat = new Material(atlas, atlas);
-                }
                 if (!visible || skipDraw) {
                     poseStack.last().pose().zero();
                 }
                 v.updateTransforms(pv.getDepth(), poseStack.last());
-                v.addInterpolatedTransformedInstance(pv.getDepth(), (ModelPart) (Object) this, mat);
+                v.addInterpolatedTransformedInstance(pv.getDepth(), (ModelPart) (Object) this, key);
             } else {
                 if (!visible || skipDraw) {
                     poseStack.last().pose().zero();

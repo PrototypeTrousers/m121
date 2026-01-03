@@ -49,13 +49,7 @@ public class BlockEntityRenderDispatcherMixin {
                     0,
                     OverlayTexture.NO_OVERLAY);
             ci.cancel();
-        }
-    }
-
-    @Inject(method = "setupAndRender", at = @At("TAIL"))
-    private static void setRendered(BlockEntityRenderer<?> renderer, BlockEntity blockEntity, float partialTick, PoseStack poseStack, MultiBufferSource bufferSource, CallbackInfo ci) {
-        if (v != null) {
-            v.poseStackVisual.setRendered();
+            psv.setRendered();
         }
     }
 

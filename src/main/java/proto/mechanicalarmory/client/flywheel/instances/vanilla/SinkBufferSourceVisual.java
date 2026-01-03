@@ -2,12 +2,12 @@ package proto.mechanicalarmory.client.flywheel.instances.vanilla;
 
 import com.mojang.blaze3d.vertex.PoseStack;
 import dev.engine_room.flywheel.api.instance.InstancerProvider;
-import dev.engine_room.flywheel.impl.mixin.PoseStackAccessor;
+import dev.engine_room.flywheel.api.material.Material;
 import dev.engine_room.flywheel.lib.instance.InstanceTypes;
 import dev.engine_room.vanillin.item.ItemModels;
 import net.minecraft.client.model.geom.ModelPart;
 import net.minecraft.client.multiplayer.ClientLevel;
-import net.minecraft.client.resources.model.Material;
+import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.world.item.ItemDisplayContext;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
@@ -80,7 +80,7 @@ public interface SinkBufferSourceVisual {
 
     VisualBufferSource getBufferSource();
 
-    default void addInterpolatedTransformedInstance(int depth, ModelPart modelPart, Material material) {
+    default void addInterpolatedTransformedInstance(int depth, ModelPart modelPart, InstanceMaterialKey instanceMaterialKey) {
         List<List<InterpolatedTransformedInstance>> transformedInstances = getTransformedInstances();
         while (transformedInstances.size() <= depth) {
             transformedInstances.add(Collections.EMPTY_LIST);
@@ -92,7 +92,7 @@ public interface SinkBufferSourceVisual {
         Matrix4f pose = getPoseStackVisual().last().pose();
 
         InterpolatedTransformedInstance newIns = new InterpolatedTransformedInstance(getInstanceProvider().instancer(
-                        InstanceTypes.TRANSFORMED, VanillaModel.cachedOf(modelPart, material))
+                        InstanceTypes.TRANSFORMED, VanillaModel.cachedOf(modelPart, instanceMaterialKey))
                 .createInstance(), new Matrix4f(pose), new Matrix4f(pose));
         newIns.instance.light(getLight());
         newIns.instance.setTransform(pose);
@@ -101,7 +101,7 @@ public interface SinkBufferSourceVisual {
         transformedInstances.get(depth).add(newIns);
     }
 
-    default void addInterpolatedTransformedInstance(int depth, GeoBone geoBone, Material material) {
+    default void addInterpolatedTransformedInstance(int depth, GeoBone geoBone, InstanceMaterialKey instanceMaterialKey) {
         List<List<InterpolatedTransformedInstance>> transformedInstances = getTransformedInstances();
         while (transformedInstances.size() <= depth) {
             transformedInstances.add(Collections.EMPTY_LIST);
@@ -113,7 +113,7 @@ public interface SinkBufferSourceVisual {
         Matrix4f pose = getPoseStackVisual().last().pose();
 
         InterpolatedTransformedInstance newIns = new InterpolatedTransformedInstance(getInstanceProvider().instancer(
-                        InstanceTypes.TRANSFORMED, GeckoModel.cachedOf(geoBone, material))
+                        InstanceTypes.TRANSFORMED, GeckoModel.cachedOf(geoBone, instanceMaterialKey))
                 .createInstance(), new Matrix4f(pose), new Matrix4f(pose));
         transformedInstances.get(depth).add(newIns);
         newIns.instance.light(getLight());
@@ -175,4 +175,6 @@ public interface SinkBufferSourceVisual {
             ti.lastTick = ((ClientLevel) getLevel()).getGameTime();
         }
     }
+
+    public record InstanceMaterialKey (Material material, TextureAtlasSprite sprite) {}
 }
