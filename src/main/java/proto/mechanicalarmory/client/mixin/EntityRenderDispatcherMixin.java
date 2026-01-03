@@ -23,6 +23,7 @@ import org.spongepowered.asm.mixin.injection.ModifyArgs;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.invoke.arg.Args;
 import proto.mechanicalarmory.MechanicalArmoryClient;
+import proto.mechanicalarmory.client.flywheel.instances.vanilla.PoseStackVisual;
 import proto.mechanicalarmory.client.flywheel.instances.vanilla.VanillaEntityVisual;
 
 @Mixin(EntityRenderDispatcher.class)
@@ -36,12 +37,13 @@ public class EntityRenderDispatcherMixin {
     @ModifyArgs(method = "render", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/entity/EntityRenderer;render(Lnet/minecraft/world/entity/Entity;FFLcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/MultiBufferSource;I)V"))
     private static void injected(Args args) {
         if (visual != null) {
-            visual.getPoseStackVisual().last().pose().setTranslation(visual.getVisualPosition().x, visual.getVisualPosition().y, visual.getVisualPosition().z);
-            visual.getPoseStackVisual().setDepth(0);
-            if (visual.visualBufferSource.isRendered()) {
+            PoseStackVisual psv = visual.getPoseStackVisual();
+            psv.last().pose().setTranslation(visual.getVisualPosition().x, visual.getVisualPosition().y, visual.getVisualPosition().z);
+            psv.setDepth(0);
+            if (psv.isRendered()) {
                 args.set(2, 1f);
             }
-            args.set(3, visual.getPoseStackVisual());
+            args.set(3, psv);
             args.set(4, visual.visualBufferSource);
         }
     }
@@ -50,7 +52,6 @@ public class EntityRenderDispatcherMixin {
     private static void setRendered(Entity entity, double x, double y, double z, float rotationYaw, float partialTicks, PoseStack poseStack, MultiBufferSource buffer, int packedLight, CallbackInfo ci) {
         if (visual != null) {
             visual.getPoseStackVisual().setRendered();
-            visual.visualBufferSource.setRendered(true);
         }
     }
 
@@ -65,7 +66,7 @@ public class EntityRenderDispatcherMixin {
                         VisualManagerImpl<Entity, EntityStorage> iii = (VisualManagerImpl<Entity, EntityStorage>) man.entities();
                         visual = (VanillaEntityVisual) ((StorageMixinAccessor) iii.getStorage()).getVisualsFor().get(leashable);
                         if (visual != null) {
-                            if (!visual.visualBufferSource.isRendered()) {
+                            if (!visual.getPoseStackVisual().isRendered()) {
                                 return true;
                             }
                             return MechanicalArmoryClient.firstFrameOfTick;

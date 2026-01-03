@@ -1,6 +1,7 @@
 package proto.mechanicalarmory.client.flywheel.instances.vanilla;
 
 import com.mojang.blaze3d.vertex.VertexConsumer;
+import dev.engine_room.flywheel.api.visual.Visual;
 import it.unimi.dsi.fastutil.objects.Object2ObjectArrayMap;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.MultiBufferSource;
@@ -65,15 +66,11 @@ public class VisualBufferSource extends MultiBufferSource.BufferSource {
         }
     }
 
-    public void setRendered(boolean rendered) {
-        this.rendered = rendered;
-    }
-
-    public boolean isRendered() {
-        return rendered;
-    }
-
     public Object2ObjectArrayMap<VertexConsumer, Material> getMaterialMap() {
         return bufferMaterialMap;
+    }
+
+    public SinkBufferSourceVisual getVisual() {
+        return visual;
     }
 }

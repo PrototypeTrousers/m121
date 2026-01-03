@@ -11,6 +11,7 @@ import dev.engine_room.flywheel.lib.visualization.VisualizationHelper;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.blockentity.BlockEntityRenderDispatcher;
 import net.minecraft.client.renderer.blockentity.BlockEntityRenderer;
+import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.phys.Vec3;
@@ -23,6 +24,7 @@ import org.spongepowered.asm.mixin.injection.ModifyArgs;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.invoke.arg.Args;
 import proto.mechanicalarmory.MechanicalArmoryClient;
+import proto.mechanicalarmory.client.flywheel.instances.vanilla.PoseStackVisual;
 import proto.mechanicalarmory.client.flywheel.instances.vanilla.VanillaBlockEntityVisual;
 
 @Mixin(BlockEntityRenderDispatcher.class)
@@ -33,16 +35,20 @@ public class BlockEntityRenderDispatcherMixin {
     @Unique
     private static VanillaBlockEntityVisual v;
 
-    @ModifyArgs(method = "setupAndRender", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/blockentity/BlockEntityRenderer;render(Lnet/minecraft/world/level/block/entity/BlockEntity;FLcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/MultiBufferSource;II)V"))
-    private static void injected(Args args) {
+    @Inject(method = "setupAndRender", at = @At(value = "HEAD"), cancellable = true)
+    private static <T extends BlockEntity> void injected(BlockEntityRenderer<T> renderer, T blockEntity, float partialTick, PoseStack poseStack, MultiBufferSource bufferSource, CallbackInfo ci) {
         if (v != null) {
-            v.poseStackVisual.last().pose().setTranslation(v.getVisualPosition().getX(), v.getVisualPosition().getY(), v.getVisualPosition().getZ());
-            v.poseStackVisual.setDepth(0);
-            if (v.visualBufferSource.isRendered()) {
-                args.set(1, 1f);
-            }
-            args.set(2, v.poseStackVisual);
-            args.set(3, v.visualBufferSource);
+            PoseStackVisual psv = v.getPoseStackVisual();
+            psv.last().pose().setTranslation(v.getVisualPosition().getX(), v.getVisualPosition().getY(), v.getVisualPosition().getZ());
+            psv.setDepth(0);
+
+            renderer.render(blockEntity,
+                    psv.isRendered() ? 0f : partialTick,
+                    v.poseStackVisual,
+                    v.visualBufferSource,
+                    0,
+                    OverlayTexture.NO_OVERLAY);
+            ci.cancel();
         }
     }
 
@@ -50,7 +56,6 @@ public class BlockEntityRenderDispatcherMixin {
     private static void setRendered(BlockEntityRenderer<?> renderer, BlockEntity blockEntity, float partialTick, PoseStack poseStack, MultiBufferSource bufferSource, CallbackInfo ci) {
         if (v != null) {
             v.poseStackVisual.setRendered();
-            v.visualBufferSource.setRendered(true);
         }
     }
 
@@ -65,7 +70,7 @@ public class BlockEntityRenderDispatcherMixin {
                         VisualManagerImpl<BlockEntity, BlockEntityStorage> iii = (VisualManagerImpl<BlockEntity, BlockEntityStorage>) man.blockEntities();
                         v = (VanillaBlockEntityVisual) iii.getStorage().visualAtPos(blockEntity.getBlockPos().asLong());
                         if (v != null) {
-                            if (!v.visualBufferSource.isRendered()) {
+                            if (!v.poseStackVisual.isRendered()) {
                                 return true;
                             }
                             return MechanicalArmoryClient.firstFrameOfTick;
