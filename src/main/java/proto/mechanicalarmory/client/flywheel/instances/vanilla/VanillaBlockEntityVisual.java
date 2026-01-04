@@ -21,7 +21,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Consumer;
 
-public class VanillaBlockEntityVisual extends AbstractBlockEntityVisual<BlockEntity> implements SimpleTickableVisual, SimpleDynamicVisual, SinkBufferSourceVisual {
+public class VanillaBlockEntityVisual extends AbstractBlockEntityVisual<BlockEntity> implements SimpleDynamicVisual, SinkBufferSourceVisual {
     final public VisualBufferSource visualBufferSource;
     final public List<List<InterpolatedTransformedInstance>> transformedInstances = new ArrayList<>();
     public final PoseStackVisual poseStackVisual = new PoseStackVisual(this);
@@ -73,6 +73,22 @@ public class VanillaBlockEntityVisual extends AbstractBlockEntityVisual<BlockEnt
 
     @Override
     public void beginFrame(DynamicVisual.Context ctx) {
+        if (updateTransforms) {
+            if (poses.size() == transformedInstances.size()) {
+                for (int depth = 0; depth < transformedInstances.size(); depth++) {
+                    PoseStack.Pose p = poses.get(depth);
+                    List<InterpolatedTransformedInstance> get = transformedInstances.get(depth);
+                    for (int i = 0; i < get.size(); i++) {
+                        InterpolatedTransformedInstance ti = get.get(i);
+                        ti.previous.set(ti.current);
+                        ti.instance.setVisible(!p.pose().equals(PoseStackVisual.ZERO));
+                        hasPoseToInterpolate = true;
+                        ti.current.set(p.pose());
+                    }
+                }
+            }
+        }
+
         if (!hasPoseToInterpolate) {
             return;
         }
@@ -139,25 +155,5 @@ public class VanillaBlockEntityVisual extends AbstractBlockEntityVisual<BlockEnt
     @Override
     public void dirtyTransforms() {
         this.updateTransforms = true;
-    }
-
-    @Override
-    public void tick(TickableVisual.Context context) {
-        if (!updateTransforms) {
-            return;
-        }
-        if (poses.size() == transformedInstances.size()) {
-            for (int depth = 0; depth < transformedInstances.size(); depth++) {
-                PoseStack.Pose p = poses.get(depth);
-                List<InterpolatedTransformedInstance> get = transformedInstances.get(depth);
-                for (int i = 0; i < get.size(); i++) {
-                    InterpolatedTransformedInstance ti = get.get(i);
-                    ti.previous.set(ti.current);
-                    ti.instance.setVisible(!p.pose().equals(PoseStackVisual.ZERO));
-                    hasPoseToInterpolate = true;
-                    ti.current.set(p.pose());
-                }
-            }
-        }
     }
 }
