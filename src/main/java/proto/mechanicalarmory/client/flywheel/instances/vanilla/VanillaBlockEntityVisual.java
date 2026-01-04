@@ -22,7 +22,6 @@ import java.util.List;
 import java.util.function.Consumer;
 
 public class VanillaBlockEntityVisual extends AbstractBlockEntityVisual<BlockEntity> implements SimpleDynamicVisual, SinkBufferSourceVisual {
-    final public VisualBufferSource visualBufferSource;
     final public List<List<InterpolatedTransformedInstance>> transformedInstances = new ArrayList<>();
     public final PoseStackVisual poseStackVisual = new PoseStackVisual(this);
     private final Matrix4f mutableInterpolationMatrix4f = new Matrix4f();
@@ -36,7 +35,6 @@ public class VanillaBlockEntityVisual extends AbstractBlockEntityVisual<BlockEnt
     public VanillaBlockEntityVisual(VisualizationContext ctx, BlockEntity blockEntity, float partialTick) {
         super(ctx, blockEntity, partialTick);
         light = LevelRenderer.getLightColor(level, pos.above());
-        visualBufferSource = new VisualBufferSource(this);
     }
 
     public PoseStackVisual getPoseStackVisual() {
@@ -146,11 +144,6 @@ public class VanillaBlockEntityVisual extends AbstractBlockEntityVisual<BlockEnt
     @Override
     public InstancerProvider getInstanceProvider() {
         return instancerProvider();
-    }
-
-    @Override
-    public VisualBufferSource getBufferSource() {
-        return visualBufferSource;
     }
 
     @Override

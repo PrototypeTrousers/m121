@@ -1,9 +1,12 @@
 package proto.mechanicalarmory.client.mixin;
 
+import com.google.common.collect.HashBiMap;
+import com.mojang.blaze3d.vertex.BufferBuilder;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import dev.engine_room.flywheel.api.material.Material;
-import net.minecraft.client.model.geom.ModelPart;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -12,7 +15,6 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import proto.mechanicalarmory.client.flywheel.instances.vanilla.PoseStackVisual;
 import proto.mechanicalarmory.client.flywheel.instances.vanilla.SinkBufferSourceVisual;
 import proto.mechanicalarmory.client.flywheel.instances.vanilla.VanillaModel;
-import proto.mechanicalarmory.client.flywheel.instances.vanilla.VisualBufferSource;
 import software.bernie.geckolib.cache.object.GeoBone;
 import software.bernie.geckolib.renderer.GeoRenderer;
 
@@ -26,12 +28,19 @@ public interface GeoRenderMixin {
             if (!pv.isRendered()) {
                 TextureAtlasSprite tas = null;
                 Material m;
+
+                MultiBufferAccessor accessor = (MultiBufferAccessor) Minecraft.getInstance().renderBuffers().bufferSource();;
+                HashBiMap<RenderType, BufferBuilder> map = (HashBiMap<RenderType, BufferBuilder>) accessor.getStartedBuilders();
+
+                RenderType r;
                 if (buffer instanceof SpriteCoordinateExpanderAccessor sceb) {
                     tas = sceb.getSprite();
-                    m = VanillaModel.makeFlywheelMaterial(((VisualBufferSource.DummyBuffer) sceb.getDelegate()).getRenderType());
+                    r = map.inverse().get(sceb.getDelegate());
                 } else  {
-                    m = VanillaModel.makeFlywheelMaterial(((VisualBufferSource.DummyBuffer) buffer).getRenderType());
+                    r = map.inverse().get(buffer);
                 }
+
+                m = VanillaModel.makeFlywheelMaterial(r);
                 SinkBufferSourceVisual.InstanceMaterialKey key = new SinkBufferSourceVisual.InstanceMaterialKey(m, tas);
 
                 v.updateTransforms(pv.getDepth(), poseStack.last());

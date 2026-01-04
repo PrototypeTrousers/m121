@@ -8,6 +8,7 @@ import dev.engine_room.flywheel.api.visualization.VisualizationContext;
 import dev.engine_room.flywheel.lib.visual.AbstractEntityVisual;
 import dev.engine_room.flywheel.lib.visual.SimpleDynamicVisual;
 import dev.engine_room.flywheel.lib.visual.SimpleTickableVisual;
+import dev.engine_room.flywheel.lib.visual.component.ShadowComponent;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.level.LevelAccessor;
@@ -20,7 +21,6 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class VanillaEntityVisual extends AbstractEntityVisual<Entity> implements SimpleDynamicVisual, SinkBufferSourceVisual {
-    final public VisualBufferSource visualBufferSource;
     final public List<List<InterpolatedTransformedInstance>> transformedInstances = new ArrayList<>();
     private final PoseStackVisual poseStackVisual = new PoseStackVisual(this);
     private final Matrix4f mutableInterpolationMatrix4f = new Matrix4f();
@@ -29,6 +29,12 @@ public class VanillaEntityVisual extends AbstractEntityVisual<Entity> implements
     private final int light;
     boolean hasPoseToInterpolate;
     private boolean updateTransforms;
+
+    public ShadowComponent getShadowComponent() {
+        return shadowComponent;
+    }
+
+    ShadowComponent shadowComponent;
 
 
     @Override
@@ -42,7 +48,7 @@ public class VanillaEntityVisual extends AbstractEntityVisual<Entity> implements
     public VanillaEntityVisual(VisualizationContext ctx, Entity entity, float partialTick) {
         super(ctx, entity, partialTick);
         light = computePackedLight(partialTick);
-        visualBufferSource = new VisualBufferSource(this);
+        shadowComponent = new ShadowComponent(ctx, entity);
     }
 
     @Override
@@ -66,11 +72,6 @@ public class VanillaEntityVisual extends AbstractEntityVisual<Entity> implements
     @Override
     public int getLight() {
         return light;
-    }
-
-    @Override
-    public VisualBufferSource getBufferSource() {
-        return visualBufferSource;
     }
 
     @Override
@@ -98,6 +99,8 @@ public class VanillaEntityVisual extends AbstractEntityVisual<Entity> implements
         if (!isVisible(ctx.frustum())) {
             return;
         }
+
+        shadowComponent.beginFrame(ctx);
 
         float pt = ctx.partialTick();
         hasPoseToInterpolate = false;

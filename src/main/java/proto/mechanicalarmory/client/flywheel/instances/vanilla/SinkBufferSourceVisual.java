@@ -79,8 +79,6 @@ public interface SinkBufferSourceVisual {
         return mutableInterpolationMatrix4f;
     }
 
-    VisualBufferSource getBufferSource();
-
     default void addInterpolatedTransformedInstance(int depth, ModelPart modelPart, InstanceMaterialKey instanceMaterialKey) {
         List<List<InterpolatedTransformedInstance>> transformedInstances = getTransformedInstances();
         while (transformedInstances.size() <= depth) {

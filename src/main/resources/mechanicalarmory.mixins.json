@@ -13,10 +13,10 @@
     "EntityRenderDispatcherMixin",
     "EntityRenderersAccessor",
     "ItemRendererMixin",
-    "MaterialAccessor",
-    "MaterialMixin",
     "ModelPartAccessor",
     "ModelPartMixin",
+    "MultiBufferAccessor",
+    "MultiBufferSourceMixin",
     "RenderTypeAccessor",
     "SpriteCoordinateExpanderAccessor",
     "TextureStateShardAccessor"

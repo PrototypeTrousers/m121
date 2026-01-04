@@ -45,7 +45,7 @@ public class BlockEntityRenderDispatcherMixin {
             renderer.render(blockEntity,
                     psv.isRendered() ? 1f : partialTick,
                     v.poseStackVisual,
-                    v.visualBufferSource,
+                    bufferSource,
                     0,
                     OverlayTexture.NO_OVERLAY);
             ci.cancel();
