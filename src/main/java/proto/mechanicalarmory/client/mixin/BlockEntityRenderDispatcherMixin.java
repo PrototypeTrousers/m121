@@ -43,7 +43,7 @@ public class BlockEntityRenderDispatcherMixin {
             psv.setDepth(0);
 
             renderer.render(blockEntity,
-                    psv.isRendered() ? 0f : partialTick,
+                    psv.isRendered() ? 1f : partialTick,
                     v.poseStackVisual,
                     v.visualBufferSource,
                     0,

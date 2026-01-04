@@ -87,6 +87,7 @@ public class VanillaBlockEntityVisual extends AbstractBlockEntityVisual<BlockEnt
                     }
                 }
             }
+            updateTransforms = false;
         }
 
         if (!hasPoseToInterpolate) {

@@ -89,6 +89,7 @@ public class VanillaEntityVisual extends AbstractEntityVisual<Entity> implements
                     }
                 }
             }
+            updateTransforms = false;
         }
 
         if(!hasPoseToInterpolate) {
@@ -104,6 +105,7 @@ public class VanillaEntityVisual extends AbstractEntityVisual<Entity> implements
             for (InterpolatedTransformedInstance ti : list) {
                 // 1. Check if an update is even needed
                 // Only update if the transformation has actually changed between ticks
+                if (!ti.previous.equals(ti.current)) {
                     hasPoseToInterpolate = true;
                     // 2. Interpolate into a temporary matrix
                     // Do NOT modify ti.current or ti.previous here!
@@ -112,7 +114,7 @@ public class VanillaEntityVisual extends AbstractEntityVisual<Entity> implements
                     // 3. Apply to the rendering instance
                     ti.instance.setTransform(interpolated);
                     ti.instance.setChanged();
-
+                }
             }
         }
     }
