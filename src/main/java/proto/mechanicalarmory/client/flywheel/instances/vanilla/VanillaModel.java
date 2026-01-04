@@ -4,6 +4,7 @@ import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import dev.engine_room.flywheel.api.material.CardinalLightingMode;
 import dev.engine_room.flywheel.api.material.LightShader;
+import dev.engine_room.flywheel.api.material.Transparency;
 import dev.engine_room.flywheel.api.model.Mesh;
 import dev.engine_room.flywheel.api.model.Model;
 import dev.engine_room.flywheel.lib.internal.FlwLibLink;
@@ -98,6 +99,10 @@ public class VanillaModel implements Model {
             materialBuilder.cutout(CutoutShaders.EPSILON);
         } else {
             materialBuilder.cutout(CutoutShaders.OFF);
+        }
+
+        if (renderType.name.contains("translucent")) {
+            materialBuilder.transparency(Transparency.ORDER_INDEPENDENT);
         }
         materialBuilder.light(LightShaders.FLAT);
         materialBuilder.texture(atlas);

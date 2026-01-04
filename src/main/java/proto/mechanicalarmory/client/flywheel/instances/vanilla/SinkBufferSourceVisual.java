@@ -20,6 +20,7 @@ import software.bernie.geckolib.cache.object.GeoBone;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Objects;
 
 public interface SinkBufferSourceVisual {
 
@@ -176,5 +177,24 @@ public interface SinkBufferSourceVisual {
         }
     }
 
-    public record InstanceMaterialKey (Material material, TextureAtlasSprite sprite) {}
+    public record InstanceMaterialKey (Material material, TextureAtlasSprite sprite) {
+        @Override
+        public boolean equals(Object o) {
+            if (!(o instanceof InstanceMaterialKey that)) return false;
+            if (material.equals(that.material)) {
+                if (sprite ==null && that.sprite == null) return true;
+                if (sprite != null && that.sprite != null) {
+                    return sprite.toString().equals(that.sprite.toString());
+                } else {
+                    return false;
+                }
+            }
+            return false;
+        }
+
+        @Override
+        public int hashCode() {
+            return 1;
+        }
+    }
 }
