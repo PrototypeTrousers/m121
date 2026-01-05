@@ -2,7 +2,6 @@ package proto.mechanicalarmory.client.mixin;
 
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
-import com.mojang.blaze3d.vertex.BufferBuilder;
 import com.mojang.blaze3d.vertex.PoseStack;
 import dev.engine_room.flywheel.impl.BackendManagerImpl;
 import dev.engine_room.flywheel.impl.visualization.VisualManagerImpl;
@@ -11,7 +10,6 @@ import dev.engine_room.flywheel.impl.visualization.storage.EntityStorage;
 import dev.engine_room.flywheel.lib.visual.component.ShadowComponent;
 import dev.engine_room.flywheel.lib.visualization.VisualizationHelper;
 import net.minecraft.client.renderer.MultiBufferSource;
-import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.culling.Frustum;
 import net.minecraft.client.renderer.entity.EntityRenderDispatcher;
 import net.minecraft.client.renderer.entity.EntityRenderer;
@@ -27,10 +25,9 @@ import org.spongepowered.asm.mixin.injection.ModifyArgs;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.invoke.arg.Args;
 import proto.mechanicalarmory.MechanicalArmoryClient;
-import proto.mechanicalarmory.client.flywheel.instances.vanilla.PoseStackVisual;
+import proto.mechanicalarmory.client.flywheel.instances.vanilla.ExtendedRecyclingPoseStack;
 import proto.mechanicalarmory.client.flywheel.instances.vanilla.VanillaEntityVisual;
-
-import java.util.Map;
+import proto.mechanicalarmory.client.flywheel.instances.vanilla.WrappingPoseStack;
 
 @Mixin(EntityRenderDispatcher.class)
 public class EntityRenderDispatcherMixin {
@@ -43,12 +40,17 @@ public class EntityRenderDispatcherMixin {
     @ModifyArgs(method = "render", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/entity/EntityRenderer;render(Lnet/minecraft/world/entity/Entity;FFLcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/MultiBufferSource;I)V"))
     private static void injected(Args args) {
         if (visual != null) {
-            PoseStackVisual psv = visual.getPoseStackVisual();
-            //psv.last().pose().setTranslation(visual.getVisualPosition().x, visual.getVisualPosition().y, visual.getVisualPosition().z);
+            WrappingPoseStack psv = visual.getPoseStackVisual();
+            psv.getWrappedPoseStack().last().pose().setTranslation(
+                    visual.getVisualPosition().x(),
+                    visual.getVisualPosition().y(),
+                    visual.getVisualPosition().z());
             psv.setDepth(0);
             if (psv.isRendered()) {
                 args.set(2, 1f);
             }
+            PoseStack poseStack = args.get(3);
+            psv.last().pose().set(poseStack.last().pose());
             args.set(3, psv);
         }
     }

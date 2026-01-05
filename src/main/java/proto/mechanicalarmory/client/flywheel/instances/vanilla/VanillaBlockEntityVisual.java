@@ -4,11 +4,9 @@ import com.mojang.blaze3d.vertex.PoseStack;
 import dev.engine_room.flywheel.api.instance.Instance;
 import dev.engine_room.flywheel.api.instance.InstancerProvider;
 import dev.engine_room.flywheel.api.visual.DynamicVisual;
-import dev.engine_room.flywheel.api.visual.TickableVisual;
 import dev.engine_room.flywheel.api.visualization.VisualizationContext;
 import dev.engine_room.flywheel.lib.visual.AbstractBlockEntityVisual;
 import dev.engine_room.flywheel.lib.visual.SimpleDynamicVisual;
-import dev.engine_room.flywheel.lib.visual.SimpleTickableVisual;
 import net.minecraft.client.renderer.LevelRenderer;
 import net.minecraft.world.level.LevelAccessor;
 import net.minecraft.world.level.block.entity.BlockEntity;
@@ -23,7 +21,7 @@ import java.util.function.Consumer;
 
 public class VanillaBlockEntityVisual extends AbstractBlockEntityVisual<BlockEntity> implements SimpleDynamicVisual, SinkBufferSourceVisual {
     final public List<List<InterpolatedTransformedInstance>> transformedInstances = new ArrayList<>();
-    public final PoseStackVisual poseStackVisual = new PoseStackVisual(this);
+    public final WrappingPoseStack extendedRecyclingPoseStack = new WrappingPoseStack(this);
     private final Matrix4f mutableInterpolationMatrix4f = new Matrix4f();
     private final int light;
     Vector3f[] interpolationVecs = new Vector3f[]{new Vector3f(), new Vector3f(), new Vector3f(), new Vector3f()};
@@ -37,8 +35,8 @@ public class VanillaBlockEntityVisual extends AbstractBlockEntityVisual<BlockEnt
         light = LevelRenderer.getLightColor(level, pos.above());
     }
 
-    public PoseStackVisual getPoseStackVisual() {
-        return poseStackVisual;
+    public WrappingPoseStack getPoseStackVisual() {
+        return extendedRecyclingPoseStack;
     }
 
     @Override
@@ -79,7 +77,7 @@ public class VanillaBlockEntityVisual extends AbstractBlockEntityVisual<BlockEnt
                     for (int i = 0; i < get.size(); i++) {
                         InterpolatedTransformedInstance ti = get.get(i);
                         ti.previous.set(ti.current);
-                        ti.instance.setVisible(!p.pose().equals(PoseStackVisual.ZERO));
+                        ti.instance.setVisible(!p.pose().equals(ExtendedRecyclingPoseStack.ZERO));
                         hasPoseToInterpolate = true;
                         ti.current.set(p.pose());
                     }

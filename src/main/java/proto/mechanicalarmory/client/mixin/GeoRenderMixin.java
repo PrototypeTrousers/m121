@@ -12,7 +12,7 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
-import proto.mechanicalarmory.client.flywheel.instances.vanilla.PoseStackVisual;
+import proto.mechanicalarmory.client.flywheel.instances.vanilla.ExtendedRecyclingPoseStack;
 import proto.mechanicalarmory.client.flywheel.instances.vanilla.SinkBufferSourceVisual;
 import proto.mechanicalarmory.client.flywheel.instances.vanilla.VanillaModel;
 import software.bernie.geckolib.cache.object.GeoBone;
@@ -22,7 +22,7 @@ import software.bernie.geckolib.renderer.GeoRenderer;
 public interface GeoRenderMixin {
     @Inject(method = "renderCubesOfBone", at = @At(value = "HEAD"))
     default void addGeckoModel(PoseStack poseStack, GeoBone bone, VertexConsumer buffer, int packedLight, int packedOverlay, int colour, CallbackInfo ci){
-        if (poseStack instanceof PoseStackVisual pv) {
+        if (poseStack instanceof ExtendedRecyclingPoseStack pv) {
             SinkBufferSourceVisual v = pv.getVisual();
             if (bone.getCubes().isEmpty()) return;
             if (!pv.isRendered()) {

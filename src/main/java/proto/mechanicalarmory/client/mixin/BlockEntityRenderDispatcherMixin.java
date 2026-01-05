@@ -20,12 +20,11 @@ import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
-import org.spongepowered.asm.mixin.injection.ModifyArgs;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
-import org.spongepowered.asm.mixin.injection.invoke.arg.Args;
 import proto.mechanicalarmory.MechanicalArmoryClient;
-import proto.mechanicalarmory.client.flywheel.instances.vanilla.PoseStackVisual;
+import proto.mechanicalarmory.client.flywheel.instances.vanilla.ExtendedRecyclingPoseStack;
 import proto.mechanicalarmory.client.flywheel.instances.vanilla.VanillaBlockEntityVisual;
+import proto.mechanicalarmory.client.flywheel.instances.vanilla.WrappingPoseStack;
 
 @Mixin(BlockEntityRenderDispatcher.class)
 public class BlockEntityRenderDispatcherMixin {
@@ -38,13 +37,12 @@ public class BlockEntityRenderDispatcherMixin {
     @Inject(method = "setupAndRender", at = @At(value = "HEAD"), cancellable = true)
     private static <T extends BlockEntity> void injected(BlockEntityRenderer<T> renderer, T blockEntity, float partialTick, PoseStack poseStack, MultiBufferSource bufferSource, CallbackInfo ci) {
         if (v != null) {
-            PoseStackVisual psv = v.getPoseStackVisual();
-            psv.last().pose().setTranslation(v.getVisualPosition().getX(), v.getVisualPosition().getY(), v.getVisualPosition().getZ());
+            WrappingPoseStack psv = v.getPoseStackVisual();
+            psv.getWrappedPoseStack().last().pose().setTranslation(v.getVisualPosition().getX(), v.getVisualPosition().getY(), v.getVisualPosition().getZ());
             psv.setDepth(0);
-
             renderer.render(blockEntity,
                     psv.isRendered() ? 1f : partialTick,
-                    v.poseStackVisual,
+                    v.extendedRecyclingPoseStack,
                     bufferSource,
                     0,
                     OverlayTexture.NO_OVERLAY);
@@ -64,7 +62,7 @@ public class BlockEntityRenderDispatcherMixin {
                         VisualManagerImpl<BlockEntity, BlockEntityStorage> iii = (VisualManagerImpl<BlockEntity, BlockEntityStorage>) man.blockEntities();
                         v = (VanillaBlockEntityVisual) iii.getStorage().visualAtPos(blockEntity.getBlockPos().asLong());
                         if (v != null) {
-                            if (!v.poseStackVisual.isRendered()) {
+                            if (!v.extendedRecyclingPoseStack.isRendered()) {
                                 return true;
                             }
                             return MechanicalArmoryClient.firstFrameOfTick;

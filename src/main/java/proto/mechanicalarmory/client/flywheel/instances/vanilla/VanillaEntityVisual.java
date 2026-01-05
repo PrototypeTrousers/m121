@@ -3,26 +3,22 @@ package proto.mechanicalarmory.client.flywheel.instances.vanilla;
 import com.mojang.blaze3d.vertex.PoseStack;
 import dev.engine_room.flywheel.api.instance.InstancerProvider;
 import dev.engine_room.flywheel.api.visual.DynamicVisual;
-import dev.engine_room.flywheel.api.visual.TickableVisual;
 import dev.engine_room.flywheel.api.visualization.VisualizationContext;
 import dev.engine_room.flywheel.lib.visual.AbstractEntityVisual;
 import dev.engine_room.flywheel.lib.visual.SimpleDynamicVisual;
-import dev.engine_room.flywheel.lib.visual.SimpleTickableVisual;
 import dev.engine_room.flywheel.lib.visual.component.ShadowComponent;
-import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.level.LevelAccessor;
 import org.joml.Matrix4f;
 import org.joml.Quaternionf;
 import org.joml.Vector3f;
-import proto.mechanicalarmory.MechanicalArmoryClient;
 
 import java.util.ArrayList;
 import java.util.List;
 
 public class VanillaEntityVisual extends AbstractEntityVisual<Entity> implements SimpleDynamicVisual, SinkBufferSourceVisual {
     final public List<List<InterpolatedTransformedInstance>> transformedInstances = new ArrayList<>();
-    private final PoseStackVisual poseStackVisual = new PoseStackVisual(this);
+    private final WrappingPoseStack extendedRecyclingPoseStack = new WrappingPoseStack(this);
     private final Matrix4f mutableInterpolationMatrix4f = new Matrix4f();
     Vector3f[] interpolationVecs = new Vector3f[]{new Vector3f(), new Vector3f(), new Vector3f(), new Vector3f()};
     Quaternionf[] interpolationQuats = new Quaternionf[]{new Quaternionf(), new Quaternionf()};
@@ -84,7 +80,7 @@ public class VanillaEntityVisual extends AbstractEntityVisual<Entity> implements
                     for (int i = 0; i < get.size(); i++) {
                         InterpolatedTransformedInstance ti = get.get(i);
                         ti.previous.set(ti.current);
-                        ti.instance.setVisible(!p.pose().equals(PoseStackVisual.ZERO));
+                        ti.instance.setVisible(!p.pose().equals(ExtendedRecyclingPoseStack.ZERO));
                         hasPoseToInterpolate = true;
                         ti.current.set(p.pose());
                     }
@@ -144,7 +140,7 @@ public class VanillaEntityVisual extends AbstractEntityVisual<Entity> implements
     }
 
     @Override
-    public PoseStackVisual getPoseStackVisual() {
-        return poseStackVisual;
+    public WrappingPoseStack getPoseStackVisual() {
+        return extendedRecyclingPoseStack;
     }
 }

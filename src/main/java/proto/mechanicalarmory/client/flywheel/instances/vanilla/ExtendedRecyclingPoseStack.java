@@ -8,16 +8,16 @@ import org.joml.Matrix4f;
 import java.util.ArrayDeque;
 import java.util.Deque;
 
-public class PoseStackVisual extends PoseStack {
+public class ExtendedRecyclingPoseStack extends PoseStack {
 
     private final SinkBufferSourceVisual visual;
-    private int depth;
+    public int depth;
     private boolean rendered;
     private final Deque<Pose> recycleBin = new ArrayDeque<>();
     private final Deque<Pose> stash = new ArrayDeque<>();
     public static Matrix4f ZERO = new Matrix4f().zero();
 
-    public PoseStackVisual(SinkBufferSourceVisual visual) {
+    public ExtendedRecyclingPoseStack(SinkBufferSourceVisual visual) {
         super();
         this.visual = visual;
     }

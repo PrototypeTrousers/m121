@@ -20,7 +20,6 @@ import software.bernie.geckolib.cache.object.GeoBone;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.Objects;
 
 public interface SinkBufferSourceVisual {
 
@@ -30,7 +29,7 @@ public interface SinkBufferSourceVisual {
 
     InstancerProvider getInstanceProvider();
 
-    PoseStackVisual getPoseStackVisual();
+    WrappingPoseStack getPoseStackVisual();
 
     LevelAccessor getLevel();
 
@@ -95,7 +94,7 @@ public interface SinkBufferSourceVisual {
                 .createInstance(), new Matrix4f(pose), new Matrix4f(pose));
         newIns.instance.light(getLight());
         newIns.instance.setTransform(pose);
-        newIns.instance.setVisible(!pose.equals(PoseStackVisual.ZERO));
+        newIns.instance.setVisible(!pose.equals(ExtendedRecyclingPoseStack.ZERO));
         newIns.instance.setChanged();
         transformedInstances.get(depth).add(newIns);
     }
@@ -117,7 +116,7 @@ public interface SinkBufferSourceVisual {
         transformedInstances.get(depth).add(newIns);
         newIns.instance.light(getLight());
         newIns.instance.setTransform(pose);
-        newIns.instance.setVisible(!pose.equals(PoseStackVisual.ZERO));
+        newIns.instance.setVisible(!pose.equals(ExtendedRecyclingPoseStack.ZERO));
         newIns.instance.setChanged();
     }
 

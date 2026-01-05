@@ -18,9 +18,10 @@ import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
-import proto.mechanicalarmory.client.flywheel.instances.vanilla.PoseStackVisual;
+import proto.mechanicalarmory.client.flywheel.instances.vanilla.ExtendedRecyclingPoseStack;
 import proto.mechanicalarmory.client.flywheel.instances.vanilla.SinkBufferSourceVisual;
 import proto.mechanicalarmory.client.flywheel.instances.vanilla.VanillaModel;
+import proto.mechanicalarmory.client.flywheel.instances.vanilla.WrappingPoseStack;
 
 
 @Mixin(targets = "net.minecraft.client.model.geom.ModelPart")
@@ -34,7 +35,8 @@ public abstract class ModelPartMixin {
 
     @Inject(method = "render(Lcom/mojang/blaze3d/vertex/PoseStack;Lcom/mojang/blaze3d/vertex/VertexConsumer;III)V", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/model/geom/ModelPart;translateAndRotate(Lcom/mojang/blaze3d/vertex/PoseStack;)V", shift = At.Shift.AFTER), cancellable = true)
     private void injected(PoseStack poseStack, VertexConsumer buffer, int packedLight, int packedOverlay, int color, CallbackInfo ci) {
-        if (poseStack instanceof PoseStackVisual pv) {
+        if (poseStack instanceof WrappingPoseStack pv) {
+            ExtendedRecyclingPoseStack eps = pv.getWrappedPoseStack();
             SinkBufferSourceVisual v = pv.getVisual();
             if (((ModelPart) (Object) this).isEmpty()) return;
             if (!pv.isRendered()) {
@@ -56,15 +58,15 @@ public abstract class ModelPartMixin {
                 SinkBufferSourceVisual.InstanceMaterialKey key = new SinkBufferSourceVisual.InstanceMaterialKey(m, tas);
 
                 if (!visible || skipDraw) {
-                    poseStack.last().pose().zero();
+                    eps.last().pose().zero();
                 }
-                v.updateTransforms(pv.getDepth(), poseStack.last());
-                v.addInterpolatedTransformedInstance(pv.getDepth(), (ModelPart) (Object) this, key);
+                v.updateTransforms(eps.getDepth(), eps.last());
+                v.addInterpolatedTransformedInstance(eps.getDepth(), (ModelPart) (Object) this, key);
             } else {
                 if (!visible || skipDraw) {
-                    poseStack.last().pose().zero();
+                    eps.last().pose().zero();
                 }
-                v.updateTransforms(pv.getDepth(), poseStack.last());
+                v.updateTransforms(eps.getDepth(), eps.last());
             }
         }
     }
@@ -72,7 +74,7 @@ public abstract class ModelPartMixin {
     @WrapOperation(method = "render(Lcom/mojang/blaze3d/vertex/PoseStack;Lcom/mojang/blaze3d/vertex/VertexConsumer;III)V",
     at = @At(value = "FIELD", target = "Lnet/minecraft/client/model/geom/ModelPart;visible:Z", opcode = Opcodes.GETFIELD))
     private boolean forceRender(ModelPart instance, Operation<Boolean> original, PoseStack poseStack){
-        return (poseStack instanceof PoseStackVisual) || original.call(instance);
+        return (poseStack instanceof WrappingPoseStack) || original.call(instance);
     }
 
     @WrapWithCondition(
@@ -81,6 +83,6 @@ public abstract class ModelPartMixin {
                     target = "Lnet/minecraft/client/model/geom/ModelPart;compile(Lcom/mojang/blaze3d/vertex/PoseStack$Pose;Lcom/mojang/blaze3d/vertex/VertexConsumer;III)V")
     )
     private boolean onlyRenderIfAllowed(ModelPart instance, PoseStack.Pose pose, VertexConsumer vertexConsumer, int buffer, int packedLight, int packedOverlay, PoseStack poseStack) {
-        return !(poseStack instanceof PoseStackVisual);
+        return !(poseStack instanceof WrappingPoseStack);
     }
 }
