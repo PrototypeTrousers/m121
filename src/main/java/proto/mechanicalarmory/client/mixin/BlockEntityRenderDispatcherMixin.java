@@ -40,11 +40,12 @@ public class BlockEntityRenderDispatcherMixin {
             WrappingPoseStack psv = v.getPoseStackVisual();
             psv.getWrappedPoseStack().last().pose().setTranslation(v.getVisualPosition().getX(), v.getVisualPosition().getY(), v.getVisualPosition().getZ());
             psv.setDepth(0);
+            psv.last().pose().set(poseStack.last().pose());
             renderer.render(blockEntity,
                     psv.isRendered() ? 1f : partialTick,
                     v.extendedRecyclingPoseStack,
                     bufferSource,
-                    0,
+                    15728880,
                     OverlayTexture.NO_OVERLAY);
             ci.cancel();
             psv.setRendered();
@@ -62,7 +63,7 @@ public class BlockEntityRenderDispatcherMixin {
                         VisualManagerImpl<BlockEntity, BlockEntityStorage> iii = (VisualManagerImpl<BlockEntity, BlockEntityStorage>) man.blockEntities();
                         v = (VanillaBlockEntityVisual) iii.getStorage().visualAtPos(blockEntity.getBlockPos().asLong());
                         if (v != null) {
-                            if (!v.extendedRecyclingPoseStack.isRendered()) {
+                            if (!v.extendedRecyclingPoseStack.isRendered() || v.extendedRecyclingPoseStack.isLegacyAccessed()) {
                                 return true;
                             }
                             return MechanicalArmoryClient.firstFrameOfTick;

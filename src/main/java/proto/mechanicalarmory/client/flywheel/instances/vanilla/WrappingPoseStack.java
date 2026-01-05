@@ -2,19 +2,17 @@ package proto.mechanicalarmory.client.flywheel.instances.vanilla;
 
 
 import com.mojang.math.Transformation;
-import dev.engine_room.flywheel.lib.internal.FlwLibLink;
 import dev.engine_room.flywheel.lib.util.RecyclingPoseStack;
+import org.jetbrains.annotations.NotNull;
 import org.joml.Matrix4f;
 import org.joml.Quaternionf;
-
-import java.util.ArrayDeque;
-import java.util.Deque;
 
 public class WrappingPoseStack extends RecyclingPoseStack {
 
     private final SinkBufferSourceVisual visual;
     private boolean rendered;
     public final ExtendedRecyclingPoseStack wrappedPoseStack;
+    boolean legacyAccessed;
 
     public WrappingPoseStack(SinkBufferSourceVisual visual) {
         super();
@@ -24,6 +22,12 @@ public class WrappingPoseStack extends RecyclingPoseStack {
 
     public ExtendedRecyclingPoseStack getWrappedPoseStack() {
         return wrappedPoseStack;
+    }
+
+    @Override
+    public @NotNull Pose last() {
+        legacyAccessed = true;
+        return super.last();
     }
 
     @Override
@@ -60,7 +64,7 @@ public class WrappingPoseStack extends RecyclingPoseStack {
     }
 
     @Override
-    public void mulPose(Quaternionf quaternion) {
+    public void mulPose(@NotNull Quaternionf quaternion) {
         super.mulPose(quaternion);
         if (wrappedPoseStack != null) {
             wrappedPoseStack.mulPose(quaternion);
@@ -68,7 +72,7 @@ public class WrappingPoseStack extends RecyclingPoseStack {
     }
 
     @Override
-    public void rotateAround(Quaternionf quaternion, float x, float y, float z) {
+    public void rotateAround(@NotNull Quaternionf quaternion, float x, float y, float z) {
         super.rotateAround(quaternion, x, y, z);
         if (wrappedPoseStack != null) {
             wrappedPoseStack.rotateAround(quaternion, x, y, z);
@@ -84,7 +88,7 @@ public class WrappingPoseStack extends RecyclingPoseStack {
     }
 
     @Override
-    public void mulPose(Matrix4f pose) {
+    public void mulPose(@NotNull Matrix4f pose) {
         super.mulPose(pose);
         if (wrappedPoseStack != null) {
             wrappedPoseStack.mulPose(pose);
@@ -92,7 +96,7 @@ public class WrappingPoseStack extends RecyclingPoseStack {
     }
 
     @Override
-    public void pushTransformation(Transformation transformation) {
+    public void pushTransformation(@NotNull Transformation transformation) {
         super.pushTransformation(transformation);
         if (wrappedPoseStack != null) {
             wrappedPoseStack.pushTransformation(transformation);
@@ -112,6 +116,11 @@ public class WrappingPoseStack extends RecyclingPoseStack {
     }
 
     public void setDepth(int depth) {
+        legacyAccessed = false;
         wrappedPoseStack.depth = depth;
+    }
+
+    public boolean isLegacyAccessed() {
+        return legacyAccessed;
     }
 }

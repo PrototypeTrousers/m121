@@ -83,7 +83,7 @@ public class EntityRenderDispatcherMixin {
                         VisualManagerImpl<Entity, EntityStorage> iii = (VisualManagerImpl<Entity, EntityStorage>) man.entities();
                         visual = (VanillaEntityVisual) ((StorageMixinAccessor) iii.getStorage()).getVisualsFor().get(leashable);
                         if (visual != null) {
-                            if (!visual.getPoseStackVisual().isRendered()) {
+                            if (!visual.getPoseStackVisual().isRendered() || visual.getPoseStackVisual().isLegacyAccessed()) {
                                 return true;
                             }
                             return MechanicalArmoryClient.firstFrameOfTick;
