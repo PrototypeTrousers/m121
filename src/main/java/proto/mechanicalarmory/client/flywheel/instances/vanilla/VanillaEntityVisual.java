@@ -25,6 +25,7 @@ public class VanillaEntityVisual extends AbstractEntityVisual<Entity> implements
     private final int light;
     boolean hasPoseToInterpolate;
     private boolean updateTransforms;
+    private boolean rendered;
 
     public ShadowComponent getShadowComponent() {
         return shadowComponent;
@@ -120,6 +121,26 @@ public class VanillaEntityVisual extends AbstractEntityVisual<Entity> implements
 
     public void dirtyTransforms() {
         this.updateTransforms = true;
+    }
+
+    @Override
+    public boolean isRendered() {
+        return this.rendered;
+    }
+
+    @Override
+    public void setRendered() {
+        this.rendered = true;
+        for (int depth = 0; depth < transformedInstances.size(); depth++) {
+            PoseStack.Pose p = poses.get(depth);
+            List<InterpolatedTransformedInstance> get = transformedInstances.get(depth);
+            for (int i = 0; i < get.size(); i++) {
+                InterpolatedTransformedInstance ti = get.get(i);
+                ti.instance.setVisible(!p.pose().equals(ExtendedRecyclingPoseStack.ZERO));
+                ti.instance.setTransform(p.pose());
+                ti.instance.setChanged();
+            }
+        }
     }
 
     @Override

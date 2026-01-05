@@ -48,7 +48,9 @@ public class BlockEntityRenderDispatcherMixin {
                     15728880,
                     OverlayTexture.NO_OVERLAY);
             ci.cancel();
-            psv.setRendered();
+            if (!psv.isRendered()) {
+                psv.setRendered();
+            }
         }
     }
 

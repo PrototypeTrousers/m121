@@ -29,6 +29,7 @@ public class VanillaBlockEntityVisual extends AbstractBlockEntityVisual<BlockEnt
     boolean hasPoseToInterpolate;
     List<PoseStack.Pose> poses = new ArrayList<>();
     private boolean updateTransforms;
+    private boolean rendered;
 
     public VanillaBlockEntityVisual(VisualizationContext ctx, BlockEntity blockEntity, float partialTick) {
         super(ctx, blockEntity, partialTick);
@@ -147,5 +148,25 @@ public class VanillaBlockEntityVisual extends AbstractBlockEntityVisual<BlockEnt
     @Override
     public void dirtyTransforms() {
         this.updateTransforms = true;
+    }
+
+    @Override
+    public boolean isRendered() {
+        return this.rendered;
+    }
+
+    @Override
+    public void setRendered() {
+        this.rendered = true;
+        for (int depth = 0; depth < transformedInstances.size(); depth++) {
+            PoseStack.Pose p = poses.get(depth);
+            List<InterpolatedTransformedInstance> get = transformedInstances.get(depth);
+            for (int i = 0; i < get.size(); i++) {
+                InterpolatedTransformedInstance ti = get.get(i);
+                ti.instance.setVisible(!p.pose().equals(ExtendedRecyclingPoseStack.ZERO));
+                ti.instance.setTransform(p.pose());
+                ti.instance.setChanged();
+            }
+        }
     }
 }

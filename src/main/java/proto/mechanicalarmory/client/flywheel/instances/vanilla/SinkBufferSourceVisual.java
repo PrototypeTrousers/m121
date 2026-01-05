@@ -134,6 +134,10 @@ public interface SinkBufferSourceVisual {
 
     void dirtyTransforms();
 
+    boolean isRendered();
+
+    void setRendered();
+
     List<PoseStack.Pose> getPoses();
 
     default void addInterpolatedItemTransformedInstance(int depth, ItemStack itemStack, ItemDisplayContext itemDisplayContext) {

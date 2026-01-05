@@ -10,7 +10,6 @@ import org.joml.Quaternionf;
 public class WrappingPoseStack extends RecyclingPoseStack {
 
     private final SinkBufferSourceVisual visual;
-    private boolean rendered;
     public final ExtendedRecyclingPoseStack wrappedPoseStack;
     boolean legacyAccessed;
 
@@ -104,11 +103,11 @@ public class WrappingPoseStack extends RecyclingPoseStack {
     }
 
     public boolean isRendered() {
-        return rendered;
+        return visual.isRendered();
     }
 
     public void setRendered() {
-        this.rendered = true;
+        this.visual.setRendered();
     }
 
     public SinkBufferSourceVisual getVisual() {
