@@ -24,7 +24,7 @@ import proto.mechanicalarmory.client.flywheel.instances.vanilla.VanillaModel;
 import proto.mechanicalarmory.client.flywheel.instances.vanilla.WrappingPoseStack;
 
 
-@Mixin(targets = "net.minecraft.client.model.geom.ModelPart")
+@Mixin(targets = "net.minecraft.client.model.geom.ModelPart", priority = 1001)
 public abstract class ModelPartMixin {
 
     @Shadow
@@ -33,7 +33,7 @@ public abstract class ModelPartMixin {
     @Shadow
     public boolean visible;
 
-    @Inject(method = "render(Lcom/mojang/blaze3d/vertex/PoseStack;Lcom/mojang/blaze3d/vertex/VertexConsumer;III)V", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/model/geom/ModelPart;translateAndRotate(Lcom/mojang/blaze3d/vertex/PoseStack;)V", shift = At.Shift.AFTER), cancellable = true)
+    @Inject(method = "render(Lcom/mojang/blaze3d/vertex/PoseStack;Lcom/mojang/blaze3d/vertex/VertexConsumer;III)V", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/model/geom/ModelPart;translateAndRotate(Lcom/mojang/blaze3d/vertex/PoseStack;)V", shift = At.Shift.AFTER))
     private void injected(PoseStack poseStack, VertexConsumer buffer, int packedLight, int packedOverlay, int color, CallbackInfo ci) {
         if (poseStack instanceof WrappingPoseStack pv) {
             ExtendedRecyclingPoseStack eps = pv.getWrappedPoseStack();
@@ -69,6 +69,16 @@ public abstract class ModelPartMixin {
                 v.updateTransforms(eps.getDepth(), eps.last());
             }
         }
+    }
+
+    @WrapOperation(method = "translateAndRotate(Lcom/mojang/blaze3d/vertex/PoseStack;)V",
+            at = @At(value = "INVOKE", target = "Lnet/caffeinemc/mods/sodium/api/math/MatrixHelper;rotateZYX(Lcom/mojang/blaze3d/vertex/PoseStack$Pose;FFF)V", opcode = Opcodes.INVOKESTATIC))
+    void sodiumCompat(PoseStack.Pose matrices, float angleZ, float angleY, float angleX, Operation<Void> original, PoseStack matrixStack){
+        if (matrixStack instanceof WrappingPoseStack pv) {
+            ExtendedRecyclingPoseStack eps = pv.getWrappedPoseStack();
+            original.call(eps.last(), angleZ, angleY, angleX);
+        }
+        original.call(matrices, angleZ, angleY, angleX);
     }
 
     @WrapOperation(method = "render(Lcom/mojang/blaze3d/vertex/PoseStack;Lcom/mojang/blaze3d/vertex/VertexConsumer;III)V",

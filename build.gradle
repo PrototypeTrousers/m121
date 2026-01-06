@@ -158,7 +158,9 @@ dependencies {
         setTransitive(false)
     }
     runtimeOnly "top.theillusivec4.curios:curios-neoforge:9.5.1+1.21.1"
-    //runtimeOnly("curse.maven:TerraBlender-940057:7326873")
+    implementation("curse.maven:Sodium-394468:6382651") {
+        setTransitive(false)
+    }
 
     // Example project dependency using a sister or child project:
     // implementation project(":myproject")
