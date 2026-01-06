@@ -22,7 +22,6 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import proto.mechanicalarmory.MechanicalArmoryClient;
-import proto.mechanicalarmory.client.flywheel.instances.vanilla.ExtendedRecyclingPoseStack;
 import proto.mechanicalarmory.client.flywheel.instances.vanilla.VanillaBlockEntityVisual;
 import proto.mechanicalarmory.client.flywheel.instances.vanilla.WrappingPoseStack;
 
@@ -32,18 +31,18 @@ public class BlockEntityRenderDispatcherMixin {
     public Level level;
 
     @Unique
-    private static VanillaBlockEntityVisual v;
+    private static VanillaBlockEntityVisual blockEntityVisual;
 
     @Inject(method = "setupAndRender", at = @At(value = "HEAD"), cancellable = true)
     private static <T extends BlockEntity> void injected(BlockEntityRenderer<T> renderer, T blockEntity, float partialTick, PoseStack poseStack, MultiBufferSource bufferSource, CallbackInfo ci) {
-        if (v != null) {
-            WrappingPoseStack psv = v.getPoseStackVisual();
-            psv.getWrappedPoseStack().last().pose().setTranslation(v.getVisualPosition().getX(), v.getVisualPosition().getY(), v.getVisualPosition().getZ());
+        if (blockEntityVisual != null) {
+            WrappingPoseStack psv = blockEntityVisual.getPoseStackVisual();
+            psv.getWrappedPoseStack().last().pose().setTranslation(blockEntityVisual.getVisualPosition().getX(), blockEntityVisual.getVisualPosition().getY(), blockEntityVisual.getVisualPosition().getZ());
             psv.setDepth(0);
             psv.last().pose().set(poseStack.last().pose());
             renderer.render(blockEntity,
                     psv.isRendered() ? 1f : partialTick,
-                    v.extendedRecyclingPoseStack,
+                    blockEntityVisual.extendedRecyclingPoseStack,
                     bufferSource,
                     15728880,
                     OverlayTexture.NO_OVERLAY);
@@ -56,24 +55,20 @@ public class BlockEntityRenderDispatcherMixin {
 
     @WrapOperation(method = "render", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/blockentity/BlockEntityRenderer;shouldRender(Lnet/minecraft/world/level/block/entity/BlockEntity;Lnet/minecraft/world/phys/Vec3;)Z"))
     boolean should(BlockEntityRenderer<?> instance, BlockEntity blockEntity, Vec3 cameraPos, Operation<Boolean> original, BlockEntity blockEntity1, float partialTick, PoseStack poseStack, MultiBufferSource bufferSource) {
-        v = null;
+        blockEntityVisual = null;
         boolean should = original.call(instance, blockEntity, cameraPos) == true;
         if (should && BackendManagerImpl.isBackendOn()) {
             if (VisualizationHelper.canVisualize(blockEntity)) {
                 VisualizationManagerImpl man = VisualizationManagerImpl.get(blockEntity.getLevel());
                 if (man != null) {
                     VisualManagerImpl<BlockEntity, BlockEntityStorage> iii = (VisualManagerImpl<BlockEntity, BlockEntityStorage>) man.blockEntities();
-                    if (iii.getStorage().visualAtPos(blockEntity.getBlockPos().asLong()) instanceof VanillaBlockEntityVisual vanillaBlockEntityVisual) {
-                        vanillaBlockEntityVisual = (VanillaBlockEntityVisual) iii.getStorage().visualAtPos(blockEntity.getBlockPos().asLong());
-                        if (vanillaBlockEntityVisual != null) {
-                            v = vanillaBlockEntityVisual;
-                            if (!vanillaBlockEntityVisual.extendedRecyclingPoseStack.isRendered() || vanillaBlockEntityVisual.extendedRecyclingPoseStack.isLegacyAccessed()) {
-                                return true;
-                            }
-                            return MechanicalArmoryClient.firstFrameOfTick;
+                    if (iii.getStorage().visualAtPos(blockEntity.getBlockPos().asLong()) instanceof VanillaBlockEntityVisual visual) {
+                        blockEntityVisual = visual;
+                        if (!visual.extendedRecyclingPoseStack.isRendered() || visual.extendedRecyclingPoseStack.isLegacyAccessed()) {
+                            return true;
                         }
+                        return MechanicalArmoryClient.firstFrameOfTick;
                     }
-                    return true;
                 }
             }
         }

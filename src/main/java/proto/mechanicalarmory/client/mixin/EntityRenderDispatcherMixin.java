@@ -25,7 +25,6 @@ import org.spongepowered.asm.mixin.injection.ModifyArgs;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.invoke.arg.Args;
 import proto.mechanicalarmory.MechanicalArmoryClient;
-import proto.mechanicalarmory.client.flywheel.instances.vanilla.ExtendedRecyclingPoseStack;
 import proto.mechanicalarmory.client.flywheel.instances.vanilla.VanillaEntityVisual;
 import proto.mechanicalarmory.client.flywheel.instances.vanilla.WrappingPoseStack;
 
@@ -35,16 +34,16 @@ public class EntityRenderDispatcherMixin {
     public Level level;
 
     @Unique
-    private static VanillaEntityVisual visual;
+    private static VanillaEntityVisual entityVisual;
 
     @ModifyArgs(method = "render", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/entity/EntityRenderer;render(Lnet/minecraft/world/entity/Entity;FFLcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/MultiBufferSource;I)V"))
     private static void injected(Args args) {
-        if (visual != null) {
-            WrappingPoseStack psv = visual.getPoseStackVisual();
+        if (entityVisual != null) {
+            WrappingPoseStack psv = entityVisual.getPoseStackVisual();
             psv.getWrappedPoseStack().last().pose().setTranslation(
-                    visual.getVisualPosition().x(),
-                    visual.getVisualPosition().y(),
-                    visual.getVisualPosition().z());
+                    entityVisual.getVisualPosition().x(),
+                    entityVisual.getVisualPosition().y(),
+                    entityVisual.getVisualPosition().z());
             psv.setDepth(0);
             if (psv.isRendered()) {
                 args.set(2, 1f);
@@ -57,15 +56,15 @@ public class EntityRenderDispatcherMixin {
 
     @Inject(method = "render", at = @At("TAIL"))
     private static void setRendered(Entity entity, double x, double y, double z, float rotationYaw, float partialTicks, PoseStack poseStack, MultiBufferSource buffer, int packedLight, CallbackInfo ci) {
-        if (visual != null) {
-            visual.getPoseStackVisual().setRendered();
+        if (entityVisual != null) {
+            entityVisual.getPoseStackVisual().setRendered();
         }
     }
 
     @Inject(method = "renderShadow", at = @At("HEAD"), cancellable = true)
     private static void setupShadow(PoseStack poseStack, MultiBufferSource buffer, Entity entity, float weight, float partialTicks, LevelReader level, float size, CallbackInfo ci) {
-        if (visual != null) {
-            ShadowComponent sc = visual.getShadowComponent();
+        if (entityVisual != null) {
+            ShadowComponent sc = entityVisual.getShadowComponent();
             sc.radius(size);
             sc.strength(weight);
             ci.cancel();
@@ -74,27 +73,23 @@ public class EntityRenderDispatcherMixin {
 
     @WrapOperation(method = "shouldRender", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/entity/EntityRenderer;shouldRender(Lnet/minecraft/world/entity/Entity;Lnet/minecraft/client/renderer/culling/Frustum;DDD)Z"))
     boolean should(EntityRenderer<?> instance, Entity leashable, Frustum aabb, double v, double livingEntity, double camera, Operation<Boolean> original) {
-        visual = null;
-        if (BackendManagerImpl.isBackendOn()) {
-            if (original.call(instance, leashable, aabb, v, livingEntity, camera) == true) {
-                if (VisualizationHelper.canVisualize(leashable)) {
-                    VisualizationManagerImpl man = VisualizationManagerImpl.get(leashable.level());
-                    if (man != null) {
-                        VisualManagerImpl<Entity, EntityStorage> iii = (VisualManagerImpl<Entity, EntityStorage>) man.entities();
-                        visual = (VanillaEntityVisual) ((StorageMixinAccessor) iii.getStorage()).getVisualsFor().get(leashable);
-                        if (visual != null) {
-                            if (!visual.getPoseStackVisual().isRendered() || visual.getPoseStackVisual().isLegacyAccessed()) {
-                                return true;
-                            }
-                            return MechanicalArmoryClient.firstFrameOfTick;
+        entityVisual = null;
+        boolean should = original.call(instance, leashable, aabb, v, livingEntity, camera);
+        if (should && BackendManagerImpl.isBackendOn()) {
+            if (VisualizationHelper.canVisualize(leashable)) {
+                VisualizationManagerImpl man = VisualizationManagerImpl.get(leashable.level());
+                if (man != null) {
+                    VisualManagerImpl<Entity, EntityStorage> iii = (VisualManagerImpl<Entity, EntityStorage>) man.entities();
+                    if (((StorageMixinAccessor) iii.getStorage()).getVisualsFor().get(leashable) instanceof VanillaEntityVisual visual) {
+                        entityVisual = visual;
+                        if (!entityVisual.getPoseStackVisual().isRendered() || entityVisual.getPoseStackVisual().isLegacyAccessed()) {
+                            return true;
                         }
-                        return true;
+                        return MechanicalArmoryClient.firstFrameOfTick;
                     }
                 }
             }
-            return false;
-        } else {
-            return original.call(instance, leashable, aabb, v, livingEntity, camera);
         }
+        return should;
     }
 }
