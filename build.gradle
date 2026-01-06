@@ -152,6 +152,13 @@ dependencies {
     implementation "rearth.oritech:oritech-neoforge-${minecraft_version}:0.19.7"
     implementation("io.wispforest:owo-lib-neoforge:0.12.15.1-beta.6+1.21")
 
+    implementation "rearth.oritech:oritech-neoforge-${minecraft_version}:0.19.7"
+
+    runtimeOnly ("com.hollingsworth.ars_nouveau:ars_nouveau-1.21.1:5.11.1.1275") {
+        setTransitive(false)
+    }
+    runtimeOnly "top.theillusivec4.curios:curios-neoforge:9.5.1+1.21.1"
+    //runtimeOnly("curse.maven:TerraBlender-940057:7326873")
 
     // Example project dependency using a sister or child project:
     // implementation project(":myproject")

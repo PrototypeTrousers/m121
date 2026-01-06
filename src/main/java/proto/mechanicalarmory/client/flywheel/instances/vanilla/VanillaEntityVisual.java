@@ -105,7 +105,7 @@ public class VanillaEntityVisual extends AbstractEntityVisual<Entity> implements
             for (InterpolatedTransformedInstance ti : list) {
                 // 1. Check if an update is even needed
                 // Only update if the transformation has actually changed between ticks
-                if (!ti.current.equals(ti.instance.pose)) {
+                if (!ti.current.equals(ti.instance.pose,0.0001f)) {
                     hasPoseToInterpolate = true;
                     // 2. Interpolate into a temporary matrix
                     // Do NOT modify ti.current or ti.previous here!

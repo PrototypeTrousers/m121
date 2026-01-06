@@ -3,6 +3,7 @@ package proto.mechanicalarmory;
 import com.google.common.base.Stopwatch;
 import de.javagl.jgltf.model.GltfModel;
 import de.javagl.jgltf.model.io.GltfModelReader;
+import dev.engine_room.flywheel.api.visualization.BlockEntityVisualizer;
 import dev.engine_room.flywheel.api.visualization.VisualizerRegistry;
 import dev.engine_room.flywheel.lib.model.part.ModelTree;
 import net.minecraft.client.Minecraft;
@@ -15,6 +16,7 @@ import net.minecraft.server.packs.resources.Resource;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.neoforged.api.distmarker.Dist;
+import net.neoforged.bus.api.EventPriority;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.common.EventBusSubscriber;
@@ -58,36 +60,19 @@ public class MechanicalArmoryClient {
         container.registerExtensionPoint(IConfigScreenFactory.class, ConfigurationScreen::new);
     }
 
-    @SubscribeEvent
+    @SubscribeEvent(priority = EventPriority.LOWEST)
     static void onClientSetup(FMLClientSetupEvent event) {
-        VisualizerRegistry.setVisualizer(BlockEntitiesContent.CENTRIFUGE_ENTITY,VanillaBlockVisualiser.VANILLA_BLOCK_VISUALISER);
         VisualizerRegistry.setVisualizer(MAEntities.ARM_ENTITY.get(), ArmVisualiser.ARM_VISUAL);
-        VisualizerRegistry.setVisualizer(BlockEntityType.SIGN, VanillaBlockVisualiser.VANILLA_BLOCK_VISUALISER);
-        VisualizerRegistry.setVisualizer(BlockEntityType.HANGING_SIGN, VanillaBlockVisualiser.VANILLA_BLOCK_VISUALISER);
-        VisualizerRegistry.setVisualizer(BlockEntityType.MOB_SPAWNER, VanillaBlockVisualiser.VANILLA_BLOCK_VISUALISER);
-        VisualizerRegistry.setVisualizer(BlockEntityType.PISTON, VanillaBlockVisualiser.VANILLA_BLOCK_VISUALISER);
-        VisualizerRegistry.setVisualizer(BlockEntityType.CHEST, VanillaBlockVisualiser.VANILLA_BLOCK_VISUALISER);
-        VisualizerRegistry.setVisualizer(BlockEntityType.ENDER_CHEST, VanillaBlockVisualiser.VANILLA_BLOCK_VISUALISER);
-        VisualizerRegistry.setVisualizer(BlockEntityType.TRAPPED_CHEST, VanillaBlockVisualiser.VANILLA_BLOCK_VISUALISER);
-        VisualizerRegistry.setVisualizer(BlockEntityType.ENCHANTING_TABLE, VanillaBlockVisualiser.VANILLA_BLOCK_VISUALISER);
-        VisualizerRegistry.setVisualizer(BlockEntityType.LECTERN, VanillaBlockVisualiser.VANILLA_BLOCK_VISUALISER);
-        VisualizerRegistry.setVisualizer(BlockEntityType.END_PORTAL, VanillaBlockVisualiser.VANILLA_BLOCK_VISUALISER);
-        VisualizerRegistry.setVisualizer(BlockEntityType.END_GATEWAY, VanillaBlockVisualiser.VANILLA_BLOCK_VISUALISER);
-        VisualizerRegistry.setVisualizer(BlockEntityType.BEACON, VanillaBlockVisualiser.VANILLA_BLOCK_VISUALISER);
-        VisualizerRegistry.setVisualizer(BlockEntityType.SKULL, VanillaBlockVisualiser.VANILLA_BLOCK_VISUALISER);
-        VisualizerRegistry.setVisualizer(BlockEntityType.BANNER, VanillaBlockVisualiser.VANILLA_BLOCK_VISUALISER);
-        VisualizerRegistry.setVisualizer(BlockEntityType.STRUCTURE_BLOCK, VanillaBlockVisualiser.VANILLA_BLOCK_VISUALISER);
-        VisualizerRegistry.setVisualizer(BlockEntityType.SHULKER_BOX, VanillaBlockVisualiser.VANILLA_BLOCK_VISUALISER);
-        VisualizerRegistry.setVisualizer(BlockEntityType.BED, VanillaBlockVisualiser.VANILLA_BLOCK_VISUALISER);
-        VisualizerRegistry.setVisualizer(BlockEntityType.CONDUIT, VanillaBlockVisualiser.VANILLA_BLOCK_VISUALISER);
-        VisualizerRegistry.setVisualizer(BlockEntityType.BELL, VanillaBlockVisualiser.VANILLA_BLOCK_VISUALISER);
-        VisualizerRegistry.setVisualizer(BlockEntityType.CAMPFIRE, VanillaBlockVisualiser.VANILLA_BLOCK_VISUALISER);
-        VisualizerRegistry.setVisualizer(BlockEntityType.BRUSHABLE_BLOCK, VanillaBlockVisualiser.VANILLA_BLOCK_VISUALISER);
-        VisualizerRegistry.setVisualizer(BlockEntityType.DECORATED_POT, VanillaBlockVisualiser.VANILLA_BLOCK_VISUALISER);
-        VisualizerRegistry.setVisualizer(BlockEntityType.TRIAL_SPAWNER, VanillaBlockVisualiser.VANILLA_BLOCK_VISUALISER);
-        VisualizerRegistry.setVisualizer(BlockEntityType.VAULT, VanillaBlockVisualiser.VANILLA_BLOCK_VISUALISER);
-        BuiltInRegistries.ENTITY_TYPE.forEach(c -> VisualizerRegistry.setVisualizer(c, VanillaEntityVisualiser.VANILLA_ENTITY_VISUALISER));
-        VisualizerRegistry.setVisualizer(EntityType.VILLAGER, VanillaEntityVisualiser.VANILLA_ENTITY_VISUALISER);
+        BuiltInRegistries.BLOCK_ENTITY_TYPE.forEach(c -> {
+            if (VisualizerRegistry.getVisualizer(c) == null) {
+                VisualizerRegistry.setVisualizer(c, VanillaBlockVisualiser.VANILLA_BLOCK_VISUALISER);
+            }
+        });
+        BuiltInRegistries.ENTITY_TYPE.forEach(c -> {
+            if (VisualizerRegistry.getVisualizer(c) == null) {
+                VisualizerRegistry.setVisualizer(c, VanillaEntityVisualiser.VANILLA_ENTITY_VISUALISER);
+            }
+        });
 
         // Some client setup code
         MechanicalArmory.LOGGER.info("HELLO FROM CLIENT SETUP");

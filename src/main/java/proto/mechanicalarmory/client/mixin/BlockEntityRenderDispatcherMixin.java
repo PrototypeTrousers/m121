@@ -57,26 +57,26 @@ public class BlockEntityRenderDispatcherMixin {
     @WrapOperation(method = "render", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/blockentity/BlockEntityRenderer;shouldRender(Lnet/minecraft/world/level/block/entity/BlockEntity;Lnet/minecraft/world/phys/Vec3;)Z"))
     boolean should(BlockEntityRenderer<?> instance, BlockEntity blockEntity, Vec3 cameraPos, Operation<Boolean> original, BlockEntity blockEntity1, float partialTick, PoseStack poseStack, MultiBufferSource bufferSource) {
         v = null;
-        if (BackendManagerImpl.isBackendOn()) {
-            if (original.call(instance, blockEntity, cameraPos) == true) {
-                if (VisualizationHelper.canVisualize(blockEntity)) {
-                    VisualizationManagerImpl man = VisualizationManagerImpl.get(blockEntity.getLevel());
-                    if (man != null) {
-                        VisualManagerImpl<BlockEntity, BlockEntityStorage> iii = (VisualManagerImpl<BlockEntity, BlockEntityStorage>) man.blockEntities();
-                        v = (VanillaBlockEntityVisual) iii.getStorage().visualAtPos(blockEntity.getBlockPos().asLong());
-                        if (v != null) {
-                            if (!v.extendedRecyclingPoseStack.isRendered() || v.extendedRecyclingPoseStack.isLegacyAccessed()) {
+        boolean should = original.call(instance, blockEntity, cameraPos) == true;
+        if (should && BackendManagerImpl.isBackendOn()) {
+            if (VisualizationHelper.canVisualize(blockEntity)) {
+                VisualizationManagerImpl man = VisualizationManagerImpl.get(blockEntity.getLevel());
+                if (man != null) {
+                    VisualManagerImpl<BlockEntity, BlockEntityStorage> iii = (VisualManagerImpl<BlockEntity, BlockEntityStorage>) man.blockEntities();
+                    if (iii.getStorage().visualAtPos(blockEntity.getBlockPos().asLong()) instanceof VanillaBlockEntityVisual vanillaBlockEntityVisual) {
+                        vanillaBlockEntityVisual = (VanillaBlockEntityVisual) iii.getStorage().visualAtPos(blockEntity.getBlockPos().asLong());
+                        if (vanillaBlockEntityVisual != null) {
+                            v = vanillaBlockEntityVisual;
+                            if (!vanillaBlockEntityVisual.extendedRecyclingPoseStack.isRendered() || vanillaBlockEntityVisual.extendedRecyclingPoseStack.isLegacyAccessed()) {
                                 return true;
                             }
                             return MechanicalArmoryClient.firstFrameOfTick;
                         }
-                        return true;
                     }
+                    return true;
                 }
             }
-            return false;
-        } else {
-            return original.call(instance, blockEntity, cameraPos);
         }
+        return should;
     }
 }
