@@ -105,7 +105,7 @@ public class VanillaEntityVisual extends AbstractEntityVisual<Entity> implements
             for (InterpolatedTransformedInstance ti : list) {
                 // 1. Check if an update is even needed
                 // Only update if the transformation has actually changed between ticks
-                if (!ti.previous.equals(ti.current)) {
+                if (!ti.current.equals(ti.instance.pose)) {
                     hasPoseToInterpolate = true;
                     // 2. Interpolate into a temporary matrix
                     // Do NOT modify ti.current or ti.previous here!
@@ -131,16 +131,6 @@ public class VanillaEntityVisual extends AbstractEntityVisual<Entity> implements
     @Override
     public void setRendered() {
         this.rendered = true;
-        for (int depth = 0; depth < transformedInstances.size(); depth++) {
-            PoseStack.Pose p = poses.get(depth);
-            List<InterpolatedTransformedInstance> get = transformedInstances.get(depth);
-            for (int i = 0; i < get.size(); i++) {
-                InterpolatedTransformedInstance ti = get.get(i);
-                ti.instance.setVisible(!p.pose().equals(ExtendedRecyclingPoseStack.ZERO));
-                ti.instance.setTransform(p.pose());
-                ti.instance.setChanged();
-            }
-        }
     }
 
     @Override
