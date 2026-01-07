@@ -28,7 +28,7 @@ import proto.mechanicalarmory.MechanicalArmoryClient;
 import proto.mechanicalarmory.client.flywheel.instances.vanilla.VanillaEntityVisual;
 import proto.mechanicalarmory.client.flywheel.instances.vanilla.WrappingPoseStack;
 
-@Mixin(EntityRenderDispatcher.class)
+@Mixin(value = EntityRenderDispatcher.class, priority = 1001)
 public class EntityRenderDispatcherMixin {
     @Shadow
     public Level level;
@@ -51,6 +51,7 @@ public class EntityRenderDispatcherMixin {
             PoseStack poseStack = args.get(3);
             psv.last().pose().set(poseStack.last().pose());
             args.set(3, psv);
+            entityVisual.setBufferSource(args.get(4));
         }
     }
 
@@ -58,6 +59,7 @@ public class EntityRenderDispatcherMixin {
     private static void setRendered(Entity entity, double x, double y, double z, float rotationYaw, float partialTicks, PoseStack poseStack, MultiBufferSource buffer, int packedLight, CallbackInfo ci) {
         if (entityVisual != null) {
             entityVisual.getPoseStackVisual().setRendered();
+            entityVisual.setBufferSource(null);
         }
     }
 

@@ -8,6 +8,7 @@ import dev.engine_room.flywheel.api.visualization.VisualizationContext;
 import dev.engine_room.flywheel.lib.visual.AbstractBlockEntityVisual;
 import dev.engine_room.flywheel.lib.visual.SimpleDynamicVisual;
 import net.minecraft.client.renderer.LevelRenderer;
+import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.world.level.LevelAccessor;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import org.jetbrains.annotations.Nullable;
@@ -30,6 +31,7 @@ public class VanillaBlockEntityVisual extends AbstractBlockEntityVisual<BlockEnt
     List<PoseStack.Pose> poses = new ArrayList<>();
     private boolean updateTransforms;
     private boolean rendered;
+    private MultiBufferSource bufferSource;
 
     public VanillaBlockEntityVisual(VisualizationContext ctx, BlockEntity blockEntity, float partialTick) {
         super(ctx, blockEntity, partialTick);
@@ -43,6 +45,16 @@ public class VanillaBlockEntityVisual extends AbstractBlockEntityVisual<BlockEnt
     @Override
     public List<PoseStack.Pose> getPoses() {
         return poses;
+    }
+
+    @Override
+    public void setBufferSource(MultiBufferSource bufferSource) {
+        this.bufferSource = bufferSource;
+    }
+
+    @Override
+    public MultiBufferSource getBufferSource() {
+        return this.bufferSource;
     }
 
     @Override

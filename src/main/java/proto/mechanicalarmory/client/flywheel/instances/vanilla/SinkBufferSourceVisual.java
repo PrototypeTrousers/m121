@@ -7,6 +7,7 @@ import dev.engine_room.flywheel.lib.instance.InstanceTypes;
 import dev.engine_room.vanillin.item.ItemModels;
 import net.minecraft.client.model.geom.ModelPart;
 import net.minecraft.client.multiplayer.ClientLevel;
+import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.world.item.ItemDisplayContext;
 import net.minecraft.world.item.ItemStack;
@@ -177,6 +178,10 @@ public interface SinkBufferSourceVisual {
             ti.lastTick = ((ClientLevel) getLevel()).getGameTime();
         }
     }
+
+    void setBufferSource(MultiBufferSource bufferSource);
+
+    MultiBufferSource getBufferSource();
 
     public record InstanceMaterialKey (Material material, TextureAtlasSprite sprite) {
         @Override

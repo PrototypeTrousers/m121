@@ -25,7 +25,7 @@ import proto.mechanicalarmory.MechanicalArmoryClient;
 import proto.mechanicalarmory.client.flywheel.instances.vanilla.VanillaBlockEntityVisual;
 import proto.mechanicalarmory.client.flywheel.instances.vanilla.WrappingPoseStack;
 
-@Mixin(BlockEntityRenderDispatcher.class)
+@Mixin(value = BlockEntityRenderDispatcher.class, priority = 1001)
 public class BlockEntityRenderDispatcherMixin {
     @Shadow
     public Level level;
@@ -40,6 +40,7 @@ public class BlockEntityRenderDispatcherMixin {
             psv.getWrappedPoseStack().last().pose().setTranslation(blockEntityVisual.getVisualPosition().getX(), blockEntityVisual.getVisualPosition().getY(), blockEntityVisual.getVisualPosition().getZ());
             psv.setDepth(0);
             psv.last().pose().set(poseStack.last().pose());
+            blockEntityVisual.setBufferSource(bufferSource);
             renderer.render(blockEntity,
                     psv.isRendered() ? 1f : partialTick,
                     blockEntityVisual.extendedRecyclingPoseStack,
@@ -50,6 +51,7 @@ public class BlockEntityRenderDispatcherMixin {
             if (!psv.isRendered()) {
                 psv.setRendered();
             }
+            blockEntityVisual.setBufferSource(null);
         }
     }
 

@@ -11,8 +11,10 @@ import dev.engine_room.flywheel.api.material.Material;
 import it.unimi.dsi.fastutil.objects.ReferenceSet;
 import net.irisshaders.batchedentityrendering.impl.FullyBufferedMultiBufferSource;
 import net.irisshaders.batchedentityrendering.impl.SegmentedBufferBuilder;
+import net.irisshaders.iris.layer.BufferSourceWrapper;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.model.geom.ModelPart;
+import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.raphimc.immediatelyfast.feature.core.BatchableBufferSource;
@@ -49,9 +51,15 @@ public abstract class ModelPartMixin {
                 TextureAtlasSprite tas = null;
                 Material m;
                 RenderType r;
+                MultiBufferAccessor accessor;
 
+                MultiBufferSource mbs = v.getBufferSource();
 
-                MultiBufferAccessor accessor = (MultiBufferAccessor) Minecraft.getInstance().renderBuffers().bufferSource();;
+                if (mbs instanceof BufferSourceWrapper bsw) {
+                    accessor = (MultiBufferAccessor) bsw.getOriginal();
+                } else {
+                    accessor = (MultiBufferAccessor) v.getBufferSource();
+                }
                 HashBiMap<RenderType, BufferBuilder> map = (HashBiMap<RenderType, BufferBuilder>) accessor.getStartedBuilders();
 
 

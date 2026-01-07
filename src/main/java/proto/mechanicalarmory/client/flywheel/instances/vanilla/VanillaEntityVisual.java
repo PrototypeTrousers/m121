@@ -7,6 +7,7 @@ import dev.engine_room.flywheel.api.visualization.VisualizationContext;
 import dev.engine_room.flywheel.lib.visual.AbstractEntityVisual;
 import dev.engine_room.flywheel.lib.visual.SimpleDynamicVisual;
 import dev.engine_room.flywheel.lib.visual.component.ShadowComponent;
+import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.level.LevelAccessor;
 import org.joml.Matrix4f;
@@ -26,6 +27,7 @@ public class VanillaEntityVisual extends AbstractEntityVisual<Entity> implements
     boolean hasPoseToInterpolate;
     private boolean updateTransforms;
     private boolean rendered;
+    private MultiBufferSource bufferSource;
 
     public ShadowComponent getShadowComponent() {
         return shadowComponent;
@@ -37,6 +39,16 @@ public class VanillaEntityVisual extends AbstractEntityVisual<Entity> implements
     @Override
     public List<PoseStack.Pose> getPoses() {
         return poses;
+    }
+
+    @Override
+    public void setBufferSource(MultiBufferSource bufferSource) {
+        this.bufferSource = bufferSource;
+    }
+
+    @Override
+    public MultiBufferSource getBufferSource() {
+        return this.bufferSource;
     }
 
     List<PoseStack.Pose> poses = new ArrayList<>();

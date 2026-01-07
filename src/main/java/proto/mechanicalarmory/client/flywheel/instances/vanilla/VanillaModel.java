@@ -16,6 +16,7 @@ import dev.engine_room.flywheel.lib.model.SimpleQuadMesh;
 import dev.engine_room.flywheel.lib.util.RendererReloadCache;
 import dev.engine_room.flywheel.lib.vertex.PosTexNormalVertexView;
 import dev.engine_room.flywheel.lib.vertex.VertexView;
+import net.irisshaders.iris.layer.OuterWrappedRenderType;
 import net.minecraft.client.model.geom.ModelPart;
 import net.minecraft.client.renderer.LightTexture;
 import net.minecraft.client.renderer.RenderStateShard;
@@ -85,6 +86,10 @@ public class VanillaModel implements Model {
     }
 
     public static dev.engine_room.flywheel.api.material.Material makeFlywheelMaterial(RenderType renderType) {
+
+        if (renderType instanceof OuterWrappedRenderType outerWrappedRenderType) {
+            renderType = outerWrappedRenderType.unwrap();
+        }
 
         CompositeRenderTypeAccessor c = ((CompositeRenderTypeAccessor) renderType);
         RenderStateShard.EmptyTextureStateShard r = ((RenderTypeAccessor) (Object) c.getState()).getTextureState();
