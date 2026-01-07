@@ -9,6 +9,8 @@ import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import dev.engine_room.flywheel.api.material.Material;
 import it.unimi.dsi.fastutil.objects.ReferenceSet;
+import net.irisshaders.batchedentityrendering.impl.FullyBufferedMultiBufferSource;
+import net.irisshaders.batchedentityrendering.impl.SegmentedBufferBuilder;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.model.geom.ModelPart;
 import net.minecraft.client.renderer.RenderType;
@@ -66,6 +68,20 @@ public abstract class ModelPartMixin {
                         ReferenceSet<BufferBuilder> value = entry.getValue();
                         if (value.contains(buffer)) {
                             r = key;
+                        }
+                    }
+                }
+
+                if (accessor instanceof FullyBufferedMultiBufferSourceAccessor bbs) {
+                    SegmentedBufferBuilder[] builders = bbs.getBuilders();
+                    for (SegmentedBufferBuilder builder : builders) {
+                        for (Map.Entry<RenderType, BufferBuilder> entry : ((SegmentedBufferBuilderAccessor) builder).getBuilders().entrySet()) {
+                            RenderType key = entry.getKey();
+                            BufferBuilder value = entry.getValue();
+                            if (value == buffer) {
+                                r = key;
+                                break;
+                            }
                         }
                     }
                 }

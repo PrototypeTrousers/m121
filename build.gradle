@@ -153,6 +153,8 @@ dependencies {
     implementation "rearth.oritech:oritech-neoforge-${minecraft_version}:0.19.7"
     implementation("io.wispforest:owo-lib-neoforge:0.12.15.1-beta.6+1.21")
     implementation("maven.modrinth:immediatelyfast:1.6.9+1.21.1-neoforge") // Get latest version from modrinth
+    implementation("maven.modrinth:iris:1.8.12+1.21.1-neoforge") // Get latest version from modrinth
+    implementation("maven.modrinth:sodium:mc1.21.1-0.6.13-neoforge") // Get latest version from modrinth
 
     implementation "rearth.oritech:oritech-neoforge-${minecraft_version}:0.19.7"
 
@@ -160,9 +162,6 @@ dependencies {
         setTransitive(false)
     }
     runtimeOnly "top.theillusivec4.curios:curios-neoforge:9.5.1+1.21.1"
-//    implementation("curse.maven:Sodium-394468:6382651") {
-//        setTransitive(false)
-//    }
 
     // Example project dependency using a sister or child project:
     // implementation project(":myproject")

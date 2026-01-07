@@ -13,6 +13,7 @@
     "CompositeRenderTypeAccessor",
     "EntityRenderDispatcherMixin",
     "EntityRenderersAccessor",
+    "FullyBufferedMultiBufferSourceAccessor",
     "ItemRendererMixin",
     "ModelPartAccessor",
     "ModelPartMixin",
@@ -28,6 +29,7 @@
   "mixins": [
     "GeoRenderMixin",
     "ItemModelsMixin",
+    "SegmentedBufferBuilderAccessor",
     "StorageMixinAccessor"
   ]
 }
