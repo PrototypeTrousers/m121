@@ -8,10 +8,12 @@ import com.mojang.blaze3d.vertex.BufferBuilder;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import dev.engine_room.flywheel.api.material.Material;
+import it.unimi.dsi.fastutil.objects.ReferenceSet;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.model.geom.ModelPart;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
+import net.raphimc.immediatelyfast.feature.core.BatchableBufferSource;
 import org.objectweb.asm.Opcodes;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
@@ -22,6 +24,8 @@ import proto.mechanicalarmory.client.flywheel.instances.vanilla.ExtendedRecyclin
 import proto.mechanicalarmory.client.flywheel.instances.vanilla.SinkBufferSourceVisual;
 import proto.mechanicalarmory.client.flywheel.instances.vanilla.VanillaModel;
 import proto.mechanicalarmory.client.flywheel.instances.vanilla.WrappingPoseStack;
+
+import java.util.Map;
 
 
 @Mixin(targets = "net.minecraft.client.model.geom.ModelPart", priority = 1001)
@@ -42,16 +46,28 @@ public abstract class ModelPartMixin {
             if (!pv.isRendered()) {
                 TextureAtlasSprite tas = null;
                 Material m;
+                RenderType r;
+
 
                 MultiBufferAccessor accessor = (MultiBufferAccessor) Minecraft.getInstance().renderBuffers().bufferSource();;
                 HashBiMap<RenderType, BufferBuilder> map = (HashBiMap<RenderType, BufferBuilder>) accessor.getStartedBuilders();
 
-                RenderType r;
+
                 if (buffer instanceof SpriteCoordinateExpanderAccessor sceb) {
                     tas = sceb.getSprite();
-                    r = map.inverse().get(sceb.getDelegate());
-                } else  {
-                    r = map.inverse().get(buffer);
+                    buffer = sceb.getDelegate();
+                }
+
+                r = map.inverse().get(buffer);
+
+                if (accessor instanceof BatchableBufferSourceAccessor bbs) {
+                    for (Map.Entry<RenderType, ReferenceSet<BufferBuilder>> entry : bbs.getPendingBuffers().entrySet()) {
+                        RenderType key = entry.getKey();
+                        ReferenceSet<BufferBuilder> value = entry.getValue();
+                        if (value.contains(buffer)) {
+                            r = key;
+                        }
+                    }
                 }
 
                 m = VanillaModel.makeFlywheelMaterial(r);
@@ -72,7 +88,7 @@ public abstract class ModelPartMixin {
     }
 
     @WrapOperation(method = "translateAndRotate(Lcom/mojang/blaze3d/vertex/PoseStack;)V",
-            at = @At(value = "INVOKE", target = "Lnet/caffeinemc/mods/sodium/api/math/MatrixHelper;rotateZYX(Lcom/mojang/blaze3d/vertex/PoseStack$Pose;FFF)V", opcode = Opcodes.INVOKESTATIC))
+            at = @At(value = "INVOKE", target = "Lnet/caffeinemc/mods/sodium/api/math/MatrixHelper;rotateZYX(Lcom/mojang/blaze3d/vertex/PoseStack$Pose;FFF)V", opcode = Opcodes.INVOKESTATIC), require = 0)
     void sodiumCompat(PoseStack.Pose matrices, float angleZ, float angleY, float angleX, Operation<Void> original, PoseStack matrixStack){
         if (matrixStack instanceof WrappingPoseStack pv) {
             ExtendedRecyclingPoseStack eps = pv.getWrappedPoseStack();

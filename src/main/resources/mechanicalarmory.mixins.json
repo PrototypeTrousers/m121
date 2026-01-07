@@ -5,6 +5,7 @@
   "compatibilityLevel": "JAVA_17",
   "refmap": "mechanicalarmory.refmap.json",
   "client": [
+    "BatchableBufferSourceAccessor",
     "BlockEntityRenderDispatcherMixin",
     "BlockEntityRenderersAccessor",
     "BufferBuilderAccessor",

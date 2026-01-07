@@ -12,4 +12,8 @@ import java.util.Map;
 public interface MultiBufferAccessor {
     @Accessor("startedBuilders")
     Map<RenderType, BufferBuilder> getStartedBuilders();
+
+    @Accessor("lastSharedType")
+
+    RenderType getLastSharedType();
 }
