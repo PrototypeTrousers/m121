@@ -20,7 +20,7 @@ public final class TriIndexSequence implements IndexSequence {
 	public void fill(long ptr, int count) {
 		ShortBuffer sb = binary.asShortBuffer();
 		for (int i = 0; i < indexCount; i++) {
-			MemoryUtil.memPutInt(ptr + i * 4L, sb.get(i));
+			MemoryUtil.memPutShort(ptr + i, sb.get(i));
 		}
 	}
 }

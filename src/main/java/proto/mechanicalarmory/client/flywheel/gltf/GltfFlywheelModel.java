@@ -1,12 +1,10 @@
 package proto.mechanicalarmory.client.flywheel.gltf;
 
 import com.fasterxml.jackson.databind.util.ByteBufferBackedInputStream;
+import com.kneelawk.krender.model.gltf.impl.GltfFile;
+import com.kneelawk.krender.model.gltf.impl.format.*;
 import com.mojang.blaze3d.platform.NativeImage;
 import com.mojang.blaze3d.systems.RenderSystem;
-import de.javagl.jgltf.model.MeshPrimitiveModel;
-import de.javagl.jgltf.model.NodeModel;
-import de.javagl.jgltf.model.TextureModel;
-import de.javagl.jgltf.model.v2.MaterialModelV2;
 import dev.engine_room.flywheel.api.material.CardinalLightingMode;
 import dev.engine_room.flywheel.api.model.Model;
 import dev.engine_room.flywheel.lib.material.SimpleMaterial;
@@ -26,16 +24,23 @@ import static proto.mechanicalarmory.MechanicalArmory.MODID;
 public class GltfFlywheelModel implements Model {
     List<ConfiguredMesh> meshes = new ArrayList<>();
     NativeImage embeddedTexture;
-    public GltfFlywheelModel(NodeModel nm, MeshPrimitiveModel meshPrimitiveModel) {
-        TextureManager manager = Minecraft.getInstance().getTextureManager();
-        MaterialModelV2 m = ((MaterialModelV2) meshPrimitiveModel.getMaterialModel());
-        TextureModel tm = m.getBaseColorTexture();
-        ResourceLocation rl = ResourceLocation.fromNamespaceAndPath(MODID, "dynamic/" + tm.getImageModel().getName());
+    public GltfFlywheelModel(GltfNode gltfNode, GltfPrimitive gltfPrimitive, GltfFile gltfFile) {
 
-        // DynamicTexture needs to be created on the Render thread otherwise it crashes with pixels being null.. somehow
+        GltfRoot gltfRoot = gltfFile.root();
+        int mIdx = gltfPrimitive.material().getAsInt();
+
+        GltfMaterial material = gltfRoot.materials().get(mIdx);
+        GltfImage image = gltfRoot.images().get(mIdx);
+        GltfBufferView bufferView = gltfRoot.bufferViews().get(image.bufferView().getAsInt());
+
+        TextureManager manager = Minecraft.getInstance().getTextureManager();
+
+        ResourceLocation rl = ResourceLocation.fromNamespaceAndPath(MODID, "dynamic/" + gltfNode.name().get().toLowerCase());
+
+//         DynamicTexture needs to be created on the Render thread otherwise it crashes with pixels being null.. somehow
         RenderSystem.recordRenderCall(() -> {
             try {
-                embeddedTexture = NativeImage.read(new ByteBufferBackedInputStream(tm.getImageModel().getImageData()));
+                embeddedTexture = NativeImage.read(gltfFile.getImageBuffer(bufferView.buffer()).createStream());
                 DynamicTexture d = new DynamicTexture(embeddedTexture);
                 manager.register(rl, d);
             } catch (IOException e) {
@@ -48,7 +53,7 @@ public class GltfFlywheelModel implements Model {
                 .cardinalLightingMode(CardinalLightingMode.ENTITY)
                 .ambientOcclusion(false)
                 .build(),
-                new GltfMesh(meshPrimitiveModel)));
+                new GltfMesh(gltfPrimitive, gltfFile)));
     }
 
     @Override

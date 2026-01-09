@@ -1,6 +1,7 @@
 package proto.mechanicalarmory.client.mixin;
 
 import com.google.common.collect.HashBiMap;
+import com.kneelawk.krender.model.gltf.impl.GltfFile;
 import com.mojang.blaze3d.vertex.BufferBuilder;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
