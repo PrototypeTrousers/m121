@@ -19,6 +19,7 @@ import net.minecraft.client.renderer.RenderType;
 import net.minecraft.resources.ResourceLocation;
 import org.joml.Vector4f;
 import org.joml.Vector4fc;
+import proto.mechanicalarmory.client.flywheel.instances.capturing.CapturingBufferSource;
 import proto.mechanicalarmory.client.mixin.BufferSourceAccessor;
 import proto.mechanicalarmory.client.mixin.CompositeRenderTypeAccessor;
 import proto.mechanicalarmory.client.mixin.RenderTypeAccessor;
@@ -31,22 +32,22 @@ import java.util.Map;
 
 public class CapturedModel implements Model {
     List<ConfiguredMesh> meshes = new ArrayList<>();
-    public CapturedModel(RenderBuffers rb) {
-        MultiBufferSource.BufferSource bs = rb.bufferSource();
-        Map<RenderType, BufferBuilder> mp = ((BufferSourceAccessor) bs).getStartedBuilders();
-        for (Map.Entry<RenderType, BufferBuilder> entry : mp.entrySet()) {
-            CompositeRenderTypeAccessor c = ((CompositeRenderTypeAccessor) entry.getKey());
-            RenderStateShard.EmptyTextureStateShard r = ((RenderTypeAccessor) (Object) c.getState()).getTextureState();
-            ResourceLocation atlas = ((TextureStateShardAccessor) r).getTexture().get();
+    public CapturedModel(CapturingBufferSource bufferSource) {
+        for (MeshData meshData : bufferSource.getMeshDataList()) {
+            RenderType rt = bufferSource.getDataRenderTypeMap().get(meshData);
 
-            meshes.add(new Model.ConfiguredMesh(SimpleMaterial.builder()
-                    .texture(atlas)
-                    .cutout(CutoutShaders.EPSILON)
-                    .light(LightShaders.SMOOTH_WHEN_EMBEDDED)
-                    .cardinalLightingMode(CardinalLightingMode.OFF)
-                    .ambientOcclusion(false)
-                    .build(),
-                    new CapturedMesh(entry)));
+                CompositeRenderTypeAccessor c = ((CompositeRenderTypeAccessor) rt);
+                RenderStateShard.EmptyTextureStateShard r = ((RenderTypeAccessor) (Object) c.getState()).getTextureState();
+                ResourceLocation atlas = ((TextureStateShardAccessor) r).getTexture().get();
+
+                meshes.add(new Model.ConfiguredMesh(SimpleMaterial.builder()
+                        .texture(atlas)
+                        .cutout(CutoutShaders.EPSILON)
+                        .light(LightShaders.FLAT)
+                        .cardinalLightingMode(CardinalLightingMode.OFF)
+                        .ambientOcclusion(false)
+                        .build(),
+                        new CapturedMesh(meshData)));
         }
     }
 
@@ -65,8 +66,8 @@ public class CapturedModel implements Model {
         int indexCount;
         MeshData meshData;
 
-        CapturedMesh(Map.Entry<RenderType, BufferBuilder> entry) {
-            meshData = entry.getValue().build();
+        CapturedMesh(MeshData meshData) {
+            this.meshData = meshData;
             vertexCount = meshData.drawState().vertexCount();
             indexCount = meshData.drawState().indexCount();
         }

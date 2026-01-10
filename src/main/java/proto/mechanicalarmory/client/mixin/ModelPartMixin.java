@@ -24,6 +24,7 @@ import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+import proto.mechanicalarmory.client.flywheel.instances.capturing.CapturingBufferSource;
 import proto.mechanicalarmory.client.flywheel.instances.vanilla.ExtendedRecyclingPoseStack;
 import proto.mechanicalarmory.client.flywheel.instances.vanilla.SinkBufferSourceVisual;
 import proto.mechanicalarmory.client.flywheel.instances.vanilla.VanillaModel;
@@ -50,48 +51,53 @@ public abstract class ModelPartMixin {
             if (!pv.isRendered()) {
                 TextureAtlasSprite tas = null;
                 Material m;
-                RenderType r;
-                MultiBufferAccessor accessor;
-
-                MultiBufferSource mbs = v.getBufferSource();
-
-                if (mbs instanceof BufferSourceWrapper bsw) {
-                    accessor = (MultiBufferAccessor) bsw.getOriginal();
-                } else {
-                    accessor = (MultiBufferAccessor) v.getBufferSource();
-                }
-                HashBiMap<RenderType, BufferBuilder> map = (HashBiMap<RenderType, BufferBuilder>) accessor.getStartedBuilders();
-
+                RenderType r = null;
 
                 if (buffer instanceof SpriteCoordinateExpanderAccessor sceb) {
                     tas = sceb.getSprite();
                     buffer = sceb.getDelegate();
                 }
 
-                r = map.inverse().get(buffer);
+                MultiBufferSource mbs = v.getBufferSource();
 
-                if (accessor instanceof BatchableBufferSourceAccessor bbs) {
-                    for (Map.Entry<RenderType, ReferenceSet<BufferBuilder>> entry : bbs.getPendingBuffers().entrySet()) {
-                        RenderType key = entry.getKey();
-                        ReferenceSet<BufferBuilder> value = entry.getValue();
-                        if (value.contains(buffer)) {
-                            r = key;
+                if (mbs instanceof BufferSourceWrapper bsw) {
+                    if (bsw.getOriginal() instanceof MultiBufferSource.BufferSource) {
+                        mbs = bsw.getOriginal();
+                    }
+                }
+
+                if (mbs instanceof MultiBufferAccessor accessor) {
+
+                    HashBiMap<RenderType, BufferBuilder> map = (HashBiMap<RenderType, BufferBuilder>) accessor.getStartedBuilders();
+                    r = map.inverse().get(buffer);
+
+                    if (accessor instanceof BatchableBufferSourceAccessor bbs) {
+                        for (Map.Entry<RenderType, ReferenceSet<BufferBuilder>> entry : bbs.getPendingBuffers().entrySet()) {
+                            RenderType key = entry.getKey();
+                            ReferenceSet<BufferBuilder> value = entry.getValue();
+                            if (value.contains(buffer)) {
+                                r = key;
+                            }
+                        }
+                    }
+
+                    if (accessor instanceof FullyBufferedMultiBufferSourceAccessor bbs) {
+                        SegmentedBufferBuilder[] builders = bbs.getBuilders();
+                        for (SegmentedBufferBuilder builder : builders) {
+                            for (Map.Entry<RenderType, BufferBuilder> entry : ((SegmentedBufferBuilderAccessor) builder).getBuilders().entrySet()) {
+                                RenderType key = entry.getKey();
+                                BufferBuilder value = entry.getValue();
+                                if (value == buffer) {
+                                    r = key;
+                                    break;
+                                }
+                            }
                         }
                     }
                 }
 
-                if (accessor instanceof FullyBufferedMultiBufferSourceAccessor bbs) {
-                    SegmentedBufferBuilder[] builders = bbs.getBuilders();
-                    for (SegmentedBufferBuilder builder : builders) {
-                        for (Map.Entry<RenderType, BufferBuilder> entry : ((SegmentedBufferBuilderAccessor) builder).getBuilders().entrySet()) {
-                            RenderType key = entry.getKey();
-                            BufferBuilder value = entry.getValue();
-                            if (value == buffer) {
-                                r = key;
-                                break;
-                            }
-                        }
-                    }
+                if (r == null) {
+                    return;
                 }
 
                 m = VanillaModel.makeFlywheelMaterial(r);
@@ -133,6 +139,11 @@ public abstract class ModelPartMixin {
                     target = "Lnet/minecraft/client/model/geom/ModelPart;compile(Lcom/mojang/blaze3d/vertex/PoseStack$Pose;Lcom/mojang/blaze3d/vertex/VertexConsumer;III)V")
     )
     private boolean onlyRenderIfAllowed(ModelPart instance, PoseStack.Pose pose, VertexConsumer vertexConsumer, int buffer, int packedLight, int packedOverlay, PoseStack poseStack) {
+        if (poseStack instanceof WrappingPoseStack wps) {
+            if (wps.getVisual().getBufferSource() instanceof CapturingBufferSource) {
+                return true;
+            }
+        }
         return !(poseStack instanceof WrappingPoseStack);
     }
 }

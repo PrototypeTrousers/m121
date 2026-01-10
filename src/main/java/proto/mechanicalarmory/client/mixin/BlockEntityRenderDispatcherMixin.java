@@ -3,6 +3,7 @@ package proto.mechanicalarmory.client.mixin;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.mojang.blaze3d.vertex.PoseStack;
+import dev.engine_room.flywheel.api.visual.Visual;
 import dev.engine_room.flywheel.impl.BackendManagerImpl;
 import dev.engine_room.flywheel.impl.visualization.VisualManagerImpl;
 import dev.engine_room.flywheel.impl.visualization.VisualizationManagerImpl;
@@ -22,6 +23,7 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import proto.mechanicalarmory.MechanicalArmoryClient;
+import proto.mechanicalarmory.client.flywheel.instances.vanilla.SinkBufferSourceVisual;
 import proto.mechanicalarmory.client.flywheel.instances.vanilla.VanillaBlockEntityVisual;
 import proto.mechanicalarmory.client.flywheel.instances.vanilla.WrappingPoseStack;
 
@@ -60,18 +62,15 @@ public class BlockEntityRenderDispatcherMixin {
         blockEntityVisual = null;
         boolean should = original.call(instance, blockEntity, cameraPos) == true;
         if (should && BackendManagerImpl.isBackendOn()) {
-            if (VisualizationHelper.canVisualize(blockEntity)) {
-                VisualizationManagerImpl man = VisualizationManagerImpl.get(blockEntity.getLevel());
-                if (man != null) {
-                    VisualManagerImpl<BlockEntity, BlockEntityStorage> iii = (VisualManagerImpl<BlockEntity, BlockEntityStorage>) man.blockEntities();
-                    if (iii.getStorage().visualAtPos(blockEntity.getBlockPos().asLong()) instanceof VanillaBlockEntityVisual visual) {
-                        blockEntityVisual = visual;
-                        if (!visual.extendedRecyclingPoseStack.isRendered() || visual.extendedRecyclingPoseStack.isLegacyAccessed()) {
-                            return true;
-                        }
-                        return MechanicalArmoryClient.firstFrameOfTick;
-                    }
+            if (poseStack instanceof WrappingPoseStack wps) {
+                SinkBufferSourceVisual v = wps.getVisual();
+                if (v instanceof VanillaBlockEntityVisual vanillaBlockEntityVisual) {
+                    blockEntityVisual = vanillaBlockEntityVisual;
                 }
+                if (!blockEntityVisual.extendedRecyclingPoseStack.isRendered() || blockEntityVisual.extendedRecyclingPoseStack.isLegacyAccessed()) {
+                    return true;
+                }
+                return MechanicalArmoryClient.firstFrameOfTick;
             }
         }
         return should;
