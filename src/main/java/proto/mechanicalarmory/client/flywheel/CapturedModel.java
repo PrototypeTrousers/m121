@@ -11,6 +11,7 @@ import dev.engine_room.flywheel.api.vertex.MutableVertexList;
 import dev.engine_room.flywheel.lib.material.CutoutShaders;
 import dev.engine_room.flywheel.lib.material.LightShaders;
 import dev.engine_room.flywheel.lib.material.SimpleMaterial;
+import dev.engine_room.flywheel.lib.model.ModelUtil;
 import dev.engine_room.flywheel.lib.model.QuadIndexSequence;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.RenderBuffers;
@@ -32,23 +33,27 @@ import java.util.Map;
 
 public class CapturedModel implements Model {
     List<ConfiguredMesh> meshes = new ArrayList<>();
+    Vector4f boundingSphere;
+
     public CapturedModel(CapturingBufferSource bufferSource) {
         for (MeshData meshData : bufferSource.getMeshDataList()) {
             RenderType rt = bufferSource.getDataRenderTypeMap().get(meshData);
 
-                CompositeRenderTypeAccessor c = ((CompositeRenderTypeAccessor) rt);
-                RenderStateShard.EmptyTextureStateShard r = ((RenderTypeAccessor) (Object) c.getState()).getTextureState();
-                ResourceLocation atlas = ((TextureStateShardAccessor) r).getTexture().get();
+            CompositeRenderTypeAccessor c = ((CompositeRenderTypeAccessor) rt);
+            RenderStateShard.EmptyTextureStateShard r = ((RenderTypeAccessor) (Object) c.getState()).getTextureState();
+            ResourceLocation atlas = ((TextureStateShardAccessor) r).getTexture().get();
 
-                meshes.add(new Model.ConfiguredMesh(SimpleMaterial.builder()
-                        .texture(atlas)
-                        .cutout(CutoutShaders.EPSILON)
-                        .light(LightShaders.FLAT)
-                        .cardinalLightingMode(CardinalLightingMode.OFF)
-                        .ambientOcclusion(false)
-                        .build(),
-                        new CapturedMesh(meshData)));
+            meshes.add(new Model.ConfiguredMesh(SimpleMaterial.builder()
+                    .texture(atlas)
+                    .cutout(CutoutShaders.EPSILON)
+                    .light(LightShaders.FLAT)
+                    .cardinalLightingMode(CardinalLightingMode.OFF)
+                    .ambientOcclusion(false)
+                    .build(),
+                    new CapturedMesh(meshData)));
         }
+
+        this.boundingSphere = ModelUtil.computeBoundingSphere(meshes);
     }
 
     @Override
@@ -58,13 +63,14 @@ public class CapturedModel implements Model {
 
     @Override
     public Vector4fc boundingSphere() {
-        return new Vector4f(1,1,1,1);
+        return this.boundingSphere;
     }
 
     static class CapturedMesh implements Mesh {
         int vertexCount;
         int indexCount;
         MeshData meshData;
+        Vector4fc boundingSphere;
 
         CapturedMesh(MeshData meshData) {
             this.meshData = meshData;
@@ -123,6 +129,7 @@ public class CapturedModel implements Model {
                 vertexList.normalY(vIdx, y);
                 vertexList.normalZ(vIdx, z);
             }
+            this.boundingSphere = ModelUtil.computeBoundingSphere(vertexList);
         }
 
         @Override
@@ -137,7 +144,7 @@ public class CapturedModel implements Model {
 
         @Override
         public Vector4fc boundingSphere() {
-            return new Vector4f(1,1,1,1);
+            return boundingSphere;
         }
     }
 }

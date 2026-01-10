@@ -13,10 +13,8 @@ import dev.engine_room.flywheel.api.visualization.VisualizerRegistry;
 import dev.engine_room.flywheel.lib.instance.InstanceTypes;
 import dev.engine_room.flywheel.lib.instance.TransformedInstance;
 import dev.engine_room.flywheel.lib.material.SimpleMaterial;
-import dev.engine_room.flywheel.lib.model.baked.SinglePosVirtualBlockGetter;
 import dev.engine_room.flywheel.lib.model.part.InstanceTree;
 import dev.engine_room.flywheel.lib.model.part.ModelTree;
-import dev.engine_room.flywheel.lib.task.ForEachPlan;
 import dev.engine_room.flywheel.lib.task.NestedPlan;
 import dev.engine_room.flywheel.lib.task.PlanMap;
 import dev.engine_room.flywheel.lib.task.RunnablePlan;
@@ -26,26 +24,19 @@ import dev.engine_room.vanillin.item.ItemModels;
 import it.unimi.dsi.fastutil.longs.LongSet;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.LevelRenderer;
-import net.minecraft.client.renderer.RenderBuffers;
 import net.minecraft.client.resources.model.BakedModel;
 import net.minecraft.core.SectionPos;
-import net.minecraft.util.RandomSource;
 import net.minecraft.world.item.ItemDisplayContext;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.entity.BlockEntity;
-import net.minecraft.world.level.block.entity.BlockEntityTicker;
-import net.minecraft.world.level.block.entity.EnchantingTableBlockEntity;
-import net.neoforged.neoforge.client.extensions.common.IClientItemExtensions;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Matrix3f;
 import org.joml.Matrix4f;
 import org.joml.Matrix4fc;
+import org.joml.Vector4f;
 import proto.mechanicalarmory.MechanicalArmoryClient;
 import proto.mechanicalarmory.client.flywheel.CapturedModel;
 import proto.mechanicalarmory.client.flywheel.instances.capturing.CapturingBufferSource;
-import proto.mechanicalarmory.client.flywheel.instances.vanilla.ExtendedRecyclingPoseStack;
-import proto.mechanicalarmory.client.flywheel.instances.vanilla.SinkBufferSourceVisual;
 import proto.mechanicalarmory.common.entities.block.ArmEntity;
 
 import java.util.ArrayList;
@@ -54,28 +45,17 @@ import java.util.function.Consumer;
 
 public class ArmVisual extends AbstractBlockEntityVisual<ArmEntity> implements DynamicVisual, TickableVisual, LightUpdatedVisual {
 
-    ModelTree modelTree = MechanicalArmoryClient.gltfFlywheelModelTree;
+    protected final List<BlockEntityVisual<?>> children = new ArrayList<>();
+    protected final PlanMap<DynamicVisual, DynamicVisual.Context> dynamicVisuals = new PlanMap<>();
+    protected final PlanMap<TickableVisual, TickableVisual.Context> tickableVisuals = new PlanMap<>();
     private final InstanceTree instanceTree;
     private final @Nullable InstanceTree firstArm;
     private final @Nullable InstanceTree secondArm;
     private final @Nullable InstanceTree baseMotor;
-    private TransformedInstance transformedInstance1;
-
-    protected final List<BlockEntityVisual<?>> children = new ArrayList<>();
-    protected final PlanMap<DynamicVisual, DynamicVisual.Context> dynamicVisuals = new PlanMap<>();
-    protected final PlanMap<TickableVisual, TickableVisual.Context> tickableVisuals = new PlanMap<>();
-
-
-
-    private VisualEmbedding embedding;
-    private BlockEntity embeddedEntity;
-
-    private static final Material MATERIAL = SimpleMaterial.builder()
-            .mipmap(false)
-            .build();
-
-    private final RecyclingPoseStack poseStack = new RecyclingPoseStack();
     private final Matrix4fc initialPose;
+    ModelTree modelTree = MechanicalArmoryClient.gltfFlywheelModelTree;
+    private TransformedInstance transformedInstance1;
+    private ItemScalingTransforms itemScalingTransforms;
 
     public ArmVisual(VisualizationContext ctx, ArmEntity blockEntity, float partialTick) {
         super(ctx, blockEntity, partialTick);
@@ -95,48 +75,20 @@ public class ArmVisual extends AbstractBlockEntityVisual<ArmEntity> implements D
                 RenderSystem.recordRenderCall(() -> {
                     CapturingBufferSource cbs = new CapturingBufferSource();
                     PoseStack pose = new PoseStack();
+
                     Minecraft.getInstance().getItemRenderer().render(stackOfBlockBelow, ItemDisplayContext.FIXED, false, pose, cbs, 0, 0, itemModel);
                     cbs.endLastBatch();
-                    transformedInstance1 = instancerProvider().instancer(InstanceTypes.TRANSFORMED, new CapturedModel(cbs)).createInstance();
+
+                    CapturedModel capturedModel = new CapturedModel(cbs);
+
+                    itemScalingTransforms = new ItemScalingTransforms(0.5f / capturedModel.boundingSphere().w(), capturedModel.boundingSphere().negate(new Vector4f()));
+
+                    transformedInstance1 = instancerProvider().instancer(InstanceTypes.TRANSFORMED, capturedModel).createInstance();
                     transformedInstance1.light(packedLight);
                 });
             } else {
                 transformedInstance1 = instancerProvider().instancer(InstanceTypes.TRANSFORMED, ItemModels.get(level, stackOfBlockBelow, ItemDisplayContext.FIXED)).createInstance();
             }
-        }
-
-//        embedding = ctx.createEmbedding(renderOrigin());
-//
-//        SinglePosVirtualBlockGetter lv = SinglePosVirtualBlockGetter.createFullBright();
-//        lv.blockState(Blocks.ENCHANTING_TABLE.defaultBlockState());
-//        embeddedEntity = new EnchantingTableBlockEntity(pos, Blocks.ENCHANTING_TABLE.defaultBlockState());
-//
-//
-//        lv.blockEntity(embeddedEntity);
-//        lv.pos(pos);
-//        embeddedEntity.setLevel(level);
-//
-//        setupVisualizer(embeddedEntity, partialTick);
-
-
-    }
-
-    @SuppressWarnings("unchecked")
-    protected <T extends BlockEntity> void setupVisualizer(T be, float partialTicks) {
-        BlockEntityVisualizer<? super T> visualizer = (BlockEntityVisualizer<? super T>) VisualizerRegistry.getVisualizer(be.getType());
-        if (visualizer == null) {
-            return;
-        }
-
-        BlockEntityVisual<? super T> visual = visualizer.createVisual(this.embedding, be, partialTicks);
-        children.add(visual);
-
-        if (visual instanceof DynamicVisual dynamic) {
-            dynamicVisuals.add(dynamic, dynamic.planFrame());
-        }
-
-        if (visual instanceof TickableVisual tickable) {
-            tickableVisuals.add(tickable, tickable.planTick());
         }
     }
 
@@ -201,15 +153,14 @@ public class ArmVisual extends AbstractBlockEntityVisual<ArmEntity> implements D
                     baseMotor.translateAndRotate(mx);
                     firstArm.translateAndRotate(mx);
                     secondArm.translateAndRotate(mx);
-
-                    //mx.scale(0.5f);
+                    
                     if (transformedInstance1 != null) {
                         transformedInstance1.mul(mx);
                         transformedInstance1.translate(0, secondArm.initialPose().y / 16f + 0.25f, 0);
+                        transformedInstance1.scale(itemScalingTransforms.scale);
+                        transformedInstance1.translate(itemScalingTransforms.offset.x, itemScalingTransforms.offset.y, itemScalingTransforms.offset.z);
+
                         transformedInstance1.setChanged();
-                    }
-                    if (embedding != null) {
-                        embedding.transforms(mx, new Matrix3f());
                     }
                     instanceTree.updateInstancesStatic(initialPose);
                 }),
@@ -221,5 +172,8 @@ public class ArmVisual extends AbstractBlockEntityVisual<ArmEntity> implements D
 
         return NestedPlan.of(
                 tickableVisuals);
+    }
+
+    private record ItemScalingTransforms(float scale, Vector4f offset) {
     }
 }
