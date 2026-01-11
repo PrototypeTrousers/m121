@@ -2,26 +2,28 @@ package proto.mechanicalarmory.client.flywheel;
 
 import com.mojang.blaze3d.vertex.BufferBuilder;
 import com.mojang.blaze3d.vertex.MeshData;
-import com.mojang.blaze3d.vertex.VertexFormat;
 import dev.engine_room.flywheel.api.material.CardinalLightingMode;
+import dev.engine_room.flywheel.api.material.WriteMask;
 import dev.engine_room.flywheel.api.model.IndexSequence;
 import dev.engine_room.flywheel.api.model.Mesh;
 import dev.engine_room.flywheel.api.model.Model;
 import dev.engine_room.flywheel.api.vertex.MutableVertexList;
+import dev.engine_room.flywheel.api.vertex.VertexList;
 import dev.engine_room.flywheel.lib.material.CutoutShaders;
 import dev.engine_room.flywheel.lib.material.LightShaders;
 import dev.engine_room.flywheel.lib.material.SimpleMaterial;
+import dev.engine_room.flywheel.lib.memory.MemoryBlock;
 import dev.engine_room.flywheel.lib.model.ModelUtil;
 import dev.engine_room.flywheel.lib.model.QuadIndexSequence;
-import net.minecraft.client.renderer.MultiBufferSource;
-import net.minecraft.client.renderer.RenderBuffers;
+import dev.engine_room.flywheel.lib.vertex.NoOverlayVertexView;
+import dev.engine_room.flywheel.lib.vertex.VertexView;
 import net.minecraft.client.renderer.RenderStateShard;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.resources.ResourceLocation;
 import org.joml.Vector4f;
 import org.joml.Vector4fc;
+import org.lwjgl.system.MemoryUtil;
 import proto.mechanicalarmory.client.flywheel.instances.capturing.CapturingBufferSource;
-import proto.mechanicalarmory.client.mixin.BufferSourceAccessor;
 import proto.mechanicalarmory.client.mixin.CompositeRenderTypeAccessor;
 import proto.mechanicalarmory.client.mixin.RenderTypeAccessor;
 import proto.mechanicalarmory.client.mixin.TextureStateShardAccessor;
@@ -43,14 +45,17 @@ public class CapturedModel implements Model {
             RenderStateShard.EmptyTextureStateShard r = ((RenderTypeAccessor) (Object) c.getState()).getTextureState();
             ResourceLocation atlas = ((TextureStateShardAccessor) r).getTexture().get();
 
+            CapturedMesh mesh = new CapturedMesh(meshData);
+
             meshes.add(new Model.ConfiguredMesh(SimpleMaterial.builder()
                     .texture(atlas)
                     .cutout(CutoutShaders.EPSILON)
-                    .light(LightShaders.FLAT)
-                    .cardinalLightingMode(CardinalLightingMode.OFF)
+                    .light(LightShaders.SMOOTH_WHEN_EMBEDDED)
+                    .cardinalLightingMode(CardinalLightingMode.CHUNK)
                     .ambientOcclusion(false)
+                    .writeMask(WriteMask.COLOR_DEPTH)
                     .build(),
-                    new CapturedMesh(meshData)));
+                    mesh));
         }
 
         this.boundingSphere = ModelUtil.computeBoundingSphere(meshes);
@@ -69,13 +74,41 @@ public class CapturedModel implements Model {
     static class CapturedMesh implements Mesh {
         int vertexCount;
         int indexCount;
-        MeshData meshData;
         Vector4fc boundingSphere;
+        VertexList vertexList;
 
         CapturedMesh(MeshData meshData) {
-            this.meshData = meshData;
-            vertexCount = meshData.drawState().vertexCount();
-            indexCount = meshData.drawState().indexCount();
+            //copied from MeshHelper
+            MeshData.DrawState drawState = meshData.drawState();
+            int vertexCount = drawState.vertexCount();
+            long srcStride = drawState.format().getVertexSize();
+
+            VertexView vertexView = new NoOverlayVertexView();
+            long dstStride = vertexView.stride();
+
+            ByteBuffer src = meshData.vertexBuffer();
+            MemoryBlock dst = MemoryBlock.mallocTracked((long) vertexCount * dstStride);
+            long srcPtr = MemoryUtil.memAddress(src);
+            long dstPtr = dst.ptr();
+            // The first 31 bytes of each vertex in a block vertex buffer are guaranteed to contain the same data in the
+            // same order regardless of whether the format is extended by mods like Iris or OptiFine. Copy these bytes and
+            // ignore the rest.
+            long bytesToCopy = Math.min(dstStride, 31);
+
+            for (int i = 0; i < vertexCount; i++) {
+                // It is safe to copy bytes directly since the NoOverlayVertexView uses the same memory layout as the first
+                // 31 bytes of the block vertex format, vanilla or otherwise.
+                MemoryUtil.memCopy(srcPtr + srcStride * i, dstPtr + dstStride * i, bytesToCopy);
+            }
+
+            vertexView.ptr(dstPtr);
+            vertexView.vertexCount(vertexCount);
+            vertexView.nativeMemoryOwner(dst);
+
+            this.vertexList = vertexView;
+            this.boundingSphere = ModelUtil.computeBoundingSphere(vertexList);
+            this.vertexCount = meshData.drawState().vertexCount();
+            this.indexCount = meshData.drawState().indexCount();
         }
 
         Map.Entry<RenderType, BufferBuilder> entry;
@@ -87,49 +120,7 @@ public class CapturedModel implements Model {
 
         @Override
         public void write(MutableVertexList vertexList) {
-            VertexFormat format = meshData.drawState().format();
-            ByteBuffer buffer = meshData.vertexBuffer();
-
-            // Calculate how many vertices are in this mesh
-            int vertexSizeInBytes = format.getVertexSize();
-
-            // BakedQuads MUST have 4 vertices
-            for (int vIdx = 0; vIdx < vertexCount; vIdx++) {
-
-                int currentVertexOffset = (vIdx) * vertexSizeInBytes;
-
-                vertexList.x(vIdx, buffer.getFloat(currentVertexOffset));
-                vertexList.y(vIdx, buffer.getFloat(currentVertexOffset + 4));
-                vertexList.z(vIdx, buffer.getFloat(currentVertexOffset + 8));
-
-                int packedColor = buffer.getInt(currentVertexOffset + 12);
-
-                int r = (packedColor) & 0xFF;
-                int g = (packedColor >> 8) & 0xFF;
-                int b = (packedColor >> 16) & 0xFF;
-                int a = (packedColor >> 24) & 0xFF;
-
-                vertexList.r(vIdx, r);
-                vertexList.g(vIdx, g);
-                vertexList.b(vIdx, b);
-                vertexList.a(vIdx, a);
-
-                vertexList.u(vIdx, buffer.getFloat(currentVertexOffset + 16));
-                vertexList.v(vIdx, buffer.getFloat(currentVertexOffset + 20));
-
-                //vertexList.light(vIdx, buffer.getInt(currentVertexOffset + 24));
-
-                int packedNormal = buffer.getInt(currentVertexOffset + 28);
-
-                float x = ((byte) (packedNormal & 0xFF)) / 127.0f;
-                float y = ((byte) ((packedNormal >> 8) & 0xFF)) / 127.0f;
-                float z = ((byte) ((packedNormal >> 16) & 0xFF)) / 127.0f;
-
-                vertexList.normalX(vIdx, x);
-                vertexList.normalY(vIdx, y);
-                vertexList.normalZ(vIdx, z);
-            }
-            this.boundingSphere = ModelUtil.computeBoundingSphere(vertexList);
+            this.vertexList.writeAll(vertexList);
         }
 
         @Override

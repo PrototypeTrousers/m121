@@ -3,6 +3,10 @@ package proto.mechanicalarmory.client.flywheel.instances.arm;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.PoseStack;
 import dev.engine_room.flywheel.api.instance.Instance;
+import dev.engine_room.flywheel.api.instance.InstanceType;
+import dev.engine_room.flywheel.api.layout.FloatRepr;
+import dev.engine_room.flywheel.api.layout.IntegerRepr;
+import dev.engine_room.flywheel.api.layout.LayoutBuilder;
 import dev.engine_room.flywheel.api.material.Material;
 import dev.engine_room.flywheel.api.task.Plan;
 import dev.engine_room.flywheel.api.visual.*;
@@ -11,6 +15,7 @@ import dev.engine_room.flywheel.api.visualization.VisualEmbedding;
 import dev.engine_room.flywheel.api.visualization.VisualizationContext;
 import dev.engine_room.flywheel.api.visualization.VisualizerRegistry;
 import dev.engine_room.flywheel.lib.instance.InstanceTypes;
+import dev.engine_room.flywheel.lib.instance.SimpleInstanceType;
 import dev.engine_room.flywheel.lib.instance.TransformedInstance;
 import dev.engine_room.flywheel.lib.material.SimpleMaterial;
 import dev.engine_room.flywheel.lib.model.part.InstanceTree;
@@ -18,14 +23,20 @@ import dev.engine_room.flywheel.lib.model.part.ModelTree;
 import dev.engine_room.flywheel.lib.task.NestedPlan;
 import dev.engine_room.flywheel.lib.task.PlanMap;
 import dev.engine_room.flywheel.lib.task.RunnablePlan;
+import dev.engine_room.flywheel.lib.util.ExtraMemoryOps;
 import dev.engine_room.flywheel.lib.util.RecyclingPoseStack;
+import dev.engine_room.flywheel.lib.util.ResourceUtil;
 import dev.engine_room.flywheel.lib.visual.AbstractBlockEntityVisual;
 import dev.engine_room.vanillin.item.ItemModels;
 import it.unimi.dsi.fastutil.longs.LongSet;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.color.item.ItemColor;
+import net.minecraft.client.color.item.ItemColors;
 import net.minecraft.client.renderer.LevelRenderer;
 import net.minecraft.client.resources.model.BakedModel;
 import net.minecraft.core.SectionPos;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.ItemDisplayContext;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.entity.BlockEntity;
@@ -34,6 +45,7 @@ import org.joml.Matrix3f;
 import org.joml.Matrix4f;
 import org.joml.Matrix4fc;
 import org.joml.Vector4f;
+import org.lwjgl.system.MemoryUtil;
 import proto.mechanicalarmory.MechanicalArmoryClient;
 import proto.mechanicalarmory.client.flywheel.CapturedModel;
 import proto.mechanicalarmory.client.flywheel.instances.capturing.CapturingBufferSource;
@@ -42,6 +54,8 @@ import proto.mechanicalarmory.common.entities.block.ArmEntity;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Consumer;
+
+import static proto.mechanicalarmory.MechanicalArmory.MODID;
 
 public class ArmVisual extends AbstractBlockEntityVisual<ArmEntity> implements DynamicVisual, TickableVisual, LightUpdatedVisual {
 
@@ -71,7 +85,7 @@ public class ArmVisual extends AbstractBlockEntityVisual<ArmEntity> implements D
         ItemStack stackOfBlockBelow = new ItemStack(this.level.getBlockState(pos.below()).getBlock());
         if (!stackOfBlockBelow.isEmpty()) {
             BakedModel itemModel = Minecraft.getInstance().getItemRenderer().getModel(stackOfBlockBelow, level, null, 42);
-            if (itemModel.isCustomRenderer()) {
+            //if (itemModel.isCustomRenderer()) {
                 RenderSystem.recordRenderCall(() -> {
                     CapturingBufferSource cbs = new CapturingBufferSource();
                     PoseStack pose = new PoseStack();
@@ -81,14 +95,19 @@ public class ArmVisual extends AbstractBlockEntityVisual<ArmEntity> implements D
 
                     CapturedModel capturedModel = new CapturedModel(cbs);
 
-                    itemScalingTransforms = new ItemScalingTransforms(0.5f / capturedModel.boundingSphere().w(), capturedModel.boundingSphere().negate(new Vector4f()));
+                    itemScalingTransforms = new ItemScalingTransforms(0.375f / capturedModel.boundingSphere().w(), capturedModel.boundingSphere().negate(new Vector4f()));
 
                     transformedInstance1 = instancerProvider().instancer(InstanceTypes.TRANSFORMED, capturedModel).createInstance();
+                    //                    if (stackOfBlockBelow.getItem() instanceof BlockItem blockItem) {
+//                        transformedInstance1.colorArgb(Minecraft.getInstance().getBlockColors().getColor(this.level.getBlockState(pos.below()), level, pos.below()));
+//                    } else {
+//                        transformedInstance1.colorArgb(capturedModel.getColor());
+//                    }
                     transformedInstance1.light(packedLight);
                 });
-            } else {
-                transformedInstance1 = instancerProvider().instancer(InstanceTypes.TRANSFORMED, ItemModels.get(level, stackOfBlockBelow, ItemDisplayContext.FIXED)).createInstance();
-            }
+//            } else {
+//                transformedInstance1 = instancerProvider().instancer(InstanceTypes.TRANSFORMED, ItemModels.get(level, stackOfBlockBelow, ItemDisplayContext.FIXED)).createInstance();
+//            }
         }
     }
 
@@ -153,7 +172,7 @@ public class ArmVisual extends AbstractBlockEntityVisual<ArmEntity> implements D
                     baseMotor.translateAndRotate(mx);
                     firstArm.translateAndRotate(mx);
                     secondArm.translateAndRotate(mx);
-                    
+
                     if (transformedInstance1 != null) {
                         transformedInstance1.mul(mx);
                         transformedInstance1.translate(0, secondArm.initialPose().y / 16f + 0.25f, 0);
