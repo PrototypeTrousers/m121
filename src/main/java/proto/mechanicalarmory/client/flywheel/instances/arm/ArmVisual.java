@@ -57,7 +57,7 @@ import java.util.function.Consumer;
 
 import static proto.mechanicalarmory.MechanicalArmory.MODID;
 
-public class ArmVisual extends AbstractBlockEntityVisual<ArmEntity> implements DynamicVisual, TickableVisual, LightUpdatedVisual {
+public class ArmVisual extends AbstractBlockEntityVisual<ArmEntity> implements DynamicVisual, LightUpdatedVisual {
 
     protected final List<BlockEntityVisual<?>> children = new ArrayList<>();
     protected final PlanMap<DynamicVisual, DynamicVisual.Context> dynamicVisuals = new PlanMap<>();
@@ -87,6 +87,9 @@ public class ArmVisual extends AbstractBlockEntityVisual<ArmEntity> implements D
             BakedModel itemModel = Minecraft.getInstance().getItemRenderer().getModel(stackOfBlockBelow, level, null, 42);
             //if (itemModel.isCustomRenderer()) {
                 RenderSystem.recordRenderCall(() -> {
+                    if (this.deleted) {
+                        return;
+                    }
                     CapturingBufferSource cbs = new CapturingBufferSource();
                     PoseStack pose = new PoseStack();
 
@@ -98,11 +101,8 @@ public class ArmVisual extends AbstractBlockEntityVisual<ArmEntity> implements D
                     itemScalingTransforms = new ItemScalingTransforms(0.375f / capturedModel.boundingSphere().w(), capturedModel.boundingSphere().negate(new Vector4f()));
 
                     transformedInstance1 = instancerProvider().instancer(InstanceTypes.TRANSFORMED, capturedModel).createInstance();
-                    //                    if (stackOfBlockBelow.getItem() instanceof BlockItem blockItem) {
-//                        transformedInstance1.colorArgb(Minecraft.getInstance().getBlockColors().getColor(this.level.getBlockState(pos.below()), level, pos.below()));
-//                    } else {
-//                        transformedInstance1.colorArgb(capturedModel.getColor());
-//                    }
+                    updateItemTransforms();
+
                     transformedInstance1.light(packedLight);
                 });
 //            } else {
@@ -152,6 +152,30 @@ public class ArmVisual extends AbstractBlockEntityVisual<ArmEntity> implements D
         lightSections.sections(LongSet.of(SectionPos.asLong(pos)));
     }
 
+    void updateItemTransforms() {
+        if (transformedInstance1 != null) {
+            transformedInstance1.setIdentityTransform();
+        }
+        if (transformedInstance1 != null) {
+            transformedInstance1.translate(visualPos.getX(), visualPos.getY(), visualPos.getZ());
+            transformedInstance1.translate(0.5, 0, 0.5f);
+        }
+
+        Matrix4f mx = new Matrix4f();
+        baseMotor.translateAndRotate(mx);
+        firstArm.translateAndRotate(mx);
+        secondArm.translateAndRotate(mx);
+
+        if (transformedInstance1 != null) {
+            transformedInstance1.mul(mx);
+            transformedInstance1.translate(0, secondArm.initialPose().y / 16f + 0.25f, 0);
+            transformedInstance1.scale(itemScalingTransforms.scale);
+            transformedInstance1.translate(itemScalingTransforms.offset.x, itemScalingTransforms.offset.y, itemScalingTransforms.offset.z);
+
+            transformedInstance1.setChanged();
+        }
+    }
+
 
     @Override
     public Plan<DynamicVisual.Context> planFrame() {
@@ -160,37 +184,10 @@ public class ArmVisual extends AbstractBlockEntityVisual<ArmEntity> implements D
                     firstArm.xRot((float) -Math.PI / 4);
                     secondArm.xRot((float) Math.PI / 2);
 
-                    if (transformedInstance1 != null) {
-                        transformedInstance1.setIdentityTransform();
-                    }
-                    if (transformedInstance1 != null) {
-                        transformedInstance1.translate(visualPos.getX(), visualPos.getY(), visualPos.getZ());
-                        transformedInstance1.translate(0.5, 0, 0.5f);
-                    }
-
-                    Matrix4f mx = new Matrix4f();
-                    baseMotor.translateAndRotate(mx);
-                    firstArm.translateAndRotate(mx);
-                    secondArm.translateAndRotate(mx);
-
-                    if (transformedInstance1 != null) {
-                        transformedInstance1.mul(mx);
-                        transformedInstance1.translate(0, secondArm.initialPose().y / 16f + 0.25f, 0);
-                        transformedInstance1.scale(itemScalingTransforms.scale);
-                        transformedInstance1.translate(itemScalingTransforms.offset.x, itemScalingTransforms.offset.y, itemScalingTransforms.offset.z);
-
-                        transformedInstance1.setChanged();
-                    }
+                    updateItemTransforms();
                     instanceTree.updateInstancesStatic(initialPose);
                 }),
                 dynamicVisuals);
-    }
-
-    @Override
-    public Plan<TickableVisual.Context> planTick() {
-
-        return NestedPlan.of(
-                tickableVisuals);
     }
 
     private record ItemScalingTransforms(float scale, Vector4f offset) {
