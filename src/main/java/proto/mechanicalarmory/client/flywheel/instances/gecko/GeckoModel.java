@@ -1,13 +1,9 @@
-package proto.mechanicalarmory.client.flywheel.instances.vanilla;
+package proto.mechanicalarmory.client.flywheel.instances.gecko;
 
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
-import dev.engine_room.flywheel.api.material.CardinalLightingMode;
 import dev.engine_room.flywheel.api.model.Mesh;
 import dev.engine_room.flywheel.api.model.Model;
-import dev.engine_room.flywheel.lib.material.CutoutShaders;
-import dev.engine_room.flywheel.lib.material.LightShaders;
-import dev.engine_room.flywheel.lib.material.SimpleMaterial;
 import dev.engine_room.flywheel.lib.memory.MemoryBlock;
 import dev.engine_room.flywheel.lib.model.SimpleQuadMesh;
 import dev.engine_room.flywheel.lib.util.RendererReloadCache;
@@ -16,8 +12,9 @@ import dev.engine_room.flywheel.lib.vertex.VertexView;
 import net.minecraft.client.renderer.LightTexture;
 import net.minecraft.client.renderer.SpriteCoordinateExpander;
 import net.minecraft.client.renderer.texture.OverlayTexture;
-import net.minecraft.client.resources.model.Material;
 import org.joml.*;
+import proto.mechanicalarmory.client.flywheel.instances.generic.FrameExtractionAnimatedVisual;
+import proto.mechanicalarmory.client.flywheel.instances.vanilla.VanillaVertexWriter;
 import software.bernie.geckolib.cache.object.GeoBone;
 import software.bernie.geckolib.cache.object.GeoCube;
 import software.bernie.geckolib.cache.object.GeoQuad;
@@ -32,11 +29,10 @@ public class GeckoModel implements Model {
 
     private static final RendererReloadCache<GeckoKey, GeckoModel> CACHE = new RendererReloadCache<>(key -> new GeckoModel(key.geoBone, key.material));
     private static final ThreadLocal<ThreadLocalObjects> THREAD_LOCAL_OBJECTS = ThreadLocal.withInitial(ThreadLocalObjects::new);
-    private static final PoseStack.Pose IDENTITY_POSE = new PoseStack().last();
     List<ConfiguredMesh> meshes = new ArrayList<>();
     GeoBone geoBone;
-    SinkBufferSourceVisual.InstanceMaterialKey material;
-    public GeckoModel(GeoBone geoBone, SinkBufferSourceVisual.InstanceMaterialKey material) {
+    FrameExtractionAnimatedVisual.InstanceMaterialKey material;
+    public GeckoModel(GeoBone geoBone, FrameExtractionAnimatedVisual.InstanceMaterialKey material) {
         this.geoBone = geoBone;
         this.material = material;
         Mesh m = fromBone(geoBone, material);
@@ -45,11 +41,11 @@ public class GeckoModel implements Model {
         }
     }
 
-    public static GeckoModel cachedOf(GeoBone geoBone, SinkBufferSourceVisual.InstanceMaterialKey material) {
+    public static GeckoModel cachedOf(GeoBone geoBone, FrameExtractionAnimatedVisual.InstanceMaterialKey material) {
         return CACHE.get(new GeckoKey(geoBone, material));
     }
 
-    SimpleQuadMesh fromBone(GeoBone geoBone, SinkBufferSourceVisual.InstanceMaterialKey material) {
+    SimpleQuadMesh fromBone(GeoBone geoBone, FrameExtractionAnimatedVisual.InstanceMaterialKey material) {
         if (geoBone.getCubes().isEmpty()){
             return null;
         }
@@ -132,7 +128,7 @@ public class GeckoModel implements Model {
         return Objects.hash(material);
     }
 
-    private record GeckoKey(GeoBone geoBone, SinkBufferSourceVisual.InstanceMaterialKey material) {
+    private record GeckoKey(GeoBone geoBone, FrameExtractionAnimatedVisual.InstanceMaterialKey material) {
 //        @Override
 //        public boolean equals(Object o) {
 //            if (o == null) return false;

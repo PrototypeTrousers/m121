@@ -1,4 +1,4 @@
-package proto.mechanicalarmory.client.flywheel.instances.vanilla;
+package proto.mechanicalarmory.client.flywheel.instances.generic;
 
 import com.mojang.blaze3d.vertex.PoseStack;
 import dev.engine_room.flywheel.api.instance.InstancerProvider;
@@ -16,13 +16,17 @@ import net.minecraft.world.level.LevelAccessor;
 import org.joml.Matrix4f;
 import org.joml.Quaternionf;
 import org.joml.Vector3f;
+import proto.mechanicalarmory.client.flywheel.instances.gecko.GeckoModel;
+import proto.mechanicalarmory.client.flywheel.instances.generic.posestacks.ExtendedRecyclingPoseStack;
+import proto.mechanicalarmory.client.flywheel.instances.generic.posestacks.WrappingPoseStack;
+import proto.mechanicalarmory.client.flywheel.instances.vanilla.VanillaModel;
 import software.bernie.geckolib.cache.object.GeoBone;
 
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
-public interface SinkBufferSourceVisual {
+public interface FrameExtractionAnimatedVisual {
 
     int getLight();
 
@@ -93,10 +97,10 @@ public interface SinkBufferSourceVisual {
         InterpolatedTransformedInstance newIns = new InterpolatedTransformedInstance(getInstanceProvider().instancer(
                         InstanceTypes.TRANSFORMED, VanillaModel.cachedOf(modelPart, instanceMaterialKey))
                 .createInstance(), new Matrix4f(pose), new Matrix4f(pose));
-        newIns.instance.light(getLight());
-        newIns.instance.setTransform(pose);
-        newIns.instance.setVisible(!pose.equals(ExtendedRecyclingPoseStack.ZERO));
-        newIns.instance.setChanged();
+        newIns.instance().light(getLight());
+        newIns.instance().setTransform(pose);
+        newIns.instance().setVisible(!pose.equals(ExtendedRecyclingPoseStack.ZERO));
+        newIns.instance().setChanged();
         transformedInstances.get(depth).add(newIns);
     }
 
@@ -115,10 +119,10 @@ public interface SinkBufferSourceVisual {
                         InstanceTypes.TRANSFORMED, GeckoModel.cachedOf(geoBone, instanceMaterialKey))
                 .createInstance(), new Matrix4f(pose), new Matrix4f(pose));
         transformedInstances.get(depth).add(newIns);
-        newIns.instance.light(getLight());
-        newIns.instance.setTransform(pose);
-        newIns.instance.setVisible(!pose.equals(ExtendedRecyclingPoseStack.ZERO));
-        newIns.instance.setChanged();
+        newIns.instance().light(getLight());
+        newIns.instance().setTransform(pose);
+        newIns.instance().setVisible(!pose.equals(ExtendedRecyclingPoseStack.ZERO));
+        newIns.instance().setChanged();
     }
 
     default void updateTransforms(int depth, PoseStack.Pose p) {
@@ -158,7 +162,7 @@ public interface SinkBufferSourceVisual {
         InterpolatedTransformedInstance newInstance = new InterpolatedTransformedInstance(getInstanceProvider().instancer(
                         InstanceTypes.TRANSFORMED, ItemModels.get((Level) getLevel(), itemStack, ItemDisplayContext.NONE))
                 .createInstance(), new Matrix4f(), new Matrix4f());
-        newInstance.instance.light(getLight());
+        newInstance.instance().light(getLight());
         transformedInstances.get(depth).add(newInstance);
     }
 
@@ -172,10 +176,9 @@ public interface SinkBufferSourceVisual {
 
         for (int i = 0; i < get.size(); i++) {
             InterpolatedTransformedInstance ti = get.get(i);
-            ti.previous.set(ti.current);
-            ti.current.set(p);
-            ti.instance.setTransform(ti.current).setChanged();
-            ti.lastTick = ((ClientLevel) getLevel()).getGameTime();
+            ti.previous().set(ti.current());
+            ti.current().set(p);
+            ti.instance().setTransform(ti.current()).setChanged();
         }
     }
 

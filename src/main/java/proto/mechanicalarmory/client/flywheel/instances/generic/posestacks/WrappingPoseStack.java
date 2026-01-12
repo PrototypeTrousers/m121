@@ -1,4 +1,4 @@
-package proto.mechanicalarmory.client.flywheel.instances.vanilla;
+package proto.mechanicalarmory.client.flywheel.instances.generic.posestacks;
 
 
 import com.mojang.math.Transformation;
@@ -6,13 +6,14 @@ import dev.engine_room.flywheel.lib.util.RecyclingPoseStack;
 import org.jetbrains.annotations.NotNull;
 import org.joml.Matrix4f;
 import org.joml.Quaternionf;
+import proto.mechanicalarmory.client.flywheel.instances.generic.FrameExtractionAnimatedVisual;
 
 public class WrappingPoseStack extends RecyclingPoseStack {
 
-    private final SinkBufferSourceVisual visual;
+    private final FrameExtractionAnimatedVisual visual;
     public final ExtendedRecyclingPoseStack wrappedPoseStack;
 
-    public WrappingPoseStack(SinkBufferSourceVisual visual) {
+    public WrappingPoseStack(FrameExtractionAnimatedVisual visual) {
         super();
         this.wrappedPoseStack = new ExtendedRecyclingPoseStack(visual);
         this.visual = visual;
@@ -108,7 +109,7 @@ public class WrappingPoseStack extends RecyclingPoseStack {
         this.visual.setRendered();
     }
 
-    public SinkBufferSourceVisual getVisual() {
+    public FrameExtractionAnimatedVisual getVisual() {
         return visual;
     }
 

@@ -1,4 +1,4 @@
-package proto.mechanicalarmory.client.flywheel.instances.vanilla;
+package proto.mechanicalarmory.client.flywheel.instances.generic;
 
 import it.unimi.dsi.fastutil.Hash;
 import net.minecraft.client.model.geom.ModelPart;

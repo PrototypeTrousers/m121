@@ -15,10 +15,10 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import proto.mechanicalarmory.client.compat.Constants;
 import proto.mechanicalarmory.client.compat.ImmediatelyFast;
 import proto.mechanicalarmory.client.compat.IrisCompat;
-import proto.mechanicalarmory.client.flywheel.instances.vanilla.ExtendedRecyclingPoseStack;
-import proto.mechanicalarmory.client.flywheel.instances.vanilla.SinkBufferSourceVisual;
+import proto.mechanicalarmory.client.flywheel.instances.generic.FrameExtractionAnimatedVisual;
+import proto.mechanicalarmory.client.flywheel.instances.generic.posestacks.ExtendedRecyclingPoseStack;
 import proto.mechanicalarmory.client.flywheel.instances.vanilla.VanillaModel;
-import proto.mechanicalarmory.client.flywheel.instances.vanilla.WrappingPoseStack;
+import proto.mechanicalarmory.client.flywheel.instances.generic.posestacks.WrappingPoseStack;
 import software.bernie.geckolib.cache.object.GeoBone;
 import software.bernie.geckolib.renderer.GeoRenderer;
 
@@ -29,7 +29,7 @@ public interface GeoRenderMixin {
     default void addGeckoModel(PoseStack poseStack, GeoBone bone, VertexConsumer buffer, int packedLight, int packedOverlay, int colour, CallbackInfo ci){
         if (poseStack instanceof WrappingPoseStack pv) {
             ExtendedRecyclingPoseStack eps = pv.getWrappedPoseStack();
-            SinkBufferSourceVisual v = pv.getVisual();
+            FrameExtractionAnimatedVisual v = pv.getVisual();
             if (bone.getCubes().isEmpty()) return;
             if (!pv.isRendered()) {
                 TextureAtlasSprite tas = null;
@@ -64,7 +64,7 @@ public interface GeoRenderMixin {
                 }
 
                 m = VanillaModel.makeFlywheelMaterial(r);
-                SinkBufferSourceVisual.InstanceMaterialKey key = new SinkBufferSourceVisual.InstanceMaterialKey(m, tas);
+                FrameExtractionAnimatedVisual.InstanceMaterialKey key = new FrameExtractionAnimatedVisual.InstanceMaterialKey(m, tas);
 
                 v.updateTransforms(eps.getDepth(), eps.last());
                 v.addInterpolatedTransformedInstance(eps.getDepth(), bone, key);

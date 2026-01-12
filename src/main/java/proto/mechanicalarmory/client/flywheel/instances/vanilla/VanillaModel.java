@@ -26,6 +26,8 @@ import org.joml.Vector4f;
 import org.joml.Vector4fc;
 import proto.mechanicalarmory.client.compat.Constants;
 import proto.mechanicalarmory.client.compat.IrisCompat;
+import proto.mechanicalarmory.client.flywheel.instances.generic.DeepModelPartHashStrategy;
+import proto.mechanicalarmory.client.flywheel.instances.generic.FrameExtractionAnimatedVisual;
 import proto.mechanicalarmory.client.mixin.CompositeRenderTypeAccessor;
 import proto.mechanicalarmory.client.mixin.RenderTypeAccessor;
 import proto.mechanicalarmory.client.mixin.TextureStateShardAccessor;
@@ -41,8 +43,8 @@ public class VanillaModel implements Model {
     private static final PoseStack.Pose IDENTITY_POSE = new PoseStack().last();
     List<ConfiguredMesh> meshes = new ArrayList<>();
     ModelPart modelPart;
-    SinkBufferSourceVisual.InstanceMaterialKey material;
-    public VanillaModel(ModelPart part, SinkBufferSourceVisual.InstanceMaterialKey instanceMaterialKey) {
+    FrameExtractionAnimatedVisual.InstanceMaterialKey material;
+    public VanillaModel(ModelPart part, FrameExtractionAnimatedVisual.InstanceMaterialKey instanceMaterialKey) {
         this.modelPart = part;
         this.material = instanceMaterialKey;
         Mesh m = fromPart(part, instanceMaterialKey);
@@ -51,11 +53,11 @@ public class VanillaModel implements Model {
         }
     }
 
-    public static VanillaModel cachedOf(ModelPart modelPart, SinkBufferSourceVisual.InstanceMaterialKey materialKey) {
+    public static VanillaModel cachedOf(ModelPart modelPart, FrameExtractionAnimatedVisual.InstanceMaterialKey materialKey) {
         return CACHE.get(new VanillaKey(modelPart, materialKey));
     }
 
-    SimpleQuadMesh fromPart(ModelPart part, SinkBufferSourceVisual.InstanceMaterialKey material) {
+    SimpleQuadMesh fromPart(ModelPart part, FrameExtractionAnimatedVisual.InstanceMaterialKey material) {
         if (part.isEmpty()) {
             return null;
         }
@@ -127,7 +129,7 @@ public class VanillaModel implements Model {
         return Objects.hash(material);
     }
 
-    private record VanillaKey(ModelPart modelPart, SinkBufferSourceVisual.InstanceMaterialKey instanceMaterialKey) {
+    private record VanillaKey(ModelPart modelPart, FrameExtractionAnimatedVisual.InstanceMaterialKey instanceMaterialKey) {
         @Override
         public boolean equals(Object o) {
             if (o == null) return false;

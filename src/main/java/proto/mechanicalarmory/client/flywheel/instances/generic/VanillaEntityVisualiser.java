@@ -1,4 +1,4 @@
-package proto.mechanicalarmory.client.flywheel.instances.vanilla;
+package proto.mechanicalarmory.client.flywheel.instances.generic;
 
 import dev.engine_room.flywheel.api.visual.EntityVisual;
 import dev.engine_room.flywheel.api.visualization.EntityVisualizer;

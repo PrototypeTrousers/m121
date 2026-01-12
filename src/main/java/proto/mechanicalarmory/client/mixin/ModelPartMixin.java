@@ -22,10 +22,10 @@ import proto.mechanicalarmory.client.compat.Constants;
 import proto.mechanicalarmory.client.compat.ImmediatelyFast;
 import proto.mechanicalarmory.client.compat.IrisCompat;
 import proto.mechanicalarmory.client.flywheel.instances.capturing.CapturingBufferSource;
-import proto.mechanicalarmory.client.flywheel.instances.vanilla.ExtendedRecyclingPoseStack;
-import proto.mechanicalarmory.client.flywheel.instances.vanilla.SinkBufferSourceVisual;
+import proto.mechanicalarmory.client.flywheel.instances.generic.FrameExtractionAnimatedVisual;
+import proto.mechanicalarmory.client.flywheel.instances.generic.posestacks.ExtendedRecyclingPoseStack;
 import proto.mechanicalarmory.client.flywheel.instances.vanilla.VanillaModel;
-import proto.mechanicalarmory.client.flywheel.instances.vanilla.WrappingPoseStack;
+import proto.mechanicalarmory.client.flywheel.instances.generic.posestacks.WrappingPoseStack;
 
 
 @Mixin(targets = "net.minecraft.client.model.geom.ModelPart", priority = 1001)
@@ -41,7 +41,7 @@ public abstract class ModelPartMixin {
     private void injected(PoseStack poseStack, VertexConsumer buffer, int packedLight, int packedOverlay, int color, CallbackInfo ci) {
         if (poseStack instanceof WrappingPoseStack pv) {
             ExtendedRecyclingPoseStack eps = pv.getWrappedPoseStack();
-            SinkBufferSourceVisual v = pv.getVisual();
+            FrameExtractionAnimatedVisual v = pv.getVisual();
             if (((ModelPart) (Object) this).isEmpty()) return;
             if (!pv.isRendered()) {
                 TextureAtlasSprite tas = null;
@@ -76,7 +76,7 @@ public abstract class ModelPartMixin {
                 }
 
                 m = VanillaModel.makeFlywheelMaterial(r);
-                SinkBufferSourceVisual.InstanceMaterialKey key = new SinkBufferSourceVisual.InstanceMaterialKey(m, tas);
+                FrameExtractionAnimatedVisual.InstanceMaterialKey key = new FrameExtractionAnimatedVisual.InstanceMaterialKey(m, tas);
 
                 if (!visible || skipDraw) {
                     eps.last().pose().zero();

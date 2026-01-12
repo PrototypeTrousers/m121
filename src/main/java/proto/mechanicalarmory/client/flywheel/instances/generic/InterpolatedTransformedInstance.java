@@ -1,33 +1,11 @@
-package proto.mechanicalarmory.client.flywheel.instances.vanilla;
+package proto.mechanicalarmory.client.flywheel.instances.generic;
 
 import dev.engine_room.flywheel.lib.instance.TransformedInstance;
 import org.joml.Matrix4f;
 
 import java.util.Objects;
 
-public class InterpolatedTransformedInstance {
-    public final TransformedInstance instance;
-    public final Matrix4f current;
-    public final Matrix4f previous;
-    public long lastTick;
-
-    public InterpolatedTransformedInstance(TransformedInstance instance, Matrix4f current, Matrix4f previous) {
-        this.instance = instance;
-        this.current = current;
-        this.previous = previous;
-    }
-
-    public TransformedInstance instance() {
-        return instance;
-    }
-
-    public Matrix4f current() {
-        return current;
-    }
-
-    public Matrix4f previous() {
-        return previous;
-    }
+public record InterpolatedTransformedInstance(TransformedInstance instance, Matrix4f current, Matrix4f previous) {
 
     @Override
     public boolean equals(Object obj) {
@@ -51,6 +29,4 @@ public class InterpolatedTransformedInstance {
                 "current=" + current + ", " +
                 "previous=" + previous + ']';
     }
-
 }
-

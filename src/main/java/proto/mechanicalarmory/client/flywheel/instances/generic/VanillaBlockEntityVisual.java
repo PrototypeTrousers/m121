@@ -1,40 +1,48 @@
-package proto.mechanicalarmory.client.flywheel.instances.vanilla;
+package proto.mechanicalarmory.client.flywheel.instances.generic;
 
 import com.mojang.blaze3d.vertex.PoseStack;
+import dev.engine_room.flywheel.api.instance.Instance;
 import dev.engine_room.flywheel.api.instance.InstancerProvider;
 import dev.engine_room.flywheel.api.visual.DynamicVisual;
 import dev.engine_room.flywheel.api.visualization.VisualizationContext;
-import dev.engine_room.flywheel.lib.visual.AbstractEntityVisual;
+import dev.engine_room.flywheel.lib.visual.AbstractBlockEntityVisual;
 import dev.engine_room.flywheel.lib.visual.SimpleDynamicVisual;
-import dev.engine_room.flywheel.lib.visual.component.ShadowComponent;
+import net.minecraft.client.renderer.LevelRenderer;
 import net.minecraft.client.renderer.MultiBufferSource;
-import net.minecraft.world.entity.Entity;
 import net.minecraft.world.level.LevelAccessor;
+import net.minecraft.world.level.block.entity.BlockEntity;
+import org.jetbrains.annotations.Nullable;
 import org.joml.Matrix4f;
 import org.joml.Quaternionf;
 import org.joml.Vector3f;
+import proto.mechanicalarmory.client.flywheel.instances.generic.posestacks.ExtendedRecyclingPoseStack;
+import proto.mechanicalarmory.client.flywheel.instances.generic.posestacks.WrappingPoseStack;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Consumer;
 
-public class VanillaEntityVisual extends AbstractEntityVisual<Entity> implements SimpleDynamicVisual, SinkBufferSourceVisual {
+public class VanillaBlockEntityVisual extends AbstractBlockEntityVisual<BlockEntity> implements SimpleDynamicVisual, FrameExtractionAnimatedVisual {
     final public List<List<InterpolatedTransformedInstance>> transformedInstances = new ArrayList<>();
-    private final WrappingPoseStack extendedRecyclingPoseStack = new WrappingPoseStack(this);
+    public final WrappingPoseStack extendedRecyclingPoseStack = new WrappingPoseStack(this);
     private final Matrix4f mutableInterpolationMatrix4f = new Matrix4f();
+    private final int light;
     Vector3f[] interpolationVecs = new Vector3f[]{new Vector3f(), new Vector3f(), new Vector3f(), new Vector3f()};
     Quaternionf[] interpolationQuats = new Quaternionf[]{new Quaternionf(), new Quaternionf()};
-    private final int light;
     boolean hasPoseToInterpolate;
+    List<PoseStack.Pose> poses = new ArrayList<>();
     private boolean updateTransforms;
     private boolean rendered;
     private MultiBufferSource bufferSource;
 
-    public ShadowComponent getShadowComponent() {
-        return shadowComponent;
+    public VanillaBlockEntityVisual(VisualizationContext ctx, BlockEntity blockEntity, float partialTick) {
+        super(ctx, blockEntity, partialTick);
+        light = LevelRenderer.getLightColor(level, pos.above());
     }
 
-    ShadowComponent shadowComponent;
-
+    public WrappingPoseStack getPoseStackVisual() {
+        return extendedRecyclingPoseStack;
+    }
 
     @Override
     public List<PoseStack.Pose> getPoses() {
@@ -49,15 +57,6 @@ public class VanillaEntityVisual extends AbstractEntityVisual<Entity> implements
     @Override
     public MultiBufferSource getBufferSource() {
         return this.bufferSource;
-    }
-
-    List<PoseStack.Pose> poses = new ArrayList<>();
-
-
-    public VanillaEntityVisual(VisualizationContext ctx, Entity entity, float partialTick) {
-        super(ctx, entity, partialTick);
-        light = computePackedLight(partialTick);
-        shadowComponent = new ShadowComponent(ctx, entity);
     }
 
     @Override
@@ -92,24 +91,22 @@ public class VanillaEntityVisual extends AbstractEntityVisual<Entity> implements
                     List<InterpolatedTransformedInstance> get = transformedInstances.get(depth);
                     for (int i = 0; i < get.size(); i++) {
                         InterpolatedTransformedInstance ti = get.get(i);
-                        ti.previous.set(ti.current);
-                        ti.instance.setVisible(!p.pose().equals(ExtendedRecyclingPoseStack.ZERO));
+                        ti.previous().set(ti.current());
+                        ti.instance().setVisible(!p.pose().equals(ExtendedRecyclingPoseStack.ZERO));
                         hasPoseToInterpolate = true;
-                        ti.current.set(p.pose());
+                        ti.current().set(p.pose());
                     }
                 }
             }
             updateTransforms = false;
         }
 
-        if(!hasPoseToInterpolate) {
+        if (!hasPoseToInterpolate) {
             return;
         }
-        if (!isVisible(ctx.frustum())) {
+        if (doDistanceLimitThisFrame(ctx) || !isVisible(ctx.frustum())) {
             return;
         }
-
-        shadowComponent.beginFrame(ctx);
 
         float pt = ctx.partialTick();
         hasPoseToInterpolate = false;
@@ -117,38 +114,38 @@ public class VanillaEntityVisual extends AbstractEntityVisual<Entity> implements
             for (InterpolatedTransformedInstance ti : list) {
                 // 1. Check if an update is even needed
                 // Only update if the transformation has actually changed between ticks
-                if (!ti.current.equals(ti.instance.pose,0.0001f)) {
+                if (!ti.current().equals(ti.instance().pose,0.0001f)) {
                     hasPoseToInterpolate = true;
                     // 2. Interpolate into a temporary matrix
                     // Do NOT modify ti.current or ti.previous here!
-                    Matrix4f interpolated = interpolate(ti.previous, ti.current, pt);
+                    Matrix4f interpolated = interpolate(ti.previous(), ti.current(), pt);
 
                     // 3. Apply to the rendering instance
-                    ti.instance.setTransform(interpolated);
-                    ti.instance.setChanged();
+                    ti.instance().setTransform(interpolated);
+                    ti.instance().setChanged();
                 }
             }
         }
     }
 
-    public void dirtyTransforms() {
-        this.updateTransforms = true;
+    @Override
+    public void collectCrumblingInstances(Consumer<@Nullable Instance> consumer) {
+        for (List<InterpolatedTransformedInstance> key : transformedInstances) {
+            key.forEach(ti -> consumer.accept(ti.instance()));
+        }
     }
 
     @Override
-    public boolean isRendered() {
-        return this.rendered;
-    }
-
-    @Override
-    public void setRendered() {
-        this.rendered = true;
+    public void updateLight(float partialTick) {
+        for (List<InterpolatedTransformedInstance> key : transformedInstances) {
+            key.forEach(ti -> ti.instance().light(light));
+        }
     }
 
     @Override
     protected void _delete() {
         for (List<InterpolatedTransformedInstance> v : transformedInstances) {
-            v.forEach(ti -> ti.instance.delete());
+            v.forEach(ti -> ti.instance().delete());
         }
     }
 
@@ -163,7 +160,17 @@ public class VanillaEntityVisual extends AbstractEntityVisual<Entity> implements
     }
 
     @Override
-    public WrappingPoseStack getPoseStackVisual() {
-        return extendedRecyclingPoseStack;
+    public void dirtyTransforms() {
+        this.updateTransforms = true;
+    }
+
+    @Override
+    public boolean isRendered() {
+        return this.rendered;
+    }
+
+    @Override
+    public void setRendered() {
+        this.rendered = true;
     }
 }

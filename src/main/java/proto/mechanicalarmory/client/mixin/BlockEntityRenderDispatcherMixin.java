@@ -22,8 +22,8 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import proto.mechanicalarmory.MechanicalArmoryClient;
-import proto.mechanicalarmory.client.flywheel.instances.vanilla.VanillaBlockEntityVisual;
-import proto.mechanicalarmory.client.flywheel.instances.vanilla.WrappingPoseStack;
+import proto.mechanicalarmory.client.flywheel.instances.generic.VanillaBlockEntityVisual;
+import proto.mechanicalarmory.client.flywheel.instances.generic.posestacks.WrappingPoseStack;
 
 @Mixin(value = BlockEntityRenderDispatcher.class, priority = 1001)
 public class BlockEntityRenderDispatcherMixin {

@@ -6,7 +6,7 @@ import dev.engine_room.flywheel.lib.memory.MemoryBlock;
 import dev.engine_room.flywheel.lib.vertex.PosTexNormalVertexView;
 import org.lwjgl.system.MemoryUtil;
 
-class VanillaVertexWriter implements VertexConsumer {
+public class VanillaVertexWriter implements VertexConsumer {
 	private static final int STRIDE = (int) PosTexNormalVertexView.STRIDE;
 
 	private MemoryBlock data;
