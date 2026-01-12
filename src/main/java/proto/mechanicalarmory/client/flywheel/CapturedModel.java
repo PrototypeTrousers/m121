@@ -15,6 +15,7 @@ import dev.engine_room.flywheel.lib.material.SimpleMaterial;
 import dev.engine_room.flywheel.lib.memory.MemoryBlock;
 import dev.engine_room.flywheel.lib.model.ModelUtil;
 import dev.engine_room.flywheel.lib.model.QuadIndexSequence;
+import dev.engine_room.flywheel.lib.vertex.FullVertexView;
 import dev.engine_room.flywheel.lib.vertex.NoOverlayVertexView;
 import dev.engine_room.flywheel.lib.vertex.VertexView;
 import net.minecraft.client.renderer.RenderStateShard;
@@ -50,8 +51,8 @@ public class CapturedModel implements Model {
             meshes.add(new Model.ConfiguredMesh(SimpleMaterial.builder()
                     .texture(atlas)
                     .cutout(CutoutShaders.EPSILON)
-                    .light(LightShaders.SMOOTH_WHEN_EMBEDDED)
-                    .cardinalLightingMode(CardinalLightingMode.CHUNK)
+                    .light(LightShaders.FLAT)
+                    .cardinalLightingMode(CardinalLightingMode.OFF)
                     .ambientOcclusion(false)
                     .writeMask(WriteMask.COLOR_DEPTH)
                     .build(),
@@ -83,17 +84,14 @@ public class CapturedModel implements Model {
             int vertexCount = drawState.vertexCount();
             long srcStride = drawState.format().getVertexSize();
 
-            VertexView vertexView = new NoOverlayVertexView();
+            VertexView vertexView = new FullVertexView();
             long dstStride = vertexView.stride();
 
             ByteBuffer src = meshData.vertexBuffer();
             MemoryBlock dst = MemoryBlock.mallocTracked((long) vertexCount * dstStride);
             long srcPtr = MemoryUtil.memAddress(src);
             long dstPtr = dst.ptr();
-            // The first 31 bytes of each vertex in a block vertex buffer are guaranteed to contain the same data in the
-            // same order regardless of whether the format is extended by mods like Iris or OptiFine. Copy these bytes and
-            // ignore the rest.
-            long bytesToCopy = Math.min(dstStride, 31);
+            long bytesToCopy = Math.min(dstStride, srcStride);
 
             for (int i = 0; i < vertexCount; i++) {
                 // It is safe to copy bytes directly since the NoOverlayVertexView uses the same memory layout as the first

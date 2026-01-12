@@ -62,15 +62,18 @@ public class BlockEntityRenderDispatcherMixin {
         blockEntityVisual = null;
         boolean should = original.call(instance, blockEntity, cameraPos) == true;
         if (should && BackendManagerImpl.isBackendOn()) {
-            if (poseStack instanceof WrappingPoseStack wps) {
-                SinkBufferSourceVisual v = wps.getVisual();
-                if (v instanceof VanillaBlockEntityVisual vanillaBlockEntityVisual) {
-                    blockEntityVisual = vanillaBlockEntityVisual;
+            if (VisualizationHelper.canVisualize(blockEntity)) {
+                VisualizationManagerImpl man = VisualizationManagerImpl.get(blockEntity.getLevel());
+                if (man != null) {
+                    VisualManagerImpl<BlockEntity, BlockEntityStorage> iii = (VisualManagerImpl<BlockEntity, BlockEntityStorage>) man.blockEntities();
+                    if (iii.getStorage().visualAtPos(blockEntity.getBlockPos().asLong()) instanceof VanillaBlockEntityVisual visual) {
+                        blockEntityVisual = visual;
+                        if (!visual.extendedRecyclingPoseStack.isRendered() || visual.extendedRecyclingPoseStack.isLegacyAccessed()) {
+                            return true;
+                        }
+                        return MechanicalArmoryClient.firstFrameOfTick;
+                    }
                 }
-                if (!blockEntityVisual.extendedRecyclingPoseStack.isRendered() || blockEntityVisual.extendedRecyclingPoseStack.isLegacyAccessed()) {
-                    return true;
-                }
-                return MechanicalArmoryClient.firstFrameOfTick;
             }
         }
         return should;

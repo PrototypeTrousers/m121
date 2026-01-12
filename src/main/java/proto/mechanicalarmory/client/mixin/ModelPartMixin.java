@@ -20,7 +20,7 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import proto.mechanicalarmory.client.compat.Constants;
 import proto.mechanicalarmory.client.compat.ImmediatelyFast;
-import proto.mechanicalarmory.client.compat.IrisBufferSource;
+import proto.mechanicalarmory.client.compat.IrisCompat;
 import proto.mechanicalarmory.client.flywheel.instances.capturing.CapturingBufferSource;
 import proto.mechanicalarmory.client.flywheel.instances.vanilla.ExtendedRecyclingPoseStack;
 import proto.mechanicalarmory.client.flywheel.instances.vanilla.SinkBufferSourceVisual;
@@ -56,7 +56,7 @@ public abstract class ModelPartMixin {
                 MultiBufferSource mbs = v.getBufferSource();
 
                 if (Constants.isIrisLoaded) {
-                    mbs = IrisBufferSource.getMultiBufferSourceFromIris(mbs);
+                    mbs = IrisCompat.getMultiBufferSourceFromIris(mbs);
                 }
 
                 if (mbs instanceof MultiBufferAccessor accessor) {
@@ -67,7 +67,7 @@ public abstract class ModelPartMixin {
                         r = ImmediatelyFast.getRenderType(mbs, buffer);
                     }
                     if (Constants.isIrisLoaded) {
-                        r = IrisBufferSource.getRenderType(mbs, buffer);
+                        r = IrisCompat.getRenderType(mbs, buffer);
                     }
                 }
 

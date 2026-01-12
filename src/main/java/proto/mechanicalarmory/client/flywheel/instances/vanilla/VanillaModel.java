@@ -3,7 +3,6 @@ package proto.mechanicalarmory.client.flywheel.instances.vanilla;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import dev.engine_room.flywheel.api.material.CardinalLightingMode;
-import dev.engine_room.flywheel.api.material.LightShader;
 import dev.engine_room.flywheel.api.material.Transparency;
 import dev.engine_room.flywheel.api.model.Mesh;
 import dev.engine_room.flywheel.api.model.Model;
@@ -16,7 +15,6 @@ import dev.engine_room.flywheel.lib.model.SimpleQuadMesh;
 import dev.engine_room.flywheel.lib.util.RendererReloadCache;
 import dev.engine_room.flywheel.lib.vertex.PosTexNormalVertexView;
 import dev.engine_room.flywheel.lib.vertex.VertexView;
-import net.irisshaders.iris.layer.OuterWrappedRenderType;
 import net.minecraft.client.model.geom.ModelPart;
 import net.minecraft.client.renderer.LightTexture;
 import net.minecraft.client.renderer.RenderStateShard;
@@ -26,6 +24,8 @@ import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.minecraft.resources.ResourceLocation;
 import org.joml.Vector4f;
 import org.joml.Vector4fc;
+import proto.mechanicalarmory.client.compat.Constants;
+import proto.mechanicalarmory.client.compat.IrisCompat;
 import proto.mechanicalarmory.client.mixin.CompositeRenderTypeAccessor;
 import proto.mechanicalarmory.client.mixin.RenderTypeAccessor;
 import proto.mechanicalarmory.client.mixin.TextureStateShardAccessor;
@@ -87,8 +87,8 @@ public class VanillaModel implements Model {
 
     public static dev.engine_room.flywheel.api.material.Material makeFlywheelMaterial(RenderType renderType) {
 
-        if (renderType instanceof OuterWrappedRenderType outerWrappedRenderType) {
-            renderType = outerWrappedRenderType.unwrap();
+        if (Constants.isIrisLoaded) {
+            renderType = IrisCompat.unwrap(renderType);
         }
 
         CompositeRenderTypeAccessor c = ((CompositeRenderTypeAccessor) renderType);
