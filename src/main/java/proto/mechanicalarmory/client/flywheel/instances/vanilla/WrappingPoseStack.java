@@ -11,7 +11,6 @@ public class WrappingPoseStack extends RecyclingPoseStack {
 
     private final SinkBufferSourceVisual visual;
     public final ExtendedRecyclingPoseStack wrappedPoseStack;
-    boolean legacyAccessed;
 
     public WrappingPoseStack(SinkBufferSourceVisual visual) {
         super();
@@ -25,7 +24,6 @@ public class WrappingPoseStack extends RecyclingPoseStack {
 
     @Override
     public @NotNull Pose last() {
-        legacyAccessed = true;
         return super.last();
     }
 
@@ -115,11 +113,6 @@ public class WrappingPoseStack extends RecyclingPoseStack {
     }
 
     public void setDepth(int depth) {
-        legacyAccessed = false;
         wrappedPoseStack.depth = depth;
-    }
-
-    public boolean isLegacyAccessed() {
-        return legacyAccessed;
     }
 }

@@ -69,6 +69,7 @@ public class MechanicalArmoryClient {
             }
         });
         BuiltInRegistries.ENTITY_TYPE.forEach(c -> {
+            if (c == EntityType.PLAYER) return;
             if (VisualizerRegistry.getVisualizer(c) == null) {
                 VisualizerRegistry.setVisualizer(c, VanillaEntityVisualiser.VANILLA_ENTITY_VISUALISER);
             }

@@ -52,7 +52,7 @@ public class CapturedModel implements Model {
                     .texture(atlas)
                     .cutout(CutoutShaders.EPSILON)
                     .light(LightShaders.FLAT)
-                    .cardinalLightingMode(CardinalLightingMode.OFF)
+                    .cardinalLightingMode(CardinalLightingMode.CHUNK)
                     .ambientOcclusion(false)
                     .writeMask(WriteMask.COLOR_DEPTH)
                     .build(),
