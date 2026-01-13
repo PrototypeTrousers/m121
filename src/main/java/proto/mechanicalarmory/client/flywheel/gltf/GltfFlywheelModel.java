@@ -48,7 +48,7 @@ public class GltfFlywheelModel implements Model {
                 .cardinalLightingMode(CardinalLightingMode.ENTITY)
                 .ambientOcclusion(false)
                 .build(),
-                new GltfMesh(meshPrimitiveModel)));
+                new GltfFlywheelMesh(meshPrimitiveModel)));
     }
 
     @Override

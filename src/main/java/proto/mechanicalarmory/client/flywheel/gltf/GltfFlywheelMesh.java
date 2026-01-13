@@ -10,14 +10,14 @@ import org.joml.Vector4fc;
 
 import java.nio.FloatBuffer;
 
-public class GltfMesh implements Mesh {
+public class GltfFlywheelMesh implements Mesh {
 
     private final int vertexCount;
     private final int indexCount;
     private final TriIndexSequence indices;
     private MeshPrimitiveModel meshPrimitiveModel;
 
-    public GltfMesh(MeshPrimitiveModel meshPrimitiveModel) {
+    public GltfFlywheelMesh(MeshPrimitiveModel meshPrimitiveModel) {
         this.meshPrimitiveModel = meshPrimitiveModel;
         AccessorModel posAccessor = meshPrimitiveModel.getAttributes().get("POSITION");
         vertexCount = posAccessor.getCount();
