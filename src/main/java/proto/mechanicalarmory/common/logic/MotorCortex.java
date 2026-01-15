@@ -24,7 +24,7 @@ public class MotorCortex implements INBTSerializable<ListTag> {
     }
 
     public ActionResult move(Vector3d target, Direction facing) {
-        Vector3d combinedVec = target.add(facing.getOpposite().getStepX() -0.5, facing.getOpposite().getStepY() -0.5, facing.getOpposite().getStepZ() -0.5);
+        Vector3d combinedVec = target;
         float pitch = (float) Math.atan2(combinedVec.y, Math.sqrt(combinedVec.x * combinedVec.x + combinedVec.z * combinedVec.z));
         pitch -= (float) (Math.PI/2);
         //model initial angle is -90 degrees

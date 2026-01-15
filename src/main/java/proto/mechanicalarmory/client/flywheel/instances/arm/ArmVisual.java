@@ -1,5 +1,6 @@
 package proto.mechanicalarmory.client.flywheel.instances.arm;
 
+import com.google.common.base.Function;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.PoseStack;
 import dev.engine_room.flywheel.api.instance.Instance;
@@ -36,6 +37,7 @@ import net.minecraft.client.renderer.LevelRenderer;
 import net.minecraft.client.resources.model.BakedModel;
 import net.minecraft.core.SectionPos;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.util.Mth;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.ItemDisplayContext;
 import net.minecraft.world.item.ItemStack;
@@ -180,9 +182,12 @@ public class ArmVisual extends AbstractBlockEntityVisual<ArmEntity> implements D
     @Override
     public Plan<DynamicVisual.Context> planFrame() {
         return NestedPlan.of(
-                RunnablePlan.of(() -> {
-                    firstArm.xRot((float) -Math.PI / 4);
-                    secondArm.xRot((float) Math.PI / 2);
+                RunnablePlan.of((context) -> {
+                    float p = context.partialTick();
+                    firstArm.xRot(Mth.lerp(p, blockEntity.getAnimationRotation(0)[0], blockEntity.getRotation(0)[0]));
+                    firstArm.yRot(Mth.lerp(p, blockEntity.getAnimationRotation(0)[1], blockEntity.getRotation(0)[1]));
+
+                    secondArm.xRot(Mth.lerp(p, blockEntity.getAnimationRotation(1)[0], blockEntity.getRotation(1)[0]));
 
                     updateItemTransforms();
                     instanceTree.updateInstancesStatic(initialPose);

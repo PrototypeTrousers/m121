@@ -6,8 +6,12 @@ import net.minecraft.core.Direction;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.NbtUtils;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.entity.BlockEntity;
 import net.neoforged.neoforge.common.util.INBTSerializable;
 import org.joml.Vector3d;
+
+import java.util.Optional;
 
 public class Targeting implements INBTSerializable<CompoundTag> {
 
@@ -47,13 +51,13 @@ public class Targeting implements INBTSerializable<CompoundTag> {
     public void setSource(BlockPos sourcePos, Direction sourceFacing) {
         this.source = Pair.of(sourcePos, sourceFacing);
         BlockPos vecPos = sourcePos.offset(sourceFacing.getNormal());
-        this.sourceVec = new Vector3d(vecPos.getX() + 0.5, vecPos.getY() + 0.5, vecPos.getZ() + 0.5);
+        this.sourceVec = new Vector3d(vecPos.getX(), vecPos.getY(), vecPos.getZ());
     }
 
     public void setTarget(BlockPos targetPos, Direction targetFacing) {
         this.target = Pair.of(targetPos, targetFacing);
         BlockPos vecPos = targetPos.offset(targetFacing.getNormal());
-        this.targetVec = new Vector3d(vecPos.getX() + 0.5, vecPos.getY() + 0.5, vecPos.getZ() + 0.5);
+        this.targetVec = new Vector3d(vecPos.getX(), vecPos.getY(), vecPos.getZ());
     }
 
     public boolean hasInput() {
@@ -80,7 +84,9 @@ public class Targeting implements INBTSerializable<CompoundTag> {
 
     @Override
     public void deserializeNBT(HolderLookup.Provider provider, CompoundTag compound) {
-        setSource(NbtUtils.readBlockPos(compound, "sourcePos").get(), Direction.from3DDataValue((compound.getInt("sourceFacing"))));
-        setTarget(NbtUtils.readBlockPos(compound, "targetPos").get(), Direction.from3DDataValue(compound.getInt("targetFacing")));
+        Optional<BlockPos> src = NbtUtils.readBlockPos(compound, "sourcePos");
+        src.ifPresent(blockPos -> this.source = Pair.of(blockPos, Direction.from3DDataValue((compound.getInt("sourceFacing")))));
+        Optional<BlockPos>  target = NbtUtils.readBlockPos(compound, "targetPos");
+        target.ifPresent(blockPos -> this.target = Pair.of(blockPos, Direction.from3DDataValue((compound.getInt("targetFacing")))));
     }
 }
