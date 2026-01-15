@@ -10,11 +10,11 @@ import de.javagl.jgltf.model.v2.MaterialModelV2;
 import dev.engine_room.flywheel.api.material.CardinalLightingMode;
 import dev.engine_room.flywheel.api.model.Model;
 import dev.engine_room.flywheel.lib.material.SimpleMaterial;
+import dev.engine_room.flywheel.lib.model.ModelUtil;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.texture.DynamicTexture;
 import net.minecraft.client.renderer.texture.TextureManager;
 import net.minecraft.resources.ResourceLocation;
-import org.joml.Vector4f;
 import org.joml.Vector4fc;
 
 import java.io.IOException;
@@ -26,6 +26,7 @@ import static proto.mechanicalarmory.MechanicalArmory.MODID;
 public class GltfFlywheelModel implements Model {
     List<ConfiguredMesh> meshes = new ArrayList<>();
     NativeImage embeddedTexture;
+    Vector4fc boundingSphere;
     public GltfFlywheelModel(NodeModel nm, MeshPrimitiveModel meshPrimitiveModel) {
         TextureManager manager = Minecraft.getInstance().getTextureManager();
         MaterialModelV2 m = ((MaterialModelV2) meshPrimitiveModel.getMaterialModel());
@@ -49,6 +50,7 @@ public class GltfFlywheelModel implements Model {
                 .ambientOcclusion(false)
                 .build(),
                 new GltfMesh(meshPrimitiveModel)));
+        boundingSphere = ModelUtil.computeBoundingSphere(meshes);
     }
 
     @Override
@@ -58,6 +60,6 @@ public class GltfFlywheelModel implements Model {
 
     @Override
     public Vector4fc boundingSphere() {
-        return new Vector4f(1, 1, 1, 1);
+        return boundingSphere;
     }
 }

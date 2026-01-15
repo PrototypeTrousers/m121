@@ -81,6 +81,7 @@ public class ArmEntity extends BlockEntity implements BlockEntityTicker<ArmEntit
         compound.put("rotation", motorCortex.serializeNBT(registries));
         compound.put("targeting", targeting.serializeNBT(registries));
         compound.put("workStatus", workStatus.serializeNBT(registries));
+        compound.put("itemHandler", itemHandler.serializeNBT(registries));
     }
 
     @Override
@@ -89,6 +90,11 @@ public class ArmEntity extends BlockEntity implements BlockEntityTicker<ArmEntit
         motorCortex.deserializeNBT(registries, compound.getList("rotation", CompoundTag.TAG_FLOAT));
         targeting.deserializeNBT(registries, compound.getCompound("targeting"));
         workStatus.deserializeNBT(registries, compound.getCompound("workStatus"));
+        itemHandler.deserializeNBT(registries, compound.getCompound("itemHandler"));
+    }
+
+    public ItemStack getItemStack() {
+        return itemHandler.getStackInSlot(0);
     }
 
     public ActionResult interact(Action action, Pair<BlockPos, Direction> blkFace) {
