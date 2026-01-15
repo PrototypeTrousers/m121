@@ -50,14 +50,17 @@ public class Targeting implements INBTSerializable<CompoundTag> {
 
     public void setSource(BlockPos sourcePos, Direction sourceFacing) {
         this.source = Pair.of(sourcePos, sourceFacing);
-        BlockPos vecPos = sourcePos.offset(sourceFacing.getNormal());
-        this.sourceVec = new Vector3d(vecPos.getX(), vecPos.getY(), vecPos.getZ());
+
+        this.sourceVec = new Vector3d(sourcePos.getX() + sourceFacing.getStepX() / 2f,
+                sourcePos.getY() + sourceFacing.getStepY() / 2f,
+                sourcePos.getZ() + sourceFacing.getStepZ() / 2f);
     }
 
     public void setTarget(BlockPos targetPos, Direction targetFacing) {
         this.target = Pair.of(targetPos, targetFacing);
-        BlockPos vecPos = targetPos.offset(targetFacing.getNormal());
-        this.targetVec = new Vector3d(vecPos.getX(), vecPos.getY(), vecPos.getZ());
+        this.targetVec = new Vector3d(targetPos.getX() + targetFacing.getStepX() / 2f,
+                targetPos.getY() + targetFacing.getStepY() / 2f,
+                targetPos.getZ() + targetFacing.getStepZ() / 2f);
     }
 
     public boolean hasInput() {
@@ -86,7 +89,7 @@ public class Targeting implements INBTSerializable<CompoundTag> {
     public void deserializeNBT(HolderLookup.Provider provider, CompoundTag compound) {
         Optional<BlockPos> src = NbtUtils.readBlockPos(compound, "sourcePos");
         src.ifPresent(blockPos -> this.source = Pair.of(blockPos, Direction.from3DDataValue((compound.getInt("sourceFacing")))));
-        Optional<BlockPos>  target = NbtUtils.readBlockPos(compound, "targetPos");
+        Optional<BlockPos> target = NbtUtils.readBlockPos(compound, "targetPos");
         target.ifPresent(blockPos -> this.target = Pair.of(blockPos, Direction.from3DDataValue((compound.getInt("targetFacing")))));
     }
 }

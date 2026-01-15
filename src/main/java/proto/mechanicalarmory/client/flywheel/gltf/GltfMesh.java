@@ -21,7 +21,6 @@ public class GltfMesh implements Mesh {
     private final int vertexCount;
     private final int indexCount;
     private final TriIndexSequence indices;
-    private MeshPrimitiveModel meshPrimitiveModel;
     Vector4fc boundingSphere;
     VertexList vertexList;
 
