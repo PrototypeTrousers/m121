@@ -28,6 +28,9 @@ public class GltfFlywheelModel implements Model {
     NativeImage embeddedTexture;
     Vector4fc boundingSphere;
     public GltfFlywheelModel(NodeModel nm, MeshPrimitiveModel meshPrimitiveModel) {
+        if (meshPrimitiveModel == null) {
+            return;
+        }
         TextureManager manager = Minecraft.getInstance().getTextureManager();
         MaterialModelV2 m = ((MaterialModelV2) meshPrimitiveModel.getMaterialModel());
         TextureModel tm = m.getBaseColorTexture();

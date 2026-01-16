@@ -36,7 +36,12 @@ public class GltfFlywheelModelTree {
             Map<String, ModelTree> newChildren = new Object2ObjectArrayMap<>();
             PartPose pp = PartPose.offset(mm.getTranslation()[0] * 16, mm.getTranslation()[1] * 16, mm.getTranslation()[2] * 16);
             addNodeChildren(mm, newChildren);
-            ModelTree modelTree = new ModelTree(null, pp, newChildren);
+            ModelTree modelTree;
+            if (mm.getName().equals("ItemAttach")) {
+                modelTree = new ModelTree(new GltfFlywheelModel(nm, null), pp, newChildren);
+            } else {
+                modelTree = new ModelTree(null, pp, newChildren);
+            }
             children.put(mm.getName(), modelTree);
         }
     }
