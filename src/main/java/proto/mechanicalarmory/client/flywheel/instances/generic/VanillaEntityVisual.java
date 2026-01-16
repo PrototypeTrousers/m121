@@ -26,7 +26,6 @@ public class VanillaEntityVisual extends AbstractEntityVisual<Entity> implements
     Vector3f[] interpolationVecs = new Vector3f[]{new Vector3f(), new Vector3f(), new Vector3f(), new Vector3f()};
     Quaternionf[] interpolationQuats = new Quaternionf[]{new Quaternionf(), new Quaternionf()};
     private final int light;
-    boolean hasPoseToInterpolate;
     private boolean updateTransforms;
     private boolean rendered;
     private MultiBufferSource bufferSource;
@@ -96,41 +95,20 @@ public class VanillaEntityVisual extends AbstractEntityVisual<Entity> implements
                         InterpolatedTransformedInstance ti = get.get(i);
                         ti.previous().set(ti.current());
                         ti.instance().setVisible(!p.pose().equals(ExtendedRecyclingPoseStack.ZERO));
-                        hasPoseToInterpolate = true;
                         ti.current().set(p.pose());
+                        ti.instance().setTransform(p.pose());
+                        ti.instance().setChanged();
                     }
                 }
             }
             updateTransforms = false;
         }
 
-        if(!hasPoseToInterpolate) {
-            return;
-        }
         if (!isVisible(ctx.frustum())) {
             return;
         }
 
         shadowComponent.beginFrame(ctx);
-
-        float pt = ctx.partialTick();
-        hasPoseToInterpolate = false;
-        for (List<InterpolatedTransformedInstance> list : transformedInstances) {
-            for (InterpolatedTransformedInstance ti : list) {
-                // 1. Check if an update is even needed
-                // Only update if the transformation has actually changed between ticks
-                if (!ti.current().equals(ti.instance().pose,0.0001f)) {
-                    hasPoseToInterpolate = true;
-                    // 2. Interpolate into a temporary matrix
-                    // Do NOT modify ti.current or ti.previous here!
-                    Matrix4f interpolated = interpolate(ti.previous(), ti.current(), pt);
-
-                    // 3. Apply to the rendering instance
-                    ti.instance().setTransform(interpolated);
-                    ti.instance().setChanged();
-                }
-            }
-        }
     }
 
     public void dirtyTransforms() {

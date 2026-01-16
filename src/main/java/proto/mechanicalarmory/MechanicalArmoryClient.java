@@ -4,6 +4,7 @@ import com.google.common.base.Stopwatch;
 import de.javagl.jgltf.model.GltfModel;
 import de.javagl.jgltf.model.io.GltfModelReader;
 import dev.engine_room.flywheel.api.visualization.VisualizerRegistry;
+import dev.engine_room.flywheel.impl.visual.BandedPrimeLimiter;
 import dev.engine_room.flywheel.lib.model.part.ModelTree;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
@@ -43,9 +44,7 @@ import static proto.mechanicalarmory.MechanicalArmory.MODID;
 public class MechanicalArmoryClient {
     public static ModelResourceLocation arm = ModelResourceLocation.standalone(ResourceLocation.fromNamespaceAndPath(MODID, "models/fullarm.glb"));
     public static ModelTree gltfFlywheelModelTree;
-
-    private static boolean worldTickJustFinished;
-    public  static boolean firstFrameOfTick;
+    public static BandedPrimeLimiter limiter = new BandedPrimeLimiter();
 
     public MechanicalArmoryClient(ModContainer container) {
         // Allows NeoForge to create a config screen for this mod's configs.
@@ -82,22 +81,7 @@ public class MechanicalArmoryClient {
 
     @SubscribeEvent
     public static void onRenderFrame(RenderFrameEvent.Pre event) {
-        if (worldTickJustFinished) {
-            firstFrameOfTick = true;
-            worldTickJustFinished = false; // Reset the flag
-        }
-    }
-
-    @SubscribeEvent
-    public static void onRenderFrame(RenderFrameEvent.Post event) {
-        firstFrameOfTick = false;
-    }
-
-    @SubscribeEvent
-    public static void onClientTickPost(LevelTickEvent.Post event) {
-        if (event.getLevel() instanceof ClientLevel) {
-            worldTickJustFinished = true;
-        }
+        limiter.tick();
     }
 
     public static GltfModel loadglTFModel(ModelResourceLocation modelResourceLocation) {

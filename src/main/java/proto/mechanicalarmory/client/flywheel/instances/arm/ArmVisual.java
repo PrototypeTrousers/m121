@@ -139,6 +139,11 @@ public class ArmVisual extends AbstractBlockEntityVisual<ArmEntity> implements D
                         return;
                     }
 
+                    if (doDistanceLimitThisFrame(context)){
+                        return;
+                    }
+
+
                     ItemStack holdingItem = blockEntity.getItemStack();
 
                     CapturedModel capturedModel = modelCache.get(holdingItem);

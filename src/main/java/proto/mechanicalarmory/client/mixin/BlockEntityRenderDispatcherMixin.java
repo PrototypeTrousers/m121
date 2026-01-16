@@ -42,7 +42,7 @@ public class BlockEntityRenderDispatcherMixin {
             psv.last().pose().set(poseStack.last().pose());
             blockEntityVisual.setBufferSource(bufferSource);
             renderer.render(blockEntity,
-                    psv.isRendered() ? 1f : partialTick,
+                    partialTick,
                     blockEntityVisual.extendedRecyclingPoseStack,
                     bufferSource,
                     15728880,
@@ -69,7 +69,7 @@ public class BlockEntityRenderDispatcherMixin {
                         if (!visual.extendedRecyclingPoseStack.isRendered()) {
                             return true;
                         }
-                        return MechanicalArmoryClient.firstFrameOfTick;
+                        return MechanicalArmoryClient.limiter.shouldUpdate((blockEntity.getBlockPos().distToCenterSqr(cameraPos)));
                     }
                 }
             }

@@ -45,9 +45,6 @@ public class EntityRenderDispatcherMixin {
                     entityVisual.getVisualPosition().y(),
                     entityVisual.getVisualPosition().z());
             psv.setDepth(0);
-            if (psv.isRendered()) {
-                args.set(2, 1f);
-            }
             PoseStack poseStack = args.get(3);
             psv.last().pose().set(poseStack.last().pose());
             args.set(3, psv);
@@ -74,9 +71,9 @@ public class EntityRenderDispatcherMixin {
     }
 
     @WrapOperation(method = "shouldRender", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/entity/EntityRenderer;shouldRender(Lnet/minecraft/world/entity/Entity;Lnet/minecraft/client/renderer/culling/Frustum;DDD)Z"))
-    boolean should(EntityRenderer<?> instance, Entity leashable, Frustum aabb, double v, double livingEntity, double camera, Operation<Boolean> original) {
+    boolean should(EntityRenderer<?> instance, Entity leashable, Frustum aabb, double camX, double camY, double camZ, Operation<Boolean> original) {
         entityVisual = null;
-        boolean should = original.call(instance, leashable, aabb, v, livingEntity, camera);
+        boolean should = original.call(instance, leashable, aabb, camX, camY, camZ);
         if (should && BackendManagerImpl.isBackendOn()) {
             if (VisualizationHelper.canVisualize(leashable)) {
                 VisualizationManagerImpl man = VisualizationManagerImpl.get(leashable.level());
@@ -87,7 +84,7 @@ public class EntityRenderDispatcherMixin {
                         if (!entityVisual.getPoseStackVisual().isRendered()) {
                             return true;
                         }
-                        return MechanicalArmoryClient.firstFrameOfTick;
+                        return MechanicalArmoryClient.limiter.shouldUpdate((leashable.position().distanceToSqr(camX, camY, camZ)));
                     }
                 }
             }
