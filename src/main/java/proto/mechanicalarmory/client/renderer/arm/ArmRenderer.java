@@ -68,7 +68,7 @@ public class ArmRenderer implements BlockEntityRenderer<ArmEntity> {
                             false,
                             RenderType.CompositeState.builder()
                                     .setLightmapState(LIGHTMAP)
-                                    .setShaderState(RENDERTYPE_ENTITY_CUTOUT_SHADER)
+                                    .setShaderState(RENDERTYPE_SOLID_SHADER)
                                     .setTextureState(new TextureStateShard(configuredMesh.material().texture(), false, false))
                                     .createCompositeState(true));
 
@@ -152,18 +152,38 @@ public class ArmRenderer implements BlockEntityRenderer<ArmEntity> {
         public void normalZ(int index, float normalZ) {
             this.nz = normalZ;
 
-            // This is the "Commit" point.
-            // We assume normalZ is the final call for any given index.
-
+            // 1. Transform Position and Normal as you already do
             Vector3f transformPosition = poseStack.last().pose().transformPosition(x, y, z, new Vector3f());
             Vector3f transformNormal = poseStack.last().transformNormal(nx, ny, nz, new Vector3f());
 
+            // 2. Define Light Directions
+            Vector3f lightWest = new Vector3f(0.2F, 1.0F, -0.7F);
+            Vector3f lightEast = new Vector3f(-0.2F, 1.0F, 0.7F);
+
+            // 3. Calculate Diffusion (Dot Product)
+            // We use max(0, dot) to ensure surfaces facing away from the light are dark
+            float dotWest = Math.max(0.0f, transformNormal.dot(lightWest));
+            float dotEast = Math.max(0.0f, transformNormal.dot(lightEast));
+
+            // 4. Combine and apply to color
+            // You can adjust '0.5f' to change the intensity of these specific lights
+            float diffuse = (dotWest + dotEast) * 0.6f;
+
+            // Ambient light: prevent the model from being pitch black in shadows
+            float ambient = 0.4f;
+            float totalLight = Math.min(1.0f, diffuse + ambient);
+
+            // Apply the light to the existing vertex colors (r, g, b)
+            float finalR = r * totalLight;
+            float finalG = g * totalLight;
+            float finalB = b * totalLight;
+
             consumer.addVertex(transformPosition.x, transformPosition.y, transformPosition.z)
-            .setColor(r, g, b, a)
-            .setUv(u, v)
-            .setOverlay(overlay)
-            .setLight(light)
-            .setNormal(transformNormal.x, transformNormal.y, transformNormal.z);
+                    .setColor(finalR, finalG, finalB, a) // Multiplied by our custom diffusion
+                    .setUv(u, v)
+                    .setOverlay(overlay)
+                    .setLight(light) // Keep the environment's packedLight for vanilla lightmap compatibility
+                    .setNormal(transformNormal.x, transformNormal.y, transformNormal.z);
         }
 
         @Override
