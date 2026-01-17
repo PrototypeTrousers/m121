@@ -7,7 +7,6 @@ import dev.engine_room.flywheel.api.visualization.VisualizerRegistry;
 import dev.engine_room.flywheel.impl.visual.BandedPrimeLimiter;
 import dev.engine_room.flywheel.lib.model.part.ModelTree;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.resources.model.ModelResourceLocation;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
@@ -20,15 +19,16 @@ import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.event.lifecycle.FMLClientSetupEvent;
+import net.neoforged.neoforge.client.event.EntityRenderersEvent;
 import net.neoforged.neoforge.client.event.ModelEvent;
 import net.neoforged.neoforge.client.event.RenderFrameEvent;
 import net.neoforged.neoforge.client.gui.ConfigurationScreen;
 import net.neoforged.neoforge.client.gui.IConfigScreenFactory;
-import net.neoforged.neoforge.event.tick.LevelTickEvent;
 import proto.mechanicalarmory.client.flywheel.gltf.GltfFlywheelModelTree;
 import proto.mechanicalarmory.client.flywheel.instances.arm.ArmVisualiser;
 import proto.mechanicalarmory.client.flywheel.instances.generic.VanillaBlockVisualiser;
 import proto.mechanicalarmory.client.flywheel.instances.generic.VanillaEntityVisualiser;
+import proto.mechanicalarmory.client.renderer.arm.ArmRenderer;
 import proto.mechanicalarmory.common.entities.MAEntities;
 
 import java.io.BufferedInputStream;
@@ -71,6 +71,14 @@ public class MechanicalArmoryClient {
         // Some client setup code
         MechanicalArmory.LOGGER.info("HELLO FROM CLIENT SETUP");
         MechanicalArmory.LOGGER.info("MINECRAFT NAME >> {}", Minecraft.getInstance().getUser().getName());
+    }
+
+    @SubscribeEvent // on the mod event bus only on the physical client
+    public static void registerEntityRenderers(EntityRenderersEvent.RegisterRenderers event) {
+        event.registerBlockEntityRenderer(MAEntities.ARM_ENTITY.get(),
+                // Pass the context to an empty (default) constructor call
+                ArmRenderer::new
+        );
     }
 
     @SubscribeEvent // on the mod event bus only on the physical client

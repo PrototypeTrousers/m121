@@ -25,7 +25,7 @@ import static proto.mechanicalarmory.MechanicalArmory.MODID;
 
 public class GltfFlywheelModel implements Model {
     List<ConfiguredMesh> meshes = new ArrayList<>();
-    NativeImage embeddedTexture;
+    public NativeImage embeddedTexture;
     Vector4fc boundingSphere;
     public GltfFlywheelModel(NodeModel nm, MeshPrimitiveModel meshPrimitiveModel) {
         if (meshPrimitiveModel == null) {

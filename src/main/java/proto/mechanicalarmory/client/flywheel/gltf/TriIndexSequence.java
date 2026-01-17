@@ -23,4 +23,8 @@ public final class TriIndexSequence implements IndexSequence {
 			MemoryUtil.memPutInt(ptr + i * 4L, sb.get(i));
 		}
 	}
+
+	public ByteBuffer getBinary() {
+		return binary;
+	}
 }

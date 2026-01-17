@@ -108,6 +108,10 @@ public class GltfMesh implements Mesh {
         this.vertexList.writeAll(vertexList);
     }
 
+    public VertexList getVertexList() {
+        return vertexList;
+    }
+
     @Override
     public IndexSequence indexSequence() {
         return indices;
