@@ -11,7 +11,6 @@ import dev.engine_room.flywheel.lib.model.part.ModelTree;
 import net.minecraft.client.renderer.LevelRenderer;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.RenderType;
-import net.minecraft.client.renderer.block.ModelBlockRenderer;
 import net.minecraft.client.renderer.blockentity.BlockEntityRenderer;
 import net.minecraft.client.renderer.blockentity.BlockEntityRendererProvider;
 import net.minecraft.world.phys.Vec3;
@@ -61,14 +60,14 @@ public class ArmRenderer implements BlockEntityRenderer<ArmEntity> {
 
                     RenderType r = RenderType.create(
                             "arm",
-                            DefaultVertexFormat.BLOCK,
+                            DefaultVertexFormat.NEW_ENTITY,
                             VertexFormat.Mode.TRIANGLES,
                             512,
                             true,
                             false,
                             RenderType.CompositeState.builder()
                                     .setLightmapState(LIGHTMAP)
-                                    .setShaderState(RENDERTYPE_SOLID_SHADER)
+                                    .setShaderState(RENDERTYPE_ENTITY_CUTOUT_SHADER)
                                     .setTextureState(new TextureStateShard(configuredMesh.material().texture(), false, false))
                                     .createCompositeState(true));
 
@@ -156,30 +155,8 @@ public class ArmRenderer implements BlockEntityRenderer<ArmEntity> {
             Vector3f transformPosition = poseStack.last().pose().transformPosition(x, y, z, new Vector3f());
             Vector3f transformNormal = poseStack.last().transformNormal(nx, ny, nz, new Vector3f());
 
-            // 2. Define Light Directions
-            Vector3f lightWest = new Vector3f(0.2F, 1.0F, -0.7F);
-            Vector3f lightEast = new Vector3f(-0.2F, 1.0F, 0.7F);
-
-            // 3. Calculate Diffusion (Dot Product)
-            // We use max(0, dot) to ensure surfaces facing away from the light are dark
-            float dotWest = Math.max(0.0f, transformNormal.dot(lightWest));
-            float dotEast = Math.max(0.0f, transformNormal.dot(lightEast));
-
-            // 4. Combine and apply to color
-            // You can adjust '0.5f' to change the intensity of these specific lights
-            float diffuse = (dotWest + dotEast) * 0.6f;
-
-            // Ambient light: prevent the model from being pitch black in shadows
-            float ambient = 0.4f;
-            float totalLight = Math.min(1.0f, diffuse + ambient);
-
-            // Apply the light to the existing vertex colors (r, g, b)
-            float finalR = r * totalLight;
-            float finalG = g * totalLight;
-            float finalB = b * totalLight;
-
             consumer.addVertex(transformPosition.x, transformPosition.y, transformPosition.z)
-                    .setColor(finalR, finalG, finalB, a) // Multiplied by our custom diffusion
+                    .setColor(r, g, b, a) // Multiplied by our custom diffusion
                     .setUv(u, v)
                     .setOverlay(overlay)
                     .setLight(light) // Keep the environment's packedLight for vanilla lightmap compatibility
