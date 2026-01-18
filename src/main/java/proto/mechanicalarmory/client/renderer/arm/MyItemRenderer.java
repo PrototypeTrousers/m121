@@ -4,44 +4,46 @@ import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.mojang.blaze3d.vertex.VertexFormat;
-import dev.engine_room.flywheel.api.material.Material;
 import dev.engine_room.flywheel.api.vertex.VertexList;
 import dev.engine_room.flywheel.lib.model.part.ModelTree;
-import net.minecraft.client.renderer.LevelRenderer;
-import net.minecraft.client.renderer.MultiBufferSource;
-import net.minecraft.client.renderer.RenderType;
-import net.minecraft.client.renderer.blockentity.BlockEntityRenderer;
-import net.minecraft.client.renderer.blockentity.BlockEntityRendererProvider;
-import net.minecraft.world.phys.Vec3;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.renderer.*;
+import net.minecraft.world.item.ItemDisplayContext;
+import net.minecraft.world.item.ItemStack;
 import org.joml.Quaternionf;
 import proto.mechanicalarmory.MechanicalArmoryClient;
 import proto.mechanicalarmory.client.flywheel.gltf.GltfFlywheelModel;
 import proto.mechanicalarmory.client.flywheel.gltf.GltfMesh;
 import proto.mechanicalarmory.client.flywheel.gltf.TriIndexSequence;
 import proto.mechanicalarmory.client.renderer.util.VertexConsumerMutableWrapper;
-import proto.mechanicalarmory.common.entities.block.ArmEntity;
 
 import java.nio.ByteBuffer;
 
-import static net.minecraft.client.renderer.RenderStateShard.*;
+import static net.minecraft.client.renderer.RenderStateShard.LIGHTMAP;
+import static net.minecraft.client.renderer.RenderStateShard.RENDERTYPE_ENTITY_CUTOUT_SHADER;
 
-public class ArmRenderer implements BlockEntityRenderer<ArmEntity> {
+public class MyItemRenderer extends BlockEntityWithoutLevelRenderer {
 
+    public static final MyItemRenderer INSTANCE = new MyItemRenderer();
     ModelTree modelTree = MechanicalArmoryClient.gltfFlywheelModelTree;
     public static RenderType r;
 
-    public ArmRenderer(BlockEntityRendererProvider.Context context) {
+
+
+    public MyItemRenderer() {
+        super(Minecraft.getInstance().getBlockEntityRenderDispatcher(),
+              Minecraft.getInstance().getEntityModels());
     }
 
     @Override
-    public void render(ArmEntity blockEntity, float partialTick, PoseStack poseStack, MultiBufferSource bufferSource, int packedLight, int packedOverlay) {
-        renderModelRecursive(modelTree, blockEntity, poseStack, bufferSource, packedLight, packedOverlay);
+    public void renderByItem(ItemStack stack, ItemDisplayContext transform, PoseStack poseStack, MultiBufferSource bufferSource, int packedLight, int packedOverlay) {
+        renderModelRecursive(modelTree, poseStack, bufferSource, packedLight, packedOverlay);
+
     }
 
-    public void renderModelRecursive(ModelTree node, ArmEntity blockEntity, PoseStack poseStack, MultiBufferSource bufferSource, int packedLight, int packedOverlay) {
+    public void renderModelRecursive(ModelTree node, PoseStack poseStack, MultiBufferSource bufferSource, int packedLight, int packedOverlay) {
         poseStack.pushPose();
-        final int packedLight2 = LevelRenderer.getLightColor(blockEntity.getLevel(), blockEntity.getBlockPos().above());
-        int six = 21;
+
 
         // 1. Apply local transformations
         // Assuming mt.initialPose() provides the local offset/rotation for this node
@@ -67,13 +69,13 @@ public class ArmRenderer implements BlockEntityRenderer<ArmEntity> {
                                 RenderType.CompositeState.builder()
                                         .setLightmapState(LIGHTMAP)
                                         .setShaderState(RENDERTYPE_ENTITY_CUTOUT_SHADER)
-                                        .setTextureState(new TextureStateShard(configuredMesh.material().texture(), false, false))
+                                        .setTextureState(new RenderStateShard.TextureStateShard(configuredMesh.material().texture(), false, false))
                                         .createCompositeState(true));
                     }
 
                     VertexConsumer consumer = bufferSource.getBuffer(r);
                     VertexConsumerMutableWrapper wrapper = new VertexConsumerMutableWrapper(
-                            poseStack, consumer, gltfMesh.vertexCount(), packedLight2, packedOverlay
+                            poseStack, consumer, gltfMesh.vertexCount(), packedLight, packedOverlay
                     );
 
                     VertexList v = gltfMesh.getVertexList();
@@ -92,21 +94,10 @@ public class ArmRenderer implements BlockEntityRenderer<ArmEntity> {
         for (int i = 0; i < node.childCount(); i++) {
             poseStack.pushPose();
             poseStack.mulPose(new Quaternionf(0.1, 0, 0, 1));
-            renderModelRecursive(node.child(i), blockEntity, poseStack, bufferSource, packedLight2, packedOverlay);
+            renderModelRecursive(node.child(i), poseStack, bufferSource, packedLight, packedOverlay);
             poseStack.popPose();
         }
 
         poseStack.popPose();
     }
-
-    @Override
-    public boolean shouldRender(ArmEntity blockEntity, Vec3 cameraPos) {
-        return true;
-    }
-
-    @Override
-    public boolean shouldRenderOffScreen(ArmEntity blockEntity) {
-        return true;
-    }
-
 }

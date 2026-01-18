@@ -7,6 +7,7 @@ import dev.engine_room.flywheel.api.visualization.VisualizerRegistry;
 import dev.engine_room.flywheel.impl.visual.BandedPrimeLimiter;
 import dev.engine_room.flywheel.lib.model.part.ModelTree;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.renderer.BlockEntityWithoutLevelRenderer;
 import net.minecraft.client.resources.model.ModelResourceLocation;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
@@ -22,6 +23,8 @@ import net.neoforged.fml.event.lifecycle.FMLClientSetupEvent;
 import net.neoforged.neoforge.client.event.EntityRenderersEvent;
 import net.neoforged.neoforge.client.event.ModelEvent;
 import net.neoforged.neoforge.client.event.RenderFrameEvent;
+import net.neoforged.neoforge.client.extensions.common.IClientItemExtensions;
+import net.neoforged.neoforge.client.extensions.common.RegisterClientExtensionsEvent;
 import net.neoforged.neoforge.client.gui.ConfigurationScreen;
 import net.neoforged.neoforge.client.gui.IConfigScreenFactory;
 import proto.mechanicalarmory.client.flywheel.gltf.GltfFlywheelModelTree;
@@ -29,7 +32,11 @@ import proto.mechanicalarmory.client.flywheel.instances.arm.ArmVisualiser;
 import proto.mechanicalarmory.client.flywheel.instances.generic.VanillaBlockVisualiser;
 import proto.mechanicalarmory.client.flywheel.instances.generic.VanillaEntityVisualiser;
 import proto.mechanicalarmory.client.renderer.arm.ArmRenderer;
+import proto.mechanicalarmory.client.renderer.arm.MyCustomItemBakedModel;
+import proto.mechanicalarmory.client.renderer.arm.MyItemRenderer;
+import proto.mechanicalarmory.common.blocks.MABlocks;
 import proto.mechanicalarmory.common.entities.MAEntities;
+import proto.mechanicalarmory.common.items.MAItems;
 
 import java.io.BufferedInputStream;
 import java.io.IOException;
@@ -43,6 +50,7 @@ import static proto.mechanicalarmory.MechanicalArmory.MODID;
 @EventBusSubscriber(modid = MODID, value = Dist.CLIENT)
 public class MechanicalArmoryClient {
     public static ModelResourceLocation arm = ModelResourceLocation.standalone(ResourceLocation.fromNamespaceAndPath(MODID, "models/fullarm.glb"));
+    public static ModelResourceLocation armItemModel = ModelResourceLocation.standalone(ResourceLocation.fromNamespaceAndPath(MODID, "arm"));
     public static ModelTree gltfFlywheelModelTree;
     public static BandedPrimeLimiter limiter = new BandedPrimeLimiter();
 
@@ -85,6 +93,24 @@ public class MechanicalArmoryClient {
     public static void registerAdditional(ModelEvent.RegisterAdditional event) {
         event.register(arm);
         gltfFlywheelModelTree = GltfFlywheelModelTree.create(loadglTFModel(arm));
+        event.register(armItemModel);
+    }
+
+    @SubscribeEvent
+    public static void onModifyBakingResult(ModelEvent.ModifyBakingResult event) {
+        // We replace whatever Minecraft thinks is there with our custom class
+        event.getModels().put(ModelResourceLocation.inventory(armItemModel.id()), new MyCustomItemBakedModel());
+    }
+
+    @SubscribeEvent
+    public static void onClientExtensions(RegisterClientExtensionsEvent event) {
+        IClientItemExtensions itemExtensions = new IClientItemExtensions() {
+            @Override
+            public BlockEntityWithoutLevelRenderer getCustomRenderer() {
+                return MyItemRenderer.INSTANCE; // Your BEWLR class
+            }
+        };
+        event.registerItem(itemExtensions , MAItems.ARM_ITEM);
     }
 
     @SubscribeEvent
@@ -99,7 +125,6 @@ public class MechanicalArmoryClient {
             Optional<Resource> resource = Minecraft.getInstance().getResourceManager().getResource(modelResourceLocation.id());
             Resource re = resource.orElseThrow(() -> new RuntimeException("Resource not found"));
             g = (new GltfModelReader()).readWithoutReferences(new BufferedInputStream(re.open()));
-            g.getSkinModels();
         } catch (IOException e) {
             e.printStackTrace();
         }
