@@ -7,10 +7,7 @@ import java.util.function.ObjIntConsumer;
 import dev.engine_room.flywheel.lib.model.part.ModelTree;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.Nullable;
-import org.joml.Matrix4f;
-import org.joml.Matrix4fc;
-import org.joml.Quaternionf;
-import org.joml.Vector3fc;
+import org.joml.*;
 
 import com.mojang.blaze3d.vertex.PoseStack;
 
@@ -114,26 +111,6 @@ public final class MyModelTree {
         return child;
     }
 
-    public void traverse(Consumer<? super TransformedInstance> consumer) {
-        for (MyModelTree child : children) {
-            child.traverse(consumer);
-        }
-    }
-
-    @ApiStatus.Experimental
-    public void traverse(int i, ObjIntConsumer<? super TransformedInstance> consumer) {
-        for (MyModelTree child : children) {
-            child.traverse(i, consumer);
-        }
-    }
-
-    @ApiStatus.Experimental
-    public void traverse(int i, int j, ObjIntIntConsumer<? super TransformedInstance> consumer) {
-        for (MyModelTree child : children) {
-            child.traverse(i, j, consumer);
-        }
-    }
-
     public void translateAndRotate(Affine<?> affine, Quaternionf tempQuaternion) {
         affine.translate(x / 16.0F, y / 16.0F, z / 16.0F);
 
@@ -159,6 +136,16 @@ public final class MyModelTree {
 
         if (xScale != ModelPart.DEFAULT_SCALE || yScale != ModelPart.DEFAULT_SCALE || zScale != ModelPart.DEFAULT_SCALE) {
             pose.scale(xScale, yScale, zScale);
+        }
+    }
+
+    public void rotateNormal(Matrix3f normal) {
+        if (xRot != 0.0F || yRot != 0.0F || zRot != 0.0F) {
+            normal.rotateZYX(zRot, yRot, xRot);
+        }
+
+        if (xScale != ModelPart.DEFAULT_SCALE || yScale != ModelPart.DEFAULT_SCALE || zScale != ModelPart.DEFAULT_SCALE) {
+            normal.scale(xScale, yScale, zScale);
         }
     }
 

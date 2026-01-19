@@ -6,8 +6,8 @@ import dev.engine_room.flywheel.api.vertex.MutableVertexList;
 import org.joml.Vector3f;
 
 public class VertexConsumerMutableWrapper implements MutableVertexList {
-    private final VertexConsumer consumer;
-    private final int vertexCount;
+    private VertexConsumer consumer;
+    private int vertexCount;
 
     // Temporary storage for the "current" vertex attributes
     private float x, y, z;
@@ -23,6 +23,30 @@ public class VertexConsumerMutableWrapper implements MutableVertexList {
         this.poseStack = poseStack;
         this.overlay = packedOverlay;
         this.light = packedLight;
+    }
+
+    public VertexConsumerMutableWrapper() {
+
+    }
+
+    public void setPoseStack(PoseStack poseStack) {
+        this.poseStack = poseStack;
+    }
+
+    public void setLight(int light) {
+        this.light = light;
+    }
+
+    public void setOverlay(int overlay) {
+        this.overlay = overlay;
+    }
+
+    public void setConsumer(VertexConsumer consumer) {
+        this.consumer = consumer;
+    }
+
+    public void setVertexCount(int vertexCount) {
+        this.vertexCount = vertexCount;
     }
 
     @Override

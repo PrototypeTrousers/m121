@@ -7,16 +7,13 @@ import com.mojang.blaze3d.vertex.VertexFormat;
 import dev.engine_room.flywheel.api.model.Model;
 import dev.engine_room.flywheel.api.vertex.VertexList;
 import dev.engine_room.flywheel.lib.model.part.ModelTree;
-import net.minecraft.client.renderer.LevelRenderer;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.blockentity.BlockEntityRenderer;
 import net.minecraft.client.renderer.blockentity.BlockEntityRendererProvider;
+import net.minecraft.util.Mth;
 import net.minecraft.world.phys.Vec3;
-import org.joml.Matrix4f;
-import org.joml.Quaternionf;
 import proto.mechanicalarmory.MechanicalArmoryClient;
-import proto.mechanicalarmory.client.flywheel.gltf.GltfFlywheelModel;
 import proto.mechanicalarmory.client.flywheel.gltf.GltfMesh;
 import proto.mechanicalarmory.client.flywheel.gltf.TriIndexSequence;
 import proto.mechanicalarmory.client.renderer.util.VertexConsumerMutableWrapper;
@@ -32,6 +29,10 @@ public class ArmRenderer implements BlockEntityRenderer<ArmEntity> {
     MyModelTree armTree = MyModelTree.create(modelTree);
     MyModelTree baseMotor = armTree.child("BaseMotor");
     MyModelTree firstArmTree = baseMotor.child("FirstArm");
+    MyModelTree secondArmTree = firstArmTree.child("SecondArm");
+
+    VertexConsumerMutableWrapper wrapper = new VertexConsumerMutableWrapper();
+
     public static RenderType r;
 
     public ArmRenderer(BlockEntityRendererProvider.Context context) {
@@ -41,7 +42,11 @@ public class ArmRenderer implements BlockEntityRenderer<ArmEntity> {
     public void render(ArmEntity blockEntity, float partialTick, PoseStack poseStack, MultiBufferSource bufferSource, int packedLight, int packedOverlay) {
         packedLight = 15728880;
         firstArmTree.resetPose();
-        firstArmTree.rotation((float) (Math.PI/4), 0, 0);
+        firstArmTree.xRot(Mth.lerp(partialTick, blockEntity.getAnimationRotation(0)[0], blockEntity.getRotation(0)[0]));
+        firstArmTree.yRot(Mth.lerp(partialTick, blockEntity.getAnimationRotation(0)[1], blockEntity.getRotation(0)[1]));
+
+        secondArmTree.xRot(Mth.lerp(partialTick, blockEntity.getAnimationRotation(1)[0], blockEntity.getRotation(1)[0]));
+
         poseStack.pushPose();
         poseStack.translate(0.5f, 0, 0.5f);
         renderModelRecursive(armTree, blockEntity, poseStack, bufferSource, packedLight, packedOverlay);
@@ -54,6 +59,7 @@ public class ArmRenderer implements BlockEntityRenderer<ArmEntity> {
         Model model = mt.model();
         poseStack.pushPose();
         modelTree.translateAndRotate(poseStack.last().pose());
+        modelTree.rotateNormal(poseStack.last().normal());
         if (model != null) {
             model.meshes().forEach(configuredMesh -> {
                 if (configuredMesh.mesh() instanceof GltfMesh gltfMesh) {
@@ -73,9 +79,11 @@ public class ArmRenderer implements BlockEntityRenderer<ArmEntity> {
                     }
 
                     VertexConsumer consumer = bufferSource.getBuffer(r);
-                    VertexConsumerMutableWrapper wrapper = new VertexConsumerMutableWrapper(
-                            poseStack, consumer, gltfMesh.vertexCount(), packedLight, packedOverlay
-                    );
+                    wrapper.setConsumer(consumer);
+                    wrapper.setPoseStack(poseStack);
+                    wrapper.setLight(packedLight);
+                    wrapper.setOverlay(packedOverlay);
+                    wrapper.setVertexCount(gltfMesh.vertexCount());
 
                     VertexList v = gltfMesh.getVertexList();
                     ByteBuffer elementBuffer = ((TriIndexSequence) gltfMesh.indexSequence()).getBinary();
@@ -84,6 +92,7 @@ public class ArmRenderer implements BlockEntityRenderer<ArmEntity> {
                         int vIndex = elementBuffer.getShort(i * 2) & 0xFFFF;
                         v.write(wrapper, vIndex, i);
                     }
+                    wrapper.setConsumer(null);
 
                 }
             });
