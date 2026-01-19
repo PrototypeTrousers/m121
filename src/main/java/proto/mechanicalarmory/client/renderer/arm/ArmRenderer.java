@@ -4,7 +4,7 @@ import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.mojang.blaze3d.vertex.VertexFormat;
-import dev.engine_room.flywheel.api.material.Material;
+import dev.engine_room.flywheel.api.model.Model;
 import dev.engine_room.flywheel.api.vertex.VertexList;
 import dev.engine_room.flywheel.lib.model.part.ModelTree;
 import net.minecraft.client.renderer.LevelRenderer;
@@ -13,6 +13,7 @@ import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.blockentity.BlockEntityRenderer;
 import net.minecraft.client.renderer.blockentity.BlockEntityRendererProvider;
 import net.minecraft.world.phys.Vec3;
+import org.joml.Matrix4f;
 import org.joml.Quaternionf;
 import proto.mechanicalarmory.MechanicalArmoryClient;
 import proto.mechanicalarmory.client.flywheel.gltf.GltfFlywheelModel;
@@ -28,6 +29,9 @@ import static net.minecraft.client.renderer.RenderStateShard.*;
 public class ArmRenderer implements BlockEntityRenderer<ArmEntity> {
 
     ModelTree modelTree = MechanicalArmoryClient.gltfFlywheelModelTree;
+    MyModelTree armTree = MyModelTree.create(modelTree);
+    MyModelTree baseMotor = armTree.child("BaseMotor");
+    MyModelTree firstArmTree = baseMotor.child("FirstArm");
     public static RenderType r;
 
     public ArmRenderer(BlockEntityRendererProvider.Context context) {
@@ -35,24 +39,21 @@ public class ArmRenderer implements BlockEntityRenderer<ArmEntity> {
 
     @Override
     public void render(ArmEntity blockEntity, float partialTick, PoseStack poseStack, MultiBufferSource bufferSource, int packedLight, int packedOverlay) {
-        renderModelRecursive(modelTree, blockEntity, poseStack, bufferSource, packedLight, packedOverlay);
+        packedLight = 15728880;
+        firstArmTree.resetPose();
+        firstArmTree.rotation((float) (Math.PI/4), 0, 0);
+        poseStack.pushPose();
+        poseStack.translate(0.5f, 0, 0.5f);
+        renderModelRecursive(armTree, blockEntity, poseStack, bufferSource, packedLight, packedOverlay);
+        poseStack.popPose();
+
     }
 
-    public void renderModelRecursive(ModelTree node, ArmEntity blockEntity, PoseStack poseStack, MultiBufferSource bufferSource, int packedLight, int packedOverlay) {
+    public void renderModelRecursive(MyModelTree modelTree, ArmEntity blockEntity, PoseStack poseStack, MultiBufferSource bufferSource, int packedLight, int packedOverlay) {
+        ModelTree mt = modelTree.getSource();
+        Model model = mt.model();
         poseStack.pushPose();
-        final int packedLight2 = LevelRenderer.getLightColor(blockEntity.getLevel(), blockEntity.getBlockPos().above());
-        int six = 21;
-
-        // 1. Apply local transformations
-        // Assuming mt.initialPose() provides the local offset/rotation for this node
-        var pose = node.initialPose();
-        poseStack.translate(pose.x/16f, pose.y/16f, pose.z/16f);
-
-        // If your initialPose includes rotation, apply it here:
-        // poseStack.mulPose(pose.rotation());
-
-        // 2. Render meshes attached to this specific node
-        GltfFlywheelModel model = (GltfFlywheelModel) node.model();
+        modelTree.translateAndRotate(poseStack.last().pose());
         if (model != null) {
             model.meshes().forEach(configuredMesh -> {
                 if (configuredMesh.mesh() instanceof GltfMesh gltfMesh) {
@@ -73,7 +74,7 @@ public class ArmRenderer implements BlockEntityRenderer<ArmEntity> {
 
                     VertexConsumer consumer = bufferSource.getBuffer(r);
                     VertexConsumerMutableWrapper wrapper = new VertexConsumerMutableWrapper(
-                            poseStack, consumer, gltfMesh.vertexCount(), packedLight2, packedOverlay
+                            poseStack, consumer, gltfMesh.vertexCount(), packedLight, packedOverlay
                     );
 
                     VertexList v = gltfMesh.getVertexList();
@@ -89,14 +90,11 @@ public class ArmRenderer implements BlockEntityRenderer<ArmEntity> {
         }
 
         // 3. Recurse into children
-        for (int i = 0; i < node.childCount(); i++) {
-            poseStack.pushPose();
-            poseStack.mulPose(new Quaternionf(0.1, 0, 0, 1));
-            renderModelRecursive(node.child(i), blockEntity, poseStack, bufferSource, packedLight2, packedOverlay);
-            poseStack.popPose();
+        for (int i = 0; i < modelTree.childCount(); i++) {
+            renderModelRecursive(modelTree.child(i), blockEntity, poseStack, bufferSource, packedLight, packedOverlay);
         }
-
         poseStack.popPose();
+
     }
 
     @Override
@@ -108,5 +106,4 @@ public class ArmRenderer implements BlockEntityRenderer<ArmEntity> {
     public boolean shouldRenderOffScreen(ArmEntity blockEntity) {
         return true;
     }
-
 }
