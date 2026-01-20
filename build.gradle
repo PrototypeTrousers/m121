@@ -71,7 +71,7 @@ runs {
         systemProperty 'forge.logging.console.level', 'debug'
 
         modSource project.sourceSets.main
-        jvmArguments.add("-XX:+AllowEnhancedClassRedefinition")
+        //jvmArguments.add("-XX:+AllowEnhancedClassRedefinition")
     }
 
     client {

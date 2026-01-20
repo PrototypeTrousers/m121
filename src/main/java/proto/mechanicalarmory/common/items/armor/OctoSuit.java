@@ -33,7 +33,7 @@ public class OctoSuit extends ArmorItem {
     private static final Map<Entity, OctoSuitEffect> EFFECT_CACHE = new WeakHashMap<>();
 
     public static OctoSuitEffect getEffect(Entity entity, LevelAccessor l) {
-        return EFFECT_CACHE.computeIfAbsent(entity, e -> new OctoSuitEffect(l));
+        return EFFECT_CACHE.computeIfAbsent(entity, e -> new OctoSuitEffect(l, e));
     }
 
     public static final DeferredItem<ArmorItem> MY_CHESTPLATE = ITEMS.registerItem("my_chestplate",
