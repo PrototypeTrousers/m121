@@ -13,6 +13,7 @@ import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.packs.resources.Resource;
 import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.player.Player;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.EventPriority;
 import net.neoforged.bus.api.SubscribeEvent;
@@ -51,6 +52,7 @@ import static proto.mechanicalarmory.MechanicalArmory.MODID;
 public class MechanicalArmoryClient {
     public static ModelResourceLocation arm = ModelResourceLocation.standalone(ResourceLocation.fromNamespaceAndPath(MODID, "models/fullarm.glb"));
     public static ModelResourceLocation armItemModel = ModelResourceLocation.standalone(ResourceLocation.fromNamespaceAndPath(MODID, "arm"));
+    public static ModelResourceLocation chestplateItemModel = ModelResourceLocation.standalone(ResourceLocation.fromNamespaceAndPath(MODID, "my_chestplate"));
     public static ModelTree gltfFlywheelModelTree;
     public static BandedPrimeLimiter limiter = new BandedPrimeLimiter();
 
@@ -100,6 +102,7 @@ public class MechanicalArmoryClient {
     public static void onModifyBakingResult(ModelEvent.ModifyBakingResult event) {
         // We replace whatever Minecraft thinks is there with our custom class
         event.getModels().put(ModelResourceLocation.inventory(armItemModel.id()), new MyCustomItemBakedModel());
+        event.getModels().put(ModelResourceLocation.inventory(chestplateItemModel.id()), new MyCustomItemBakedModel());
     }
 
     @SubscribeEvent

@@ -24,6 +24,8 @@ import org.slf4j.Logger;
 import proto.mechanicalarmory.common.blocks.MABlocks;
 import proto.mechanicalarmory.common.entities.MAEntities;
 import proto.mechanicalarmory.common.items.MAItems;
+import proto.mechanicalarmory.common.items.armor.ArmorMaterials;
+import proto.mechanicalarmory.common.items.armor.OctoSuit;
 
 // The value here should match an entry in the META-INF/neoforge.mods.toml file
 @Mod(MechanicalArmory.MODID)
@@ -49,6 +51,8 @@ public class MechanicalArmory {
         MABlocks.BLOCKS.register(modEventBus);
         // Register the Deferred Register to the mod event bus so items get registered
         MAItems.ITEMS.register(modEventBus);
+        ArmorMaterials.ARMOR_MATERIALS.register(modEventBus);
+        OctoSuit.init();
 
         MAEntities.BLOCK_ENTITY_TYPES.register(modEventBus);
         // Register the Deferred Register to the mod event bus so tabs get registered
