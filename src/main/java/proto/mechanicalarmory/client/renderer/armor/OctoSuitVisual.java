@@ -75,15 +75,18 @@ public class OctoSuitVisual implements EffectVisual<OctoSuitEffect>, SimpleDynam
                     .setChanged();
         });
 
-        solveFABRIK(instanceTree.child("RightArm"), new Vector3f(4,4,7), 32 , 0.001f);
-        instanceTree.updateInstancesStatic(pose);
-
+        solveFABRIKDirect(instanceTree.child("RightArm"), new Vector3f(
+                4 * (float) Math.sin(System.currentTimeMillis() / 100d) + 3,
+                4 * (float) Math.sin(System.currentTimeMillis() / 100d),
+                7), 32 , 0.001f);
     }
 
     private static final Vector3f BONE_AXIS = new Vector3f(0, 1, 0);
 
-    public void solveFABRIK(InstanceTree2 root, Vector3f targetPos, int iterations, float tolerance) {
-        // 1. Gather the chain
+
+
+    public void solveFABRIKDirect(InstanceTree2 root, Vector3f targetPos, int iterations, float tolerance) {
+        // --- 1. Gather Chain (Same as before) ---
         List<InstanceTree2> chain = new ArrayList<>();
         InstanceTree2 current = root;
         while (current != null) {
@@ -92,23 +95,20 @@ public class OctoSuitVisual implements EffectVisual<OctoSuitEffect>, SimpleDynam
             String nextName = "RightArm.0" + (nextId < 10 ? "0" + nextId : nextId);
             current = current.child(nextName);
         }
-
         if (chain.size() < 2) return;
 
-        // 2. Extract World Positions & Lengths
+        // --- 2. Extract World Positions (Same as before) ---
         Vector3f[] joints = new Vector3f[chain.size()];
         float[] lengths = new float[chain.size() - 1];
 
         for (int i = 0; i < chain.size(); i++) {
             joints[i] = new Vector3f();
-            // This gets the absolute world position of the joint
+            // Get the current render-space position
             chain.get(i).getPoseMatrix().getTranslation(joints[i]);
-            if (i > 0) {
-                lengths[i - 1] = joints[i].distance(joints[i - 1]);
-            }
+            if (i > 0) lengths[i - 1] = joints[i].distance(joints[i - 1]);
         }
 
-        // Root is fixed
+        // --- 3. Run FABRIK Algorithm (Same as before) ---
         Vector3f origin = new Vector3f(joints[0]);
         float totalLen = 0;
         for(float l : lengths) totalLen += l;
@@ -141,51 +141,42 @@ public class OctoSuitVisual implements EffectVisual<OctoSuitEffect>, SimpleDynam
             }
         }
 
-        // 4. Apply Rotations (World -> Local conversion)
-        // We need to track the accumulated world rotation of the parent to figure out local rotation.
-        Quaternionf accumulatedWorldRot = new Quaternionf();
-
-        // If the whole suit is rotated (e.g. by entity body yaw), initialize accumulatedWorldRot with that.
-        // For now, we assume Identity, or extract it from the root's current state if needed.
-        // accumulatedWorldRot.set(initialEntityRotation);
+        // --- 4. DIRECT MATRIX UPDATE (The New Part) ---
+        // We iterate through the chain and manually construct the matrix for each segment.
 
         for (int i = 0; i < chain.size() - 1; i++) {
-            InstanceTree2 segment = chain.get(i);
-            Vector3f currentPos = joints[i];
-            Vector3f nextPos = joints[i + 1];
+            Vector3f start = joints[i];
+            Vector3f end = joints[i+1];
 
-            // A. Calculate the direction we WANT to point in World Space
-            Vector3f targetWorldDir = new Vector3f(nextPos).sub(currentPos).normalize();
+            // A. Calculate Direction
+            Vector3f dir = new Vector3f(end).sub(start).normalize();
 
-            // B. Convert that World Direction into Local Direction relative to parent
-            // We do this by applying the INVERSE of the accumulated parent rotation
-            Vector3f targetLocalDir = new Vector3f(targetWorldDir);
-            Quaternionf invParentRot = new Quaternionf(accumulatedWorldRot).invert();
-            targetLocalDir.rotate(invParentRot);
+            // B. Calculate Rotation
+            // We want to rotate our default BONE_AXIS (0,1,0) to face the 'dir'.
+            // This Quaternion represents the Absolute World Rotation needed.
+            Quaternionf rotation = new Quaternionf().rotationTo(BONE_AXIS, dir);
 
-            // C. Calculate the rotation needed to turn our BONE_AXIS to face targetLocalDir
-            Quaternionf localRot = new Quaternionf().rotationTo(BONE_AXIS, targetLocalDir);
+            // C. Construct the Matrix (Translation * Rotation)
+            // Note: We do NOT include the parent's matrix. We are working in absolute space now.
+            Matrix4f newMatrix = new Matrix4f()
+                    .translate(start)
+                    .rotate(rotation);
 
-            // D. Apply to the visual instance
-            // Assuming InstanceTree2 has a method to set rotation from Quaternion
-            // If it only has Euler (xRot, yRot), we convert:
-            applyQuaternionToInstance(segment, localRot);
-
-            // E. Update the accumulated world rotation for the next child
-            accumulatedWorldRot.mul(localRot);
+            // D. Force-apply to the Instance
+            // You need to access the underlying TransformedInstance here.
+            // Assuming InstanceTree2 has a method to get it, or you can add one.
+            updateInstanceMatrix(chain.get(i), newMatrix);
         }
     }
 
-    private void applyQuaternionToInstance(InstanceTree2 segment, Quaternionf q) {
-        // JOML method to get Euler angles YXZ is common for Minecraft
-        Vector3f euler = new Vector3f();
-        q.getEulerAnglesZYX(euler);
-
-        // Apply (Note: JOML returns radians, Minecraft usually expects radians or degrees depending on method)
-        // Check if your InstanceTree2 expects Radians or Degrees.
-        // Assuming Radians here:
-        segment.yRot(euler.y); // Yaw
-        segment.xRot(euler.x); // Pitch
-        segment.zRot(euler.z); // Roll
+    // Helper to bridge InstanceTree2 and Flywheel Instance
+    private void updateInstanceMatrix(InstanceTree2 treeNode, Matrix4f mat) {
+        for (int child = 0 ; child < treeNode.childCount() ; child++) {
+            TransformedInstance instance = treeNode.child(child).instance();
+            if (instance != null) {
+                instance.setTransform(mat)
+                        .setChanged();
+            }
+        }
     }
 }
