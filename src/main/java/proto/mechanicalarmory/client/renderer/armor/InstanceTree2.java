@@ -1,252 +1,528 @@
 package proto.mechanicalarmory.client.renderer.armor;
 
-import com.mojang.blaze3d.vertex.PoseStack;
-import dev.engine_room.flywheel.api.instance.InstancerProvider;
-import dev.engine_room.flywheel.api.model.Model;
-import dev.engine_room.flywheel.lib.instance.InstanceTypes;
-import dev.engine_room.flywheel.lib.instance.TransformedInstance;
-import dev.engine_room.flywheel.lib.model.part.ModelTree;
-import dev.engine_room.flywheel.lib.transform.Affine;
-import dev.engine_room.flywheel.lib.transform.TransformStack;
-import net.minecraft.client.model.geom.PartPose;
-import org.jetbrains.annotations.ApiStatus;
-import org.jetbrains.annotations.Nullable;
-import org.joml.*;
-
 import java.util.NoSuchElementException;
 import java.util.function.Consumer;
 import java.util.function.ObjIntConsumer;
 
+import dev.engine_room.flywheel.lib.model.part.ModelTree;
+import org.jetbrains.annotations.ApiStatus;
+import org.jetbrains.annotations.Nullable;
+import org.joml.Matrix4f;
+import org.joml.Matrix4fc;
+import org.joml.Quaternionf;
+import org.joml.Vector3fc;
+
+import com.mojang.blaze3d.vertex.PoseStack;
+
+import dev.engine_room.flywheel.api.instance.InstancerProvider;
+import dev.engine_room.flywheel.api.model.Model;
+import dev.engine_room.flywheel.lib.instance.InstanceTypes;
+import dev.engine_room.flywheel.lib.instance.TransformedInstance;
+import dev.engine_room.flywheel.lib.transform.Affine;
+import dev.engine_room.flywheel.lib.transform.TransformStack;
+import net.minecraft.client.model.geom.ModelPart;
+import net.minecraft.client.model.geom.PartPose;
+
 public final class InstanceTree2 {
-    private final ModelTree source;
-    @Nullable
-    private final TransformedInstance instance;
-    private final InstanceTree2[] children;
+	private final ModelTree source;
+	@Nullable
+	private final TransformedInstance instance;
+	private final InstanceTree2[] children;
 
-    private final Matrix4f poseMatrix;
+	public Matrix4f getPoseMatrix() {
+		return poseMatrix;
+	}
 
-    private float x, y, z;
-    private final Quaternionf rotation = new Quaternionf();
-    private float xScale = 1.0f, yScale = 1.0f, zScale = 1.0f;
+	private final Matrix4f poseMatrix;
 
-    private boolean visible = true;
-    private boolean skipDraw = false;
-    private boolean changed;
+	private float x;
+	private float y;
+	private float z;
+	private float xRot;
+	private float yRot;
+	private float zRot;
+	private float xScale;
+	private float yScale;
+	private float zScale;
+	private boolean visible = true;
+	private boolean skipDraw = false;
 
-    private InstanceTree2(ModelTree source, @Nullable TransformedInstance instance, InstanceTree2[] children) {
-        this.source = source;
-        this.instance = instance;
-        this.children = children;
-        this.poseMatrix = (instance != null) ? instance.pose : new Matrix4f();
-        resetPose();
-    }
+	private boolean changed;
 
-    public static InstanceTree2 create(InstancerProvider provider, ModelTree meshTree) {
-        InstanceTree2[] children = new InstanceTree2[meshTree.childCount()];
-        for (int i = 0; i < meshTree.childCount(); i++) {
-            children[i] = create(provider, meshTree.child(i));
-        }
+	private InstanceTree2(ModelTree source, @Nullable TransformedInstance instance, InstanceTree2[] children) {
+		this.source = source;
+		this.instance = instance;
+		this.children = children;
 
-        Model model = meshTree.model();
-        TransformedInstance instance = (model != null)
-                ? provider.instancer(InstanceTypes.TRANSFORMED, model).createInstance()
-                : null;
+		if (instance != null) {
+			poseMatrix = instance.pose;
+		} else {
+			poseMatrix = new Matrix4f();
+		}
 
-        return new InstanceTree2(meshTree, instance, children);
-    }
+		resetPose();
+	}
 
-    // --- Update Methods ---
+	public static InstanceTree2 create(InstancerProvider provider, ModelTree meshTree) {
+		InstanceTree2[] children = new InstanceTree2[meshTree.childCount()];
+		for (int i = 0; i < meshTree.childCount(); i++) {
+			children[i] = create(provider, meshTree.child(i));
+		}
 
-    public void updateInstances(Matrix4fc initialPose) {
-        propagateAnimation(initialPose, true);
-    }
+		Model model = meshTree.model();
+		TransformedInstance instance;
+		if (model != null) {
+			instance = provider.instancer(InstanceTypes.TRANSFORMED, model)
+					.createInstance();
+		} else {
+			instance = null;
+		}
 
-    public void updateInstancesStatic(Matrix4fc initialPose) {
-        propagateAnimation(initialPose, false);
-    }
+		return new InstanceTree2(meshTree, instance, children);
+	}
 
-    // --- Propagation Logic ---
+	@Nullable
+	public TransformedInstance instance() {
+		return instance;
+	}
 
-    public void propagateAnimation(Matrix4fc initialPose, boolean force) {
-        if (!visible) return;
+	public PartPose initialPose() {
+		return source.initialPose();
+	}
 
-        if (changed || force) {
-            poseMatrix.set(initialPose);
-            applyLocalTransform(poseMatrix);
-            force = true;
+	public int childCount() {
+		return children.length;
+	}
 
-            if (instance != null && !skipDraw) {
-                instance.setChanged();
-            }
-        }
+	public InstanceTree2 child(int index) {
+		return children[index];
+	}
 
-        for (InstanceTree2 child : children) {
-            child.propagateAnimation(poseMatrix, force);
-        }
-        changed = false;
-    }
+	public String childName(int index) {
+		return source.childName(index);
+	}
 
-    private void applyLocalTransform(Matrix4f matrix) {
-        matrix.translate(x / 16.0F, y / 16.0F, z / 16.0F);
-        matrix.rotate(rotation);
-        if (xScale != 1.0F || yScale != 1.0F || zScale != 1.0F) {
-            matrix.scale(xScale, yScale, zScale);
-        }
-    }
+	public int childIndex(String name) {
+		return source.childIndex(name);
+	}
 
-    // --- Transform Logic ---
+	public boolean hasChild(String name) {
+		return childIndex(name) >= 0;
+	}
 
-    public void translateAndRotate(Affine<?> affine) {
-        affine.translate(x / 16.0F, y / 16.0F, z / 16.0F);
-        affine.rotate(rotation);
-        if (xScale != 1.0F || yScale != 1.0F || zScale != 1.0F) {
-            affine.scale(xScale, yScale, zScale);
-        }
-    }
+	@Nullable
+	public InstanceTree2 child(String name) {
+		int index = childIndex(name);
 
-    public void translateAndRotate(PoseStack poseStack) {
-        translateAndRotate(TransformStack.of(poseStack));
-    }
+		if (index < 0) {
+			return null;
+		}
 
-    // --- Getters & Setters ---
+		return child(index);
+	}
 
-    public float xPos() { return x; }
-    public void xPos(float x) { this.x = x; setChanged(); }
-    public float yPos() { return y; }
-    public void yPos(float y) { this.y = y; setChanged(); }
-    public float zPos() { return z; }
-    public void zPos(float z) { this.z = z; setChanged(); }
+	public InstanceTree2 childOrThrow(String name) {
+		InstanceTree2 child = child(name);
 
-    public void pos(float x, float y, float z) {
-        this.x = x; this.y = y; this.z = z; setChanged();
-    }
+		if (child == null) {
+			throw new NoSuchElementException("Can't find part " + name);
+		}
 
-    public Quaternionfc rotation() { return rotation; }
-    public void rotation(Quaternionfc rotation) { this.rotation.set(rotation); setChanged(); }
+		return child;
+	}
 
-    /** Sets rotation using Euler angles (Minecraft order: ZYX) */
-    public void rotation(float xRot, float yRot, float zRot) {
-        this.rotation.rotationZYX(zRot, yRot, xRot);
-        setChanged();
-    }
+	public void traverse(Consumer<? super TransformedInstance> consumer) {
+		if (instance != null) {
+			consumer.accept(instance);
+		}
+		for (InstanceTree2 child : children) {
+			child.traverse(consumer);
+		}
+	}
 
-    public float xScale() { return xScale; }
-    public void xScale(float xScale) { this.xScale = xScale; setChanged(); }
-    public float yScale() { return yScale; }
-    public void yScale(float yScale) { this.yScale = yScale; setChanged(); }
-    public float zScale() { return zScale; }
-    public void zScale(float zScale) { this.zScale = zScale; setChanged(); }
+	@ApiStatus.Experimental
+	public void traverse(int i, ObjIntConsumer<? super TransformedInstance> consumer) {
+		if (instance != null) {
+			consumer.accept(instance, i);
+		}
+		for (InstanceTree2 child : children) {
+			child.traverse(i, consumer);
+		}
+	}
 
-    public void scale(float x, float y, float z) {
-        this.xScale = x; this.yScale = y; this.zScale = z; setChanged();
-    }
+	@ApiStatus.Experimental
+	public void traverse(int i, int j, ObjIntIntConsumer<? super TransformedInstance> consumer) {
+		if (instance != null) {
+			consumer.accept(instance, i, j);
+		}
+		for (InstanceTree2 child : children) {
+			child.traverse(i, j, consumer);
+		}
+	}
 
-    public void xRot(float xRot) {
-        this.rotation.rotateX(xRot);
-        setChanged();
-    }
+	public void translateAndRotate(Affine<?> affine, Quaternionf tempQuaternion) {
+		affine.translate(x / 16.0F, y / 16.0F, z / 16.0F);
 
-    public void yRot(float yRot) {
-        this.rotation.rotateY(yRot);
-        setChanged();
-    }
+		if (xRot != 0.0F || yRot != 0.0F || zRot != 0.0F) {
+			affine.rotate(tempQuaternion.rotationZYX(zRot, yRot, xRot));
+		}
 
-    public void zRot(float zRot) {
-        this.rotation.rotateZ(zRot);
-        setChanged();
-    }
+		if (xScale != ModelPart.DEFAULT_SCALE || yScale != ModelPart.DEFAULT_SCALE || zScale != ModelPart.DEFAULT_SCALE) {
+			affine.scale(xScale, yScale, zScale);
+		}
+	}
 
-    // --- Pose Management ---
+	public void translateAndRotate(PoseStack poseStack, Quaternionf tempQuaternion) {
+		translateAndRotate(TransformStack.of(poseStack), tempQuaternion);
+	}
 
-    public void loadPose(PartPose pose) {
-        this.x = pose.x;
-        this.y = pose.y;
-        this.z = pose.z;
-        this.rotation.rotationZYX(pose.zRot, pose.yRot, pose.xRot);
-        this.xScale = 1.0F;
-        this.yScale = 1.0F;
-        this.zScale = 1.0F;
-        setChanged();
-    }
+	public void translateAndRotate(Matrix4f pose) {
+		pose.translate(x / 16.0F, y / 16.0F, z / 16.0F);
 
-    public void resetPose() {
-        loadPose(source.initialPose());
-    }
+		if (xRot != 0.0F || yRot != 0.0F || zRot != 0.0F) {
+			pose.rotateZYX(zRot, yRot, xRot);
+		}
 
-    public void copyTransform(InstanceTree2 tree) {
-        this.x = tree.x;
-        this.y = tree.y;
-        this.z = tree.z;
-        this.rotation.set(tree.rotation);
-        this.xScale = tree.xScale;
-        this.yScale = tree.yScale;
-        this.zScale = tree.zScale;
-        setChanged();
-    }
+		if (xScale != ModelPart.DEFAULT_SCALE || yScale != ModelPart.DEFAULT_SCALE || zScale != ModelPart.DEFAULT_SCALE) {
+			pose.scale(xScale, yScale, zScale);
+		}
+	}
 
-    // --- Utility Methods ---
+	/**
+	 * Update the instances in this tree, assuming initialPose changes.
+	 *
+	 * <p>This is the preferred method for entity visuals, or if you're not sure which you need.
+	 *
+	 * @param initialPose The root transformation matrix.
+	 */
+	public void updateInstances(Matrix4fc initialPose) {
+		propagateAnimation(initialPose, true);
+	}
 
-    public void visible(boolean visible) {
-        this.visible = visible;
-        updateVisible();
-        for (InstanceTree2 child : children) child.visible(visible);
-    }
+	/**
+	 * Update the instances in this tree, assuming initialPose doesn't change between invocations.
+	 *
+	 * <p>This is the preferred method for block entity visuals.
+	 *
+	 * @param initialPose The root transformation matrix.
+	 */
+	public void updateInstancesStatic(Matrix4fc initialPose) {
+		propagateAnimation(initialPose, false);
+	}
 
-    public void skipDraw(boolean skipDraw) {
-        this.skipDraw = skipDraw;
-        updateVisible();
-    }
+	/**
+	 * Propagate pose transformations to this tree and all its children.
+	 *
+	 * @param initialPose The root transformation matrix.
+	 * @param force       Whether to force the update even if this node's transformations haven't changed.
+	 */
+	public void propagateAnimation(Matrix4fc initialPose, boolean force) {
+		if (!visible) {
+			return;
+		}
 
-    private void updateVisible() {
-        if (instance != null) instance.setVisible(visible && !skipDraw);
-    }
+		if (changed || force) {
+			poseMatrix.set(initialPose);
+			translateAndRotate(poseMatrix);
+			force = true;
 
-    @Nullable
-    public TransformedInstance instance() { return instance; }
+			if (instance != null && !skipDraw) {
+				instance.setChanged();
+			}
+		}
 
-    private void setChanged() { this.changed = true; }
+		for (InstanceTree2 child : children) {
+			child.propagateAnimation(poseMatrix, force);
+		}
 
-    public void delete() {
-        if (instance != null) instance.delete();
-        for (InstanceTree2 child : children) child.delete();
-    }
+		changed = false;
+	}
 
-    // --- Traversal Boilerplate ---
+	/**
+	 * Set the visibility of this tree and all its children, recursively.
+	 *
+	 * @param visible Whether to make this tree visible.
+	 */
+	public void visible(boolean visible) {
+		this.visible = visible;
 
-    public void traverse(Consumer<? super TransformedInstance> consumer) {
-        if (instance != null) consumer.accept(instance);
-        for (InstanceTree2 child : children) child.traverse(consumer);
-    }
+		updateVisible();
 
-    @ApiStatus.Experimental
-    public void traverse(int i, ObjIntConsumer<? super TransformedInstance> consumer) {
-        if (instance != null) consumer.accept(instance, i);
-        for (InstanceTree2 child : children) child.traverse(i, consumer);
-    }
+		// I think you'll get weird behavior if you mark a parent invisible and then mark its child visible.
+		// Not sure if there's a good way to solve that, though.
+		for (InstanceTree2 child : children) {
+			child.visible(visible);
+		}
+	}
 
-    @ApiStatus.Experimental
-    public interface ObjIntIntConsumer<T> { void accept(T t, int i, int j); }
+	/**
+	 * Set the visibility of this specific node in the tree.
+	 *
+	 * @param skipDraw Whether this node should skip rendering.
+	 */
+	public void skipDraw(boolean skipDraw) {
+		this.skipDraw = skipDraw;
 
-    @ApiStatus.Experimental
-    public void traverse(int i, int j, ObjIntIntConsumer<? super TransformedInstance> consumer) {
-        if (instance != null) consumer.accept(instance, i, j);
-        for (InstanceTree2 child : children) child.traverse(i, j, consumer);
-    }
+		updateVisible();
+	}
 
-    public int childCount() { return children.length; }
-    public InstanceTree2 child(int index) { return children[index]; }
-    public String childName(int index) { return source.childName(index); }
-    public int childIndex(String name) { return source.childIndex(name); }
+	private void updateVisible() {
+		if (instance != null) {
+			instance.setVisible(visible && !skipDraw);
+		}
+	}
 
-    @Nullable
-    public InstanceTree2 child(String name) {
-        int index = childIndex(name);
-        return index < 0 ? null : child(index);
-    }
+	public boolean visible() {
+		return visible;
+	}
 
-    public InstanceTree2 childOrThrow(String name) {
-        InstanceTree2 child = child(name);
-        if (child == null) throw new NoSuchElementException("Can't find part " + name);
-        return child;
-    }
+	public boolean skipDraw() {
+		return skipDraw;
+	}
+
+	public float xPos() {
+		return x;
+	}
+
+	public float yPos() {
+		return y;
+	}
+
+	public float zPos() {
+		return z;
+	}
+
+	public float xRot() {
+		return xRot;
+	}
+
+	public float yRot() {
+		return yRot;
+	}
+
+	public float zRot() {
+		return zRot;
+	}
+
+	public float xScale() {
+		return xScale;
+	}
+
+	public float yScale() {
+		return yScale;
+	}
+
+	public float zScale() {
+		return zScale;
+	}
+
+	public void xPos(float x) {
+		this.x = x;
+		setChanged();
+	}
+
+	public void yPos(float y) {
+		this.y = y;
+		setChanged();
+	}
+
+	public void zPos(float z) {
+		this.z = z;
+		setChanged();
+	}
+
+	public void pos(float x, float y, float z) {
+		this.x = x;
+		this.y = y;
+		this.z = z;
+		setChanged();
+	}
+
+	public void xRot(float xRot) {
+		this.xRot = xRot;
+		setChanged();
+	}
+
+	public void yRot(float yRot) {
+		this.yRot = yRot;
+		setChanged();
+	}
+
+	public void zRot(float zRot) {
+		this.zRot = zRot;
+		setChanged();
+	}
+
+	public void rotation(float xRot, float yRot, float zRot) {
+		this.xRot = xRot;
+		this.yRot = yRot;
+		this.zRot = zRot;
+		setChanged();
+	}
+
+	public void xScale(float xScale) {
+		this.xScale = xScale;
+		setChanged();
+	}
+
+	public void yScale(float yScale) {
+		this.yScale = yScale;
+		setChanged();
+	}
+
+	public void zScale(float zScale) {
+		this.zScale = zScale;
+		setChanged();
+	}
+
+	public void scale(float xScale, float yScale, float zScale) {
+		this.xScale = xScale;
+		this.yScale = yScale;
+		this.zScale = zScale;
+		setChanged();
+	}
+
+	public void offsetPos(float xOffset, float yOffset, float zOffset) {
+		x += xOffset;
+		y += yOffset;
+		z += zOffset;
+		setChanged();
+	}
+
+	public void offsetXPos(float xOffset) {
+		x += xOffset;
+		setChanged();
+	}
+
+	public void offsetYPos(float yOffset) {
+		y += yOffset;
+		setChanged();
+	}
+
+	public void offsetZPos(float zOffset) {
+		z += zOffset;
+		setChanged();
+	}
+
+	public void offsetPos(Vector3fc offset) {
+		offsetPos(offset.x(), offset.y(), offset.z());
+	}
+
+	public void offsetRotation(float xOffset, float yOffset, float zOffset) {
+		xRot += xOffset;
+		yRot += yOffset;
+		zRot += zOffset;
+		setChanged();
+	}
+
+	public void offsetXRot(float xOffset) {
+		xRot += xOffset;
+		setChanged();
+	}
+
+	public void offsetYRot(float yOffset) {
+		yRot += yOffset;
+		setChanged();
+	}
+
+	public void offsetZRot(float zOffset) {
+		zRot += zOffset;
+		setChanged();
+	}
+
+	public void offsetRotation(Vector3fc offset) {
+		offsetRotation(offset.x(), offset.y(), offset.z());
+	}
+
+	public void offsetScale(float xOffset, float yOffset, float zOffset) {
+		xScale += xOffset;
+		yScale += yOffset;
+		zScale += zOffset;
+		setChanged();
+	}
+
+	public void offsetXScale(float xOffset) {
+		xScale += xOffset;
+		setChanged();
+	}
+
+	public void offsetYScale(float yOffset) {
+		yScale += yOffset;
+		setChanged();
+	}
+
+	public void offsetZScale(float zOffset) {
+		zScale += zOffset;
+		setChanged();
+	}
+
+	public void offsetScale(Vector3fc offset) {
+		offsetScale(offset.x(), offset.y(), offset.z());
+	}
+
+	public PartPose storePose() {
+		return PartPose.offsetAndRotation(x, y, z, xRot, yRot, zRot);
+	}
+
+	public void loadPose(PartPose pose) {
+		x = pose.x;
+		y = pose.y;
+		z = pose.z;
+		xRot = pose.xRot;
+		yRot = pose.yRot;
+		zRot = pose.zRot;
+		xScale = ModelPart.DEFAULT_SCALE;
+		yScale = ModelPart.DEFAULT_SCALE;
+		zScale = ModelPart.DEFAULT_SCALE;
+		setChanged();
+	}
+
+	public void resetPose() {
+		loadPose(source.initialPose());
+	}
+
+	public void copyTransform(InstanceTree2 tree) {
+		x = tree.x;
+		y = tree.y;
+		z = tree.z;
+		xRot = tree.xRot;
+		yRot = tree.yRot;
+		zRot = tree.zRot;
+		xScale = tree.xScale;
+		yScale = tree.yScale;
+		zScale = tree.zScale;
+		setChanged();
+	}
+
+	public void copyTransform(ModelPart modelPart) {
+		x = modelPart.x;
+		y = modelPart.y;
+		z = modelPart.z;
+		xRot = modelPart.xRot;
+		yRot = modelPart.yRot;
+		zRot = modelPart.zRot;
+		xScale = modelPart.xScale;
+		yScale = modelPart.yScale;
+		zScale = modelPart.zScale;
+		setChanged();
+	}
+
+	private void setChanged() {
+		changed = true;
+	}
+
+	public void delete() {
+		if (instance != null) {
+			instance.delete();
+		}
+		for (InstanceTree2 child : children) {
+			child.delete();
+		}
+	}
+
+	@ApiStatus.Experimental
+	@FunctionalInterface
+	public interface ObjIntIntConsumer<T> {
+		void accept(T t, int i, int j);
+	}
 }
