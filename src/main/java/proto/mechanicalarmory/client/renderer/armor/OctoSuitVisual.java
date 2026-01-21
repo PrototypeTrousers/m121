@@ -22,7 +22,7 @@ public class OctoSuitVisual implements EffectVisual<OctoSuitEffect>, SimpleDynam
     Vector3f visualPos;
     ModelTree modelTree = MechanicalArmoryClient.octoArmModelTree;
 
-    private final InstanceTree instanceTree;
+    private final InstanceTree2 instanceTree;
 //    private final @Nullable InstanceTree firstArm;
 //    private final @Nullable InstanceTree secondArm;
 //    private final @Nullable InstanceTree baseMotor;
@@ -36,39 +36,48 @@ public class OctoSuitVisual implements EffectVisual<OctoSuitEffect>, SimpleDynam
                 (float) (holderEntity.getPosition(partialTick).z - ctx.renderOrigin().getZ()));
         this.holderEntity = holderEntity;
 
-        instanceTree = InstanceTree.create(ctx.instancerProvider(), modelTree);
+        instanceTree = InstanceTree2.create(ctx.instancerProvider(), modelTree);
 //        baseMotor = instanceTree.child("BaseMotor");
 //        firstArm = baseMotor.child("FirstArm");
 //        secondArm = firstArm.child("SecondArm");
 //        itemAttachment = secondArm.child("ItemAttach");
         var rightArm = instanceTree.child("RightArm");
+        rightArm.yRot((float) (Math.PI));
+        rightArm.xRot(0.5f);
+        rightArm.zRot(-0.5f);
 
-        float totalSegments = 7f;
-// The total amount of "bend" you want in the whole arm (90 degrees)
-        float totalRad = (float) (270 * Math.PI / 180);
+        var rightArm001 = rightArm.child("RightArm.001");
+        rightArm001.xRot(0.5f);
+        rightArm001.zRot(-0.5f);
 
-        InstanceTree parent = rightArm;
-        for (int i = 1; i <= 8; i++) {
-            // Dynamically get RightArm.001 through RightArm.007
-            var segment = parent.child("RightArm.00" + (i));
-            parent = segment;
+        var rightArm002 = rightArm001.child("RightArm.002");
+        rightArm002.xRot(0.5f);
+        rightArm002.zRot(-0.5f);
 
-            // Progress is 0.0 at the shoulder, 1.0 at the fingertips
-            float progress = (i - 1) / (totalSegments - 1);
+        var rightArm003 = rightArm002.child("RightArm.003");
+        rightArm003.xRot(0.5f);
+        rightArm003.zRot(-0.5f);
 
-            // We split the 90-degree bend across the segments.
-            // Early segments only get Z-rotation (bending it Right)
-            // Later segments only get X-rotation (bending it Forward)
-            float segmentRotation = totalRad / totalSegments;
+        var rightArm004 = rightArm003.child("RightArm.004");
+        rightArm004.xRot(0.5f);
+        rightArm004.zRot(-0.5f);
 
-            // Use 'progress' to shift the rotation from Z to X
-            float zAmount = (1.0f - progress) * segmentRotation;
-            float xAmount = progress * segmentRotation;
+        var rightArm005 = rightArm004.child("RightArm.005");
+        rightArm005.xRot(0.5f);
+        rightArm005.zRot(-0.5f);
 
-            segment.zRot(zAmount);
-            segment.xRot(-xAmount); // Negative X usually bends "forward"
-            segment.yRot(0);        // Explicitly kill any inherited twist
-        }
+        var rightArm006 = rightArm005.child("RightArm.006");
+        rightArm006.xRot(0.5f);
+        rightArm006.zRot(-0.5f);
+
+//        var rightArm007 = rightArm006.child("RightArm.007");
+//        rightArm007.xRot(-0.5f);
+
+
+
+
+
+
 
 
 //        transformedInstance.light(15,15);
@@ -100,6 +109,7 @@ public class OctoSuitVisual implements EffectVisual<OctoSuitEffect>, SimpleDynam
 
 
         instanceTree.updateInstances(pose);
+        int i =0;
 
         var packedLight = LevelRenderer.getLightColor(holderEntity.level(), holderEntity.getOnPos().above());
         instanceTree.traverse(instance -> {
