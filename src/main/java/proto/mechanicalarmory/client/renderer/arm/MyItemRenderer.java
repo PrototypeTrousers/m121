@@ -25,7 +25,7 @@ import static net.minecraft.client.renderer.RenderStateShard.RENDERTYPE_ENTITY_C
 public class MyItemRenderer extends BlockEntityWithoutLevelRenderer {
 
     public static final MyItemRenderer INSTANCE = new MyItemRenderer();
-    ModelTree modelTree = MechanicalArmoryClient.gltfFlywheelModelTree;
+    ModelTree modelTree = MechanicalArmoryClient.fullArmModelTree;
     public static RenderType r;
 
 

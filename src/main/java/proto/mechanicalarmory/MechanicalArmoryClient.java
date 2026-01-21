@@ -13,7 +13,6 @@ import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.packs.resources.Resource;
 import net.minecraft.world.entity.EntityType;
-import net.minecraft.world.entity.player.Player;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.EventPriority;
 import net.neoforged.bus.api.SubscribeEvent;
@@ -35,7 +34,6 @@ import proto.mechanicalarmory.client.flywheel.instances.generic.VanillaEntityVis
 import proto.mechanicalarmory.client.renderer.arm.ArmRenderer;
 import proto.mechanicalarmory.client.renderer.arm.MyCustomItemBakedModel;
 import proto.mechanicalarmory.client.renderer.arm.MyItemRenderer;
-import proto.mechanicalarmory.common.blocks.MABlocks;
 import proto.mechanicalarmory.common.entities.MAEntities;
 import proto.mechanicalarmory.common.items.MAItems;
 
@@ -51,9 +49,11 @@ import static proto.mechanicalarmory.MechanicalArmory.MODID;
 @EventBusSubscriber(modid = MODID, value = Dist.CLIENT)
 public class MechanicalArmoryClient {
     public static ModelResourceLocation arm = ModelResourceLocation.standalone(ResourceLocation.fromNamespaceAndPath(MODID, "models/fullarm.glb"));
+    public static ModelResourceLocation octoarm = ModelResourceLocation.standalone(ResourceLocation.fromNamespaceAndPath(MODID, "models/octoarm.glb"));
     public static ModelResourceLocation armItemModel = ModelResourceLocation.standalone(ResourceLocation.fromNamespaceAndPath(MODID, "arm"));
     public static ModelResourceLocation chestplateItemModel = ModelResourceLocation.standalone(ResourceLocation.fromNamespaceAndPath(MODID, "my_chestplate"));
-    public static ModelTree gltfFlywheelModelTree;
+    public static ModelTree fullArmModelTree;
+    public static ModelTree octoArmModelTree;
     public static BandedPrimeLimiter limiter = new BandedPrimeLimiter();
 
     public MechanicalArmoryClient(ModContainer container) {
@@ -94,7 +94,9 @@ public class MechanicalArmoryClient {
     @SubscribeEvent // on the mod event bus only on the physical client
     public static void registerAdditional(ModelEvent.RegisterAdditional event) {
         event.register(arm);
-        gltfFlywheelModelTree = GltfFlywheelModelTree.create(loadglTFModel(arm));
+        event.register(octoarm);
+        fullArmModelTree = GltfFlywheelModelTree.create(loadglTFModel(arm));
+        octoArmModelTree = GltfFlywheelModelTree.create(loadglTFModel(octoarm));
         event.register(armItemModel);
     }
 

@@ -43,12 +43,13 @@ public class ArmVisual extends AbstractBlockEntityVisual<ArmEntity> implements D
     private final @Nullable InstanceTree itemAttachment;
     private final @Nullable TransformedInstance itemAttachmentInstance;
     private final Matrix4fc initialPose;
-    ModelTree modelTree = MechanicalArmoryClient.gltfFlywheelModelTree;
+    ModelTree modelTree = MechanicalArmoryClient.fullArmModelTree;
     int packedLight;
 
     public ArmVisual(VisualizationContext ctx, ArmEntity blockEntity, float partialTick) {
         super(ctx, blockEntity, partialTick);
         packedLight = LevelRenderer.getLightColor(level, pos.above());
+
         initialPose = new Matrix4f().translate(visualPos.getX() + 0.5f, visualPos.getY(), visualPos.getZ() + 0.5f);
 
         instanceTree = InstanceTree.create(instancerProvider(), modelTree);

@@ -25,7 +25,7 @@ import static net.minecraft.client.renderer.RenderStateShard.*;
 
 public class ArmRenderer implements BlockEntityRenderer<ArmEntity> {
 
-    ModelTree modelTree = MechanicalArmoryClient.gltfFlywheelModelTree;
+    ModelTree modelTree = MechanicalArmoryClient.fullArmModelTree;
     MyModelTree armTree = MyModelTree.create(modelTree);
     MyModelTree baseMotor = armTree.child("BaseMotor");
     MyModelTree firstArmTree = baseMotor.child("FirstArm");
