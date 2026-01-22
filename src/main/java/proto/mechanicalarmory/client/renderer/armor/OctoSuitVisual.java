@@ -22,6 +22,7 @@ public class OctoSuitVisual implements EffectVisual<OctoSuitEffect>, SimpleDynam
     private final InstanceTree2 instanceTree;
     private final InstanceTree2 back;
     private final InstanceTree2 topRightArm;
+    private final InstanceTree2 topLeftArm;
     Matrix4f pose = new Matrix4f();
 
 
@@ -36,6 +37,18 @@ public class OctoSuitVisual implements EffectVisual<OctoSuitEffect>, SimpleDynam
         back = instanceTree.child("Cube");
         topRightArm = instanceTree.child("RightArm");
         instanceTree.updateInstancesStatic(pose);
+
+        topLeftArm = InstanceTree2.create(ctx.instancerProvider(), topRightArm.getSource());
+        topLeftArm.updateInstancesStatic(pose);
+
+        var packedLight = LevelRenderer.getLightColor(holderEntity.level(), holderEntity.getOnPos().above());
+        instanceTree.traverse(instance -> {
+            instance.light(packedLight)
+                    .setChanged();
+        });
+        topLeftArm.traverse(instance -> {
+            instance.light(packedLight).setChanged();
+        });
 
     }
 
@@ -62,16 +75,10 @@ public class OctoSuitVisual implements EffectVisual<OctoSuitEffect>, SimpleDynam
 
         pose.rotateY(-holderEntity.getPreciseBodyRotation(ctx.partialTick()) * (float) (Math.PI / 180.0));
 
-        back.child(0).instance().setTransform(pose);
-
-        var packedLight = LevelRenderer.getLightColor(holderEntity.level(), holderEntity.getOnPos().above());
-        instanceTree.traverse(instance -> {
-            instance.light(packedLight)
-                    .setChanged();
-        });
+        back.child(0).instance().setTransform(pose).setChanged();
 
         Vector3f worldTarget = new Vector3f(
-                0,
+                2,
                 0,
                 6
         );
@@ -80,6 +87,23 @@ public class OctoSuitVisual implements EffectVisual<OctoSuitEffect>, SimpleDynam
         ikSolver.solve(
                 topRightArm,
                 worldTarget,
+                pose, // New Parameter: The Root Pose
+                10,
+                0.001f
+        );
+
+        Vector3f worldTarget2 = new Vector3f(
+                -2,
+                0,
+                6
+        );
+
+        pose.translate( 1f ,0,0);
+
+        // Pass the Root Matrix (pose.last().pose())
+        ikSolver.solve(
+                topLeftArm,
+                worldTarget2,
                 pose, // New Parameter: The Root Pose
                 10,
                 0.001f

@@ -110,6 +110,10 @@ public final class InstanceTree2 {
 		return childIndex(name) >= 0;
 	}
 
+	public ModelTree getSource() {
+		return source;
+	}
+
 	@Nullable
 	public InstanceTree2 child(String name) {
 		int index = childIndex(name);
