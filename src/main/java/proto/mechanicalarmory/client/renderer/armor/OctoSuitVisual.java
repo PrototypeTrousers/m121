@@ -79,8 +79,7 @@ public class OctoSuitVisual implements EffectVisual<OctoSuitEffect>, SimpleDynam
         back.child(0).instance().setTransform(pose).setChanged();
 
 
-        // Retrieve the synced target
-        Vec3 targect = OctoSuit.ClientArmTargetCache.getTarget(holderEntity.getId());
+        Vec3 targect = OctoSuit.ClientArmTargetCache.getSmoothedPosition(holderEntity.getId(), ctx.partialTick());
         Vector3f target = new Vector3f((float) targect.x + 3, (float) targect.y, (float) targect.z);
         Vector3f target2 = new Vector3f((float) targect.x - 3, (float) targect.y, (float) targect.z);
 

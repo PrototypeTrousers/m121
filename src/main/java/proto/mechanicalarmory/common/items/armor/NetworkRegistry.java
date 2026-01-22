@@ -22,11 +22,9 @@ public class NetworkRegistry {
                 // This runs on the network thread, so we must enqueue work to the main thread
                 context.enqueueWork(() -> {
                     // Update our client-side cache
-                    OctoSuit.ClientArmTargetCache.update(
-                        payload.entityId(), 
-                        payload.x(), 
-                        payload.y(), 
-                        payload.z()
+                    OctoSuit.ClientArmTargetCache.updateTarget(
+                            payload.entityId(),
+                            new net.minecraft.world.phys.Vec3(payload.x(), payload.y(), payload.z())
                     );
                 });
             }

@@ -84,19 +84,30 @@ public class OctoSuit extends ArmorItem {
             if (player.getItemBySlot(EquipmentSlot.CHEST) == stack) {
 
                 if (!level.isClientSide) {
-                    // 1. Calculate your target (e.g., raycast 10 blocks ahead)
-                    Vec3 target = player.pick(10.0D, 0.0F, false).getLocation();
+// 1. Where does the player WANT the arm to go? (The Crosshair)
+                    Vec3 desiredTarget = player.pick(10.0D, 0.0F, false).getLocation();
 
-                    // 2. Optimization: Only send if the target has changed significantly
-                    // (You might want to store the 'last sent' target in a transient capability or map to compare)
+                    // 2. Where is the arm RIGHT NOW?
+                    // If null (first time equipping), snap to the target immediately
+                    Vec3 currentArmPos = player.getData(MyAttachments.ARM_TARGET);
+                    if (currentArmPos.equals(Vec3.ZERO)) currentArmPos = desiredTarget;
 
-                    // 3. Send the packet to everyone tracking this player (and the player themselves)
+                    // 3. Move the arm 10% of the way there (Adjust 0.1F for speed. 0.05 is heavy, 0.3 is fast)
+                    // This is the "Smoothing" logic
+                    Vec3 nextArmPos = currentArmPos.lerp(desiredTarget, 0.15D);
+
+                    // 4. Save the new position
+                    player.setData(MyAttachments.ARM_TARGET, nextArmPos);
+
+                    // 6. Send the DESIRED Target to the client
+                    // We send the 'desiredTarget' (Crosshair), not the 'nextArmPos'.
+                    // We want the client to run its own smooth simulation to save bandwidth.
+                    // Optimization: Only send if desiredTarget changed significantly (>0.1 blocks)
                     PacketDistributor.sendToPlayersTrackingEntityAndSelf(
                             player,
-                            new ArmTargetPayload(player.getId(), target.x, target.y, target.z)
+                            new ArmTargetPayload(player.getId(), desiredTarget.x, desiredTarget.y, desiredTarget.z)
                     );
                 }
-                int i =0;
             }
         }
     }
@@ -123,15 +134,32 @@ public class OctoSuit extends ArmorItem {
     }
 
     public class ClientArmTargetCache {
-        // Maps Entity ID -> Target Position
-        private static final Map<Integer, Vec3> TARGETS = new ConcurrentHashMap<>();
+        private static final Map<Integer, ArmData> CACHE = new ConcurrentHashMap<>();
 
-        public static void update(int entityId, double x, double y, double z) {
-            TARGETS.put(entityId, new Vec3(x, y, z));
+        public static class ArmData {
+            public Vec3 target = Vec3.ZERO;
+            public Vec3 current = Vec3.ZERO;
         }
 
-        public static Vec3 getTarget(int entityId) {
-            return TARGETS.get(entityId);
+        // Called when Packet arrives (Server says: "Go here")
+        public static void updateTarget(int entityId, Vec3 newTarget) {
+            CACHE.computeIfAbsent(entityId, id -> new ArmData()).target = newTarget;
+        }
+
+        // Called every Render Frame to calculate smoothing
+        public static Vec3 getSmoothedPosition(int entityId, float partialTick) {
+            ArmData data = CACHE.get(entityId);
+            if (data == null) return null;
+
+            // "Frame-rate Independent Damping"
+            // This moves 'current' towards 'target' smoothly every frame.
+            // The factor 0.15 must match your Server logic roughly,
+            // but since render frames are faster than ticks, we adjust slightly or use delta time.
+
+            double smoothness = 0.15;
+            data.current = data.current.lerp(data.target, smoothness);
+
+            return data.current;
         }
     }
 }

@@ -25,6 +25,7 @@ import proto.mechanicalarmory.common.blocks.MABlocks;
 import proto.mechanicalarmory.common.entities.MAEntities;
 import proto.mechanicalarmory.common.items.MAItems;
 import proto.mechanicalarmory.common.items.armor.ArmorMaterials;
+import proto.mechanicalarmory.common.items.armor.MyAttachments;
 import proto.mechanicalarmory.common.items.armor.OctoSuit;
 
 // The value here should match an entry in the META-INF/neoforge.mods.toml file
@@ -55,6 +56,7 @@ public class MechanicalArmory {
         // Register the Deferred Register to the mod event bus so items get registered
         MAItems.ITEMS.register(modEventBus);
 
+        MyAttachments.ATTACHMENT_TYPES.register(modEventBus);
         MAEntities.BLOCK_ENTITY_TYPES.register(modEventBus);
         // Register the Deferred Register to the mod event bus so tabs get registered
         CREATIVE_MODE_TABS.register(modEventBus);
