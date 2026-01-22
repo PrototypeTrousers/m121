@@ -78,9 +78,9 @@ public class OctoSuitVisual implements EffectVisual<OctoSuitEffect>, SimpleDynam
         back.child(0).instance().setTransform(pose).setChanged();
 
         Vector3f worldTarget = new Vector3f(
-                2,
+                2.5f,
                 0,
-                6
+                6.5f
         );
 
         // Pass the Root Matrix (pose.last().pose())
@@ -93,9 +93,9 @@ public class OctoSuitVisual implements EffectVisual<OctoSuitEffect>, SimpleDynam
         );
 
         Vector3f worldTarget2 = new Vector3f(
-                -2,
+                -2.5f,
                 0,
-                6
+                6.5f
         );
 
         pose.translate( 1f ,0,0);

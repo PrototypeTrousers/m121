@@ -4,8 +4,7 @@ import dev.engine_room.flywheel.api.visualization.VisualizationManager;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.BlockEntityWithoutLevelRenderer;
 import net.minecraft.core.Holder;
-import net.minecraft.world.entity.Entity;
-import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.entity.*;
 import net.minecraft.world.item.ArmorItem;
 import net.minecraft.world.item.ArmorMaterial;
 import net.minecraft.world.item.ItemStack;
@@ -21,12 +20,14 @@ import net.neoforged.neoforge.registries.DeferredItem;
 import org.jetbrains.annotations.Nullable;
 import proto.mechanicalarmory.client.renderer.armor.OctoSuitEffect;
 import proto.mechanicalarmory.client.renderer.armor.OctoSuitRenderer;
+import proto.mechanicalarmory.common.items.MAItems;
 
 import java.util.Map;
 import java.util.WeakHashMap;
 
 import static proto.mechanicalarmory.MechanicalArmory.MODID;
 import static proto.mechanicalarmory.common.items.MAItems.ITEMS;
+
 @EventBusSubscriber(modid = MODID, value = Dist.CLIENT)
 public class OctoSuit extends ArmorItem {
 
@@ -36,17 +37,9 @@ public class OctoSuit extends ArmorItem {
         return EFFECT_CACHE.computeIfAbsent(entity, e -> new OctoSuitEffect(l, e));
     }
 
-    public static final DeferredItem<ArmorItem> MY_CHESTPLATE = ITEMS.registerItem("my_chestplate",
-            properties -> new ArmorItem(ArmorMaterials.MY_MATERIAL, ArmorItem.Type.CHESTPLATE, properties));
-
-    public static void init() {
-
-    }
-
     public OctoSuit(Holder<ArmorMaterial> material, Type type, Properties properties) {
         super(material, type, properties);
     }
-
 
     @SubscribeEvent
     public static void onClientExtensions(RegisterClientExtensionsEvent event) {
@@ -56,14 +49,14 @@ public class OctoSuit extends ArmorItem {
                 return OctoSuitRenderer.INSTANCE; // Your BEWLR class
             }
         };
-        event.registerItem(itemExtensions , OctoSuit.MY_CHESTPLATE);
+        event.registerItem(itemExtensions, MAItems.MY_CHESTPLATE);
     }
 
     @SubscribeEvent
     public static void onClientExtensions(RenderLivingEvent.Pre event) {
         Level l = event.getEntity().level();
         VisualizationManager vm = VisualizationManager.get(l);
-        if (event.getEntity().getItemBySlot(EquipmentSlot.CHEST).getItem() == MY_CHESTPLATE.get()) {
+        if (event.getEntity().getItemBySlot(EquipmentSlot.CHEST).getItem() == MAItems.MY_CHESTPLATE.get()) {
             if (EFFECT_CACHE.get(event.getEntity()) == null) {
                 vm.effects().queueAdd(getEffect(event.getEntity(), l));
             }
@@ -72,6 +65,15 @@ public class OctoSuit extends ArmorItem {
             if (ose != null) {
                 vm.effects().queueRemove(ose);
                 EFFECT_CACHE.remove(event.getEntity());
+            }
+        }
+    }
+
+    @Override
+    public void inventoryTick(ItemStack stack, Level level, Entity entity, int slotId, boolean isSelected) {
+        if (entity instanceof LivingEntity le) {
+            if (le.getItemBySlot(EquipmentSlot.CHEST) == stack) {
+                int i =0;
             }
         }
     }

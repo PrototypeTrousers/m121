@@ -49,10 +49,11 @@ public class MechanicalArmory {
 
         // Register the Deferred Register to the mod event bus so blocks get registered
         MABlocks.BLOCKS.register(modEventBus);
+
+        ArmorMaterials.ARMOR_MATERIALS.register(modEventBus);
+
         // Register the Deferred Register to the mod event bus so items get registered
         MAItems.ITEMS.register(modEventBus);
-        ArmorMaterials.ARMOR_MATERIALS.register(modEventBus);
-        OctoSuit.init();
 
         MAEntities.BLOCK_ENTITY_TYPES.register(modEventBus);
         // Register the Deferred Register to the mod event bus so tabs get registered

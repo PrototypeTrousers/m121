@@ -12,7 +12,7 @@ public class FabrikSolver {
 
     // --- Constants ---
     private static final Vector3f BONE_AXIS = new Vector3f(0, 1, 0);
-    private static final float LIMIT_ANGLE = 25f; // Default limit
+    private static final float LIMIT_ANGLE = 12f; // Default limit
     private static final float LIMIT_COS = (float) Math.cos(Math.toRadians(LIMIT_ANGLE));
     private static final float LIMIT_RAD = (float) Math.toRadians(LIMIT_ANGLE);
     private final Vector3f localTarget = new Vector3f();
