@@ -2,11 +2,10 @@ package proto.mechanicalarmory.client.renderer.armor;
 
 import dev.engine_room.flywheel.api.visual.EffectVisual;
 import dev.engine_room.flywheel.api.visualization.VisualizationContext;
-import dev.engine_room.flywheel.lib.instance.AbstractInstance;
 import dev.engine_room.flywheel.lib.instance.TransformedInstance;
-import dev.engine_room.flywheel.lib.model.part.InstanceTree;
 import dev.engine_room.flywheel.lib.model.part.ModelTree;
 import dev.engine_room.flywheel.lib.visual.SimpleDynamicVisual;
+import net.minecraft.client.model.geom.PartPose;
 import net.minecraft.client.renderer.LevelRenderer;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.phys.Vec3;
@@ -60,13 +59,14 @@ public class OctoSuitVisual implements EffectVisual<OctoSuitEffect>, SimpleDynam
         pose.translate(0, 1 , 0);
 
         Vec3 ePos = holderEntity.getPosition(ctx.partialTick());
-        //pose.translate((float) ePos.x(), (float) ePos.y(), (float) ePos.z());
+        pose.translate((float) ePos.x(), (float) ePos.y(), (float) ePos.z());
                 Vec3 behind = Vec3.directionFromRotation(
                 0, (float) ( 180 + holderEntity.getPreciseBodyRotation(ctx.partialTick())));
-        //pose.translate((float) behind.x(), (float) behind.y(), (float) behind.z());
+        pose.translate((float) behind.x(), (float) behind.y(), (float) behind.z());
 
-        //pose.rotateY(-holderEntity.getPreciseBodyRotation(ctx.partialTick()) * (float) (Math.PI / 180.0));
+        pose.rotateY(-holderEntity.getPreciseBodyRotation(ctx.partialTick()) * (float) (Math.PI / 180.0));
 
+        instanceTree.child("Cube").child("Cube").instance().setTransform(pose);
 
 
         var packedLight = LevelRenderer.getLightColor(holderEntity.level(), holderEntity.getOnPos().above());
@@ -75,18 +75,32 @@ public class OctoSuitVisual implements EffectVisual<OctoSuitEffect>, SimpleDynam
                     .setChanged();
         });
 
-        solveFABRIKDirect(instanceTree.child("RightArm"), new Vector3f(
-                4 * (float) Math.sin(System.currentTimeMillis() / 100d) + 3,
-                4 * (float) Math.sin(System.currentTimeMillis() / 100d),
-                7), 32 , 0.001f);
+// Define where the Shoulder is physically located on the body model (Local Space)
+        // You must tweak this vector to match your specific model's shoulder coordinates!
+        PartPose init = instanceTree.child("RightArm").initialPose();
+        Vector3f shoulderOffset = new Vector3f(init.x / 16f, init.y / 16f, init.z / 16f);
+
+        Vector3f localTarget = new Vector3f(
+                0,
+                0,
+                2
+        );
+
+        // Pass the Root Matrix (pose.last().pose())
+        solveFABRIKDirect(
+                instanceTree.child("RightArm"),
+                localTarget,
+                shoulderOffset, // New Parameter
+                pose, // New Parameter: The Root Pose
+                10,
+                0.001f
+        );
     }
 
     private static final Vector3f BONE_AXIS = new Vector3f(0, 1, 0);
 
-
-
-    public void solveFABRIKDirect(InstanceTree2 root, Vector3f targetPos, int iterations, float tolerance) {
-        // --- 1. Gather Chain (Same as before) ---
+    public void solveFABRIKDirect(InstanceTree2 root, Vector3f localTargetPos, Vector3f localShoulderPos, Matrix4f rootPose, int iterations, float tolerance) {
+        // --- 1. Gather Chain ---
         List<InstanceTree2> chain = new ArrayList<>();
         InstanceTree2 current = root;
         while (current != null) {
@@ -97,43 +111,45 @@ public class OctoSuitVisual implements EffectVisual<OctoSuitEffect>, SimpleDynam
         }
         if (chain.size() < 2) return;
 
-        // --- 2. Extract World Positions (Same as before) ---
+        // --- 2. Extract World Positions ---
         Vector3f[] joints = new Vector3f[chain.size()];
         float[] lengths = new float[chain.size() - 1];
 
         for (int i = 0; i < chain.size(); i++) {
             joints[i] = new Vector3f();
-            // Get the current render-space position
             chain.get(i).getPoseMatrix().getTranslation(joints[i]);
+            rootPose.transformPosition(joints[i]);
+
+            // Calculate lengths based on the initial setup (or cache these if the model scales)
             if (i > 0) lengths[i - 1] = joints[i].distance(joints[i - 1]);
         }
 
-        // --- 3. Run FABRIK Algorithm (Same as before) ---
+        Vector3f worldTarget = new Vector3f(localTargetPos);
+        rootPose.transformPosition(worldTarget);
+
+        // --- 3. Run FABRIK Algorithm ---
         Vector3f origin = new Vector3f(joints[0]);
         float totalLen = 0;
-        for(float l : lengths) totalLen += l;
+        for (float l : lengths) totalLen += l;
 
-        // unreachable target optimization
-        if (origin.distance(targetPos) > totalLen) {
-            // Just stretch out in a line towards target
-            Vector3f dir = new Vector3f(targetPos).sub(origin).normalize();
+        if (origin.distance(worldTarget) > totalLen) {
+            Vector3f dir = new Vector3f(worldTarget).sub(origin).normalize();
             for (int i = 1; i < joints.length; i++) {
-                joints[i].set(joints[i-1]).add(new Vector3f(dir).mul(lengths[i-1]));
+                joints[i].set(joints[i - 1]).add(new Vector3f(dir).mul(lengths[i - 1]));
             }
         } else {
-            // 3. FABRIK Iteration
             for (int iter = 0; iter < iterations; iter++) {
-                if (joints[joints.length - 1].distance(targetPos) < tolerance) break;
+                if (joints[joints.length - 1].distance(worldTarget) < tolerance) break;
 
                 // BACKWARD: Tip -> Root
-                joints[joints.length - 1].set(targetPos);
+                joints[joints.length - 1].set(worldTarget);
                 for (int i = joints.length - 2; i >= 0; i--) {
                     Vector3f dir = new Vector3f(joints[i]).sub(joints[i + 1]).normalize();
                     joints[i].set(joints[i + 1]).add(dir.mul(lengths[i]));
                 }
 
                 // FORWARD: Root -> Tip
-                joints[0].set(origin);
+                joints[0].set(origin); // Snaps back to the new correct shoulder pos
                 for (int i = 1; i < joints.length; i++) {
                     Vector3f dir = new Vector3f(joints[i]).sub(joints[i - 1]).normalize();
                     joints[i].set(joints[i - 1]).add(dir.mul(lengths[i - 1]));
@@ -141,30 +157,20 @@ public class OctoSuitVisual implements EffectVisual<OctoSuitEffect>, SimpleDynam
             }
         }
 
-        // --- 4. DIRECT MATRIX UPDATE (The New Part) ---
-        // We iterate through the chain and manually construct the matrix for each segment.
-
+        // --- 4. DIRECT MATRIX UPDATE ---
         for (int i = 0; i < chain.size() - 1; i++) {
             Vector3f start = joints[i];
-            Vector3f end = joints[i+1];
+            Vector3f end = joints[i + 1];
 
-            // A. Calculate Direction
             Vector3f dir = new Vector3f(end).sub(start).normalize();
 
-            // B. Calculate Rotation
-            // We want to rotate our default BONE_AXIS (0,1,0) to face the 'dir'.
-            // This Quaternion represents the Absolute World Rotation needed.
+            // This rotation is global, which is what we want since 'start' is global
             Quaternionf rotation = new Quaternionf().rotationTo(BONE_AXIS, dir);
 
-            // C. Construct the Matrix (Translation * Rotation)
-            // Note: We do NOT include the parent's matrix. We are working in absolute space now.
             Matrix4f newMatrix = new Matrix4f()
                     .translate(start)
                     .rotate(rotation);
 
-            // D. Force-apply to the Instance
-            // You need to access the underlying TransformedInstance here.
-            // Assuming InstanceTree2 has a method to get it, or you can add one.
             updateInstanceMatrix(chain.get(i), newMatrix);
         }
     }
