@@ -11,6 +11,7 @@ import org.joml.Matrix4f;
 import org.joml.Vector3f;
 import proto.mechanicalarmory.MechanicalArmoryClient;
 import proto.mechanicalarmory.client.renderer.util.FabrikSolver;
+import proto.mechanicalarmory.common.items.armor.OctoSuit;
 
 public class OctoSuitVisual implements EffectVisual<OctoSuitEffect>, SimpleDynamicVisual {
 
@@ -77,33 +78,29 @@ public class OctoSuitVisual implements EffectVisual<OctoSuitEffect>, SimpleDynam
 
         back.child(0).instance().setTransform(pose).setChanged();
 
-        Vector3f worldTarget = new Vector3f(
-                2.5f,
-                0,
-                6.5f
-        );
 
-        // Pass the Root Matrix (pose.last().pose())
-        ikSolver.solve(
-                topRightArm,
-                worldTarget,
-                pose, // New Parameter: The Root Pose
-                10,
-                0.001f
-        );
+        // Retrieve the synced target
+        Vec3 targect = OctoSuit.ClientArmTargetCache.getTarget(holderEntity.getId());
+        Vector3f target = new Vector3f((float) targect.x + 3, (float) targect.y, (float) targect.z);
+        Vector3f target2 = new Vector3f((float) targect.x - 3, (float) targect.y, (float) targect.z);
 
-        Vector3f worldTarget2 = new Vector3f(
-                -2.5f,
-                0,
-                6.5f
-        );
+        if (target != null) {
+            // Run your FABRIK / Inverse Kinematics logic here using 'target'
+            ikSolver.solve(
+                    topRightArm,
+                    target,
+                    pose, // New Parameter: The Root Pose
+                    10,
+                    0.001f
+            );
+        }
 
         pose.translate( 1f ,0,0);
 
         // Pass the Root Matrix (pose.last().pose())
         ikSolver.solve(
                 topLeftArm,
-                worldTarget2,
+                target2,
                 pose, // New Parameter: The Root Pose
                 10,
                 0.001f
