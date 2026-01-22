@@ -2,35 +2,26 @@ package proto.mechanicalarmory.client.renderer.armor;
 
 import dev.engine_room.flywheel.api.visual.EffectVisual;
 import dev.engine_room.flywheel.api.visualization.VisualizationContext;
-import dev.engine_room.flywheel.lib.instance.TransformedInstance;
 import dev.engine_room.flywheel.lib.model.part.ModelTree;
 import dev.engine_room.flywheel.lib.visual.SimpleDynamicVisual;
-import net.minecraft.client.model.geom.PartPose;
 import net.minecraft.client.renderer.LevelRenderer;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.phys.Vec3;
 import org.joml.Matrix4f;
-import org.joml.Quaternionf;
 import org.joml.Vector3f;
 import proto.mechanicalarmory.MechanicalArmoryClient;
 import proto.mechanicalarmory.client.renderer.util.FabrikSolver;
 
-import java.util.ArrayList;
-import java.util.List;
-
 public class OctoSuitVisual implements EffectVisual<OctoSuitEffect>, SimpleDynamicVisual {
 
-    TransformedInstance transformedInstance;
     Entity holderEntity;
     Vector3f visualPos;
     ModelTree modelTree = MechanicalArmoryClient.octoArmModelTree;
     private final FabrikSolver ikSolver = new FabrikSolver();
 
     private final InstanceTree2 instanceTree;
-//    private final @Nullable InstanceTree firstArm;
-//    private final @Nullable InstanceTree secondArm;
-//    private final @Nullable InstanceTree baseMotor;
-//    private final @Nullable InstanceTree itemAttachment;
+    private final InstanceTree2 back;
+    private final InstanceTree2 topRightArm;
     Matrix4f pose = new Matrix4f();
 
 
@@ -41,6 +32,9 @@ public class OctoSuitVisual implements EffectVisual<OctoSuitEffect>, SimpleDynam
         this.holderEntity = holderEntity;
 
         instanceTree = InstanceTree2.create(ctx.instancerProvider(), modelTree);
+
+        back = instanceTree.child("Cube");
+        topRightArm = instanceTree.child("RightArm");
         instanceTree.updateInstancesStatic(pose);
 
     }
@@ -52,7 +46,7 @@ public class OctoSuitVisual implements EffectVisual<OctoSuitEffect>, SimpleDynam
 
     @Override
     public void delete() {
-        transformedInstance.delete();
+        instanceTree.delete();
     }
 
     @Override
@@ -68,8 +62,7 @@ public class OctoSuitVisual implements EffectVisual<OctoSuitEffect>, SimpleDynam
 
         pose.rotateY(-holderEntity.getPreciseBodyRotation(ctx.partialTick()) * (float) (Math.PI / 180.0));
 
-        instanceTree.child("Cube").child("Cube").instance().setTransform(pose);
-
+        back.child(0).instance().setTransform(pose);
 
         var packedLight = LevelRenderer.getLightColor(holderEntity.level(), holderEntity.getOnPos().above());
         instanceTree.traverse(instance -> {
@@ -85,7 +78,7 @@ public class OctoSuitVisual implements EffectVisual<OctoSuitEffect>, SimpleDynam
 
         // Pass the Root Matrix (pose.last().pose())
         ikSolver.solve(
-                instanceTree.child("RightArm"),
+                topRightArm,
                 worldTarget,
                 pose, // New Parameter: The Root Pose
                 10,
