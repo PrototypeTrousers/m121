@@ -83,7 +83,7 @@ public class OctoSuitVisual implements EffectVisual<OctoSuitEffect>, SimpleDynam
         Vector3f localTarget = new Vector3f(
                 0,
                 0,
-                2
+                6
         );
 
         // Pass the Root Matrix (pose.last().pose())
@@ -152,6 +152,24 @@ public class OctoSuitVisual implements EffectVisual<OctoSuitEffect>, SimpleDynam
                 joints[0].set(origin); // Snaps back to the new correct shoulder pos
                 for (int i = 1; i < joints.length; i++) {
                     Vector3f dir = new Vector3f(joints[i]).sub(joints[i - 1]).normalize();
+                    Vector3f referenceDir;
+
+                    if (i == 1) {
+                        // Shoulder Constraint
+                        referenceDir = new Vector3f(0, -1, 0);
+                        rootPose.transformDirection(referenceDir);
+
+                        // Use optimized check
+                        dir = constrainCone(dir, referenceDir, LIMIT_15_COS, LIMIT_15_RAD);
+                    } else {
+                        // Elbow Constraint
+                        referenceDir = new Vector3f(joints[i-1]).sub(joints[i-2]).normalize();
+
+                        // Use optimized check
+                        dir = constrainCone(dir, referenceDir, LIMIT_15_COS, LIMIT_15_RAD);
+                    }
+
+                    // Apply
                     joints[i].set(joints[i - 1]).add(dir.mul(lengths[i - 1]));
                 }
             }
@@ -184,5 +202,42 @@ public class OctoSuitVisual implements EffectVisual<OctoSuitEffect>, SimpleDynam
                         .setChanged();
             }
         }
+    }
+
+    // Pre-calculate this once in your class (e.g., for 90 degrees)
+    private static final float LIMIT_15_COS = (float) Math.cos(Math.toRadians(15));
+    private static final float LIMIT_15_RAD = (float) Math.toRadians(15);
+
+    private Vector3f constrainCone(Vector3f currentDir, Vector3f referenceDir, float minCos, float maxRad) {
+        // 1. Fast Check: Dot Product
+        // We assume both vectors are already normalized (FABRIK does this anyway)
+        float currentDot = currentDir.dot(referenceDir);
+
+        // If dot is larger than the limit cosine, we are inside the cone.
+        // (Remember: Cosine 0deg = 1.0, Cosine 90deg = 0.0)
+        if (currentDot >= minCos) {
+            return currentDir;
+        }
+
+        // 2. Correction (Only runs if violated)
+        // We need to clamp the vector to the edge of the cone.
+
+        // Find the axis perpendicular to both (the "hinge" of the error)
+        Vector3f axis = new Vector3f(referenceDir).cross(currentDir);
+
+        if (axis.lengthSquared() < 0.00001f) {
+            // Edge case: vectors are exactly opposite (180 deg apart)
+            // Rotate around arbitrary axis (X or Z)
+            if (Math.abs(referenceDir.x) > 0.9f) axis.set(0, 0, 1);
+            else axis.set(1, 0, 0);
+        } else {
+            axis.normalize();
+        }
+
+        // Rotate the REFERENCE vector by the MAX angle to get the new limit boundary
+        // We don't need to know the current angle, we just force it to the max allowed.
+        Quaternionf correction = new Quaternionf().setAngleAxis(maxRad, axis.x, axis.y, axis.z);
+
+        return new Vector3f(referenceDir).rotate(correction).normalize();
     }
 }
