@@ -1,6 +1,12 @@
 package proto.mechanicalarmory.common.items.armor;
 
+import dev.engine_room.flywheel.api.event.EndClientResourceReloadEvent;
+import dev.engine_room.flywheel.api.event.ReloadLevelRendererEvent;
+import dev.engine_room.flywheel.api.visual.Effect;
 import dev.engine_room.flywheel.api.visualization.VisualizationManager;
+import dev.engine_room.flywheel.impl.visualization.VisualManagerImpl;
+import dev.engine_room.flywheel.impl.visualization.VisualizationManagerImpl;
+import io.netty.buffer.ByteBuf;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.BlockEntityWithoutLevelRenderer;
 import net.minecraft.core.Holder;
@@ -23,7 +29,9 @@ import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.client.event.RenderLivingEvent;
 import net.neoforged.neoforge.client.extensions.common.IClientItemExtensions;
 import net.neoforged.neoforge.client.extensions.common.RegisterClientExtensionsEvent;
+import net.neoforged.neoforge.event.entity.living.LivingEquipmentChangeEvent;
 import net.neoforged.neoforge.network.PacketDistributor;
+import net.neoforged.neoforge.network.handling.IPayloadContext;
 import net.neoforged.neoforge.registries.DeferredItem;
 import org.jetbrains.annotations.Nullable;
 import proto.mechanicalarmory.client.renderer.armor.OctoSuitEffect;
@@ -39,13 +47,6 @@ import static proto.mechanicalarmory.common.items.MAItems.ITEMS;
 
 @EventBusSubscriber(modid = MODID, value = Dist.CLIENT)
 public class OctoSuit extends ArmorItem {
-
-    private static final Map<Entity, OctoSuitEffect> EFFECT_CACHE = new WeakHashMap<>();
-
-    public static OctoSuitEffect getEffect(Entity entity, LevelAccessor l) {
-        return EFFECT_CACHE.computeIfAbsent(entity, e -> new OctoSuitEffect(l, e));
-    }
-
     public OctoSuit(Holder<ArmorMaterial> material, Type type, Properties properties) {
         super(material, type, properties);
     }
@@ -62,19 +63,28 @@ public class OctoSuit extends ArmorItem {
     }
 
     @SubscribeEvent
-    public static void onClientExtensions(RenderLivingEvent.Pre event) {
-        Level l = event.getEntity().level();
-        VisualizationManager vm = VisualizationManager.get(l);
-        if (event.getEntity().getItemBySlot(EquipmentSlot.CHEST).getItem() == MAItems.MY_CHESTPLATE.get()) {
-            if (EFFECT_CACHE.get(event.getEntity()) == null) {
-                vm.effects().queueAdd(getEffect(event.getEntity(), l));
-            }
-        } else {
-            OctoSuitEffect ose = EFFECT_CACHE.get(event.getEntity());
-            if (ose != null) {
-                vm.effects().queueRemove(ose);
-                EFFECT_CACHE.remove(event.getEntity());
-            }
+    public static void onLivingEquipmentChangeEvent(LivingEquipmentChangeEvent event) {
+        if (event.getFrom().getItem() instanceof OctoSuit) {
+            PacketDistributor.sendToPlayersTrackingEntityAndSelf(
+                    event.getEntity(),
+                    new RemoveFlywheelEffectPayload(event.getEntity().getId())
+            );
+        }
+    }
+
+    @SubscribeEvent
+    public static void onEndClientResourceReloadEvent(EndClientResourceReloadEvent event) {
+        Player player = Minecraft.getInstance().player;
+        if (player != null) {
+            Minecraft.getInstance().player.removeData(MyAttachments.ARM_EFFECT_VISUAL);
+        }
+    }
+
+    @SubscribeEvent
+    public static void onReloadLevelRendererEvent(ReloadLevelRendererEvent event) {
+        Player player = Minecraft.getInstance().player;
+        if (player != null) {
+            Minecraft.getInstance().player.removeData(MyAttachments.ARM_EFFECT_VISUAL);
         }
     }
 
@@ -107,8 +117,38 @@ public class OctoSuit extends ArmorItem {
                             player,
                             new ArmTargetPayload(player.getId(), desiredTarget.x, desiredTarget.y, desiredTarget.z)
                     );
+                } else {
+                    OctoSuitEffect effect = player.getData(MyAttachments.ARM_EFFECT_VISUAL);
                 }
             }
+        }
+    }
+
+    public record RemoveFlywheelEffectPayload(int entityId) implements CustomPacketPayload {
+
+        // 1. Define the unique location for this packet
+        public static final Type<RemoveFlywheelEffectPayload> TYPE =
+                new Type<>(ResourceLocation.fromNamespaceAndPath(MODID, "remove_flywheel_effect"));
+
+        // 2. Define how to encode/decode the packet
+        public static final StreamCodec<ByteBuf, RemoveFlywheelEffectPayload> STREAM_CODEC =
+                StreamCodec.composite(
+                        ByteBufCodecs.VAR_INT, RemoveFlywheelEffectPayload::entityId,
+                        RemoveFlywheelEffectPayload::new
+                );
+
+        @Override
+        public Type<? extends CustomPacketPayload> type() {
+            return TYPE;
+        }
+
+        // 3. Handle the packet (Client Side)
+        public static void handle(RemoveFlywheelEffectPayload payload, IPayloadContext context) {
+            context.enqueueWork(() -> {
+                Entity e = Minecraft.getInstance().level.getEntity(payload.entityId());
+                Effect effect = e.removeData(MyAttachments.ARM_EFFECT_VISUAL);
+                VisualizationManager.get(Minecraft.getInstance().level).effects().queueRemove(effect);
+            });
         }
     }
 
@@ -116,7 +156,7 @@ public class OctoSuit extends ArmorItem {
 
         // Unique ID for this packet
         public static final Type<ArmTargetPayload> TYPE =
-                new Type<>(ResourceLocation.fromNamespaceAndPath("mymod", "arm_target"));
+                new Type<>(ResourceLocation.fromNamespaceAndPath(MODID, "arm_target"));
 
         // Codec to encode/decode the data (int + 3 doubles)
         public static final StreamCodec<RegistryFriendlyByteBuf, ArmTargetPayload> STREAM_CODEC = StreamCodec.composite(

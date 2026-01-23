@@ -1,5 +1,6 @@
 package proto.mechanicalarmory.common.items.armor;
 
+import net.minecraft.world.phys.Vec3;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
@@ -24,10 +25,17 @@ public class NetworkRegistry {
                     // Update our client-side cache
                     OctoSuit.ClientArmTargetCache.updateTarget(
                             payload.entityId(),
-                            new net.minecraft.world.phys.Vec3(payload.x(), payload.y(), payload.z())
+                            new Vec3(payload.x(), payload.y(), payload.z())
                     );
                 });
             }
+        );
+
+        // Register for Server -> Client communication
+        registrar.playToClient(
+                OctoSuit.RemoveFlywheelEffectPayload.TYPE,
+                OctoSuit.RemoveFlywheelEffectPayload.STREAM_CODEC,
+                OctoSuit.RemoveFlywheelEffectPayload::handle
         );
     }
 }

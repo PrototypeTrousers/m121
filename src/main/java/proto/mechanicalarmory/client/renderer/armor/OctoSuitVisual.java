@@ -61,6 +61,7 @@ public class OctoSuitVisual implements EffectVisual<OctoSuitEffect>, SimpleDynam
     @Override
     public void delete() {
         instanceTree.delete();
+        topLeftArm.delete();
     }
 
     @Override
