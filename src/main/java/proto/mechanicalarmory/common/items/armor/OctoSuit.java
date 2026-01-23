@@ -34,10 +34,12 @@ import net.neoforged.neoforge.network.PacketDistributor;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 import net.neoforged.neoforge.registries.DeferredItem;
 import org.jetbrains.annotations.Nullable;
+import org.joml.Vector3f;
 import proto.mechanicalarmory.client.renderer.armor.OctoSuitEffect;
 import proto.mechanicalarmory.client.renderer.armor.OctoSuitRenderer;
 import proto.mechanicalarmory.common.items.MAItems;
 
+import java.util.List;
 import java.util.Map;
 import java.util.WeakHashMap;
 import java.util.concurrent.ConcurrentHashMap;
@@ -94,29 +96,36 @@ public class OctoSuit extends ArmorItem {
             if (player.getItemBySlot(EquipmentSlot.CHEST) == stack) {
 
                 if (!level.isClientSide) {
-// 1. Where does the player WANT the arm to go? (The Crosshair)
-                    Vec3 desiredTarget = player.pick(10.0D, 0.0F, false).getLocation();
+                        // --- CHANGED SECTION START ---
+
+                    // 1. Calculate Target: 3 blocks Front, 3 blocks Left
+                    // We use pitch '0' so the arm stays level with the horizon even if player looks up/down.
+                    // If you want it to pitch with the head, replace '0' with 'player.getXRot()'
+                    Vector3f forw = player.getDirection().step().mul(3);
+                    Vector3f right = player.getDirection().getClockWise().step().mul(3);
+
+                    // Combine with Eye Position
+                    Vec3 desiredTarget = player.position()
+                            .add(forw.x, forw.y, forw.z)
+                            .add(right.x, right.y, right.z);
+
+                    // --- CHANGED SECTION END ---
 
                     // 2. Where is the arm RIGHT NOW?
                     // If null (first time equipping), snap to the target immediately
-                    Vec3 currentArmPos = player.getData(MyAttachments.ARM_TARGET);
-                    if (currentArmPos.equals(Vec3.ZERO)) currentArmPos = desiredTarget;
+                    List<Vec3> currentArmPositions = player.getData(MyAttachments.ARM_TARGETS);
 
-                    // 3. Move the arm 10% of the way there (Adjust 0.1F for speed. 0.05 is heavy, 0.3 is fast)
-                    // This is the "Smoothing" logic
-                    Vec3 nextArmPos = currentArmPos.lerp(desiredTarget, 0.15D);
+                    Vec3 currentTarget = currentArmPositions.get(0);
+
+                    currentArmPositions.set(0, currentTarget.lerp(desiredTarget, level.getGameTime() % 19 / 19f));
+
+                    desiredTarget = desiredTarget.add(-2 * right.x, -2 * right.y, -2 * right.z);
+
+                    currentTarget = currentArmPositions.get(1);
+                    currentArmPositions.set(1, currentTarget.lerp(desiredTarget, level.getGameTime() % 19 / 19f));
 
                     // 4. Save the new position
-                    player.setData(MyAttachments.ARM_TARGET, nextArmPos);
-
-                    // 6. Send the DESIRED Target to the client
-                    // We send the 'desiredTarget' (Crosshair), not the 'nextArmPos'.
-                    // We want the client to run its own smooth simulation to save bandwidth.
-                    // Optimization: Only send if desiredTarget changed significantly (>0.1 blocks)
-                    PacketDistributor.sendToPlayersTrackingEntityAndSelf(
-                            player,
-                            new ArmTargetPayload(player.getId(), desiredTarget.x, desiredTarget.y, desiredTarget.z)
-                    );
+                    player.setData(MyAttachments.ARM_TARGETS, currentArmPositions);
                 } else {
                     OctoSuitEffect effect = player.getData(MyAttachments.ARM_EFFECT_VISUAL);
                 }
@@ -149,27 +158,6 @@ public class OctoSuit extends ArmorItem {
                 Effect effect = e.removeData(MyAttachments.ARM_EFFECT_VISUAL);
                 VisualizationManager.get(Minecraft.getInstance().level).effects().queueRemove(effect);
             });
-        }
-    }
-
-    public record ArmTargetPayload(int entityId, double x, double y, double z) implements CustomPacketPayload {
-
-        // Unique ID for this packet
-        public static final Type<ArmTargetPayload> TYPE =
-                new Type<>(ResourceLocation.fromNamespaceAndPath(MODID, "arm_target"));
-
-        // Codec to encode/decode the data (int + 3 doubles)
-        public static final StreamCodec<RegistryFriendlyByteBuf, ArmTargetPayload> STREAM_CODEC = StreamCodec.composite(
-                ByteBufCodecs.VAR_INT, ArmTargetPayload::entityId,
-                ByteBufCodecs.DOUBLE, ArmTargetPayload::x,
-                ByteBufCodecs.DOUBLE, ArmTargetPayload::y,
-                ByteBufCodecs.DOUBLE, ArmTargetPayload::z,
-                ArmTargetPayload::new
-        );
-
-        @Override
-        public Type<? extends CustomPacketPayload> type() {
-            return TYPE;
         }
     }
 

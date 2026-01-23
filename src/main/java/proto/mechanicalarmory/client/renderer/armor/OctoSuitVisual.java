@@ -13,6 +13,10 @@ import proto.mechanicalarmory.MechanicalArmoryClient;
 import proto.mechanicalarmory.client.renderer.util.FabrikSolver;
 import proto.mechanicalarmory.common.items.armor.OctoSuit;
 
+import java.util.List;
+
+import static proto.mechanicalarmory.common.items.armor.MyAttachments.ARM_TARGETS;
+
 public class OctoSuitVisual implements EffectVisual<OctoSuitEffect>, SimpleDynamicVisual {
 
     Entity holderEntity;
@@ -27,7 +31,7 @@ public class OctoSuitVisual implements EffectVisual<OctoSuitEffect>, SimpleDynam
     Matrix4f pose = new Matrix4f();
 
 
-    public OctoSuitVisual(VisualizationContext ctx, Entity holderEntity , float partialTick) {
+    public OctoSuitVisual(VisualizationContext ctx, Entity holderEntity, float partialTick) {
         this.visualPos = new Vector3f((float) (holderEntity.getPosition(partialTick).x - ctx.renderOrigin().getX()),
                 (float) (holderEntity.getPosition(partialTick).y - ctx.renderOrigin().getY()),
                 (float) (holderEntity.getPosition(partialTick).z - ctx.renderOrigin().getZ()));
@@ -67,40 +71,37 @@ public class OctoSuitVisual implements EffectVisual<OctoSuitEffect>, SimpleDynam
     @Override
     public void beginFrame(Context ctx) {
         pose.identity();
-        pose.translate(0, 1 , 0);
+        pose.translate(0, 1, 0);
 
         Vec3 ePos = holderEntity.getPosition(ctx.partialTick());
         pose.translate((float) ePos.x(), (float) ePos.y(), (float) ePos.z());
-                Vec3 behind = Vec3.directionFromRotation(
-                0, (float) ( 180 + holderEntity.getPreciseBodyRotation(ctx.partialTick())));
+        Vec3 behind = Vec3.directionFromRotation(
+                0, (float) (180 + holderEntity.getPreciseBodyRotation(ctx.partialTick())));
         pose.translate((float) behind.x(), (float) behind.y(), (float) behind.z());
 
         pose.rotateY(-holderEntity.getPreciseBodyRotation(ctx.partialTick()) * (float) (Math.PI / 180.0));
 
         back.child(0).instance().setTransform(pose).setChanged();
 
+        List<Vec3> targets = holderEntity.getData(ARM_TARGETS);
 
-        Vec3 targect = OctoSuit.ClientArmTargetCache.getSmoothedPosition(holderEntity.getId(), ctx.partialTick());
-        Vector3f target = new Vector3f((float) targect.x + 3, (float) targect.y, (float) targect.z);
-        Vector3f target2 = new Vector3f((float) targect.x - 3, (float) targect.y, (float) targect.z);
 
-        if (target != null) {
-            // Run your FABRIK / Inverse Kinematics logic here using 'target'
-            ikSolver.solve(
-                    topRightArm,
-                    target,
-                    pose, // New Parameter: The Root Pose
-                    10,
-                    0.001f
-            );
-        }
+        // Run your FABRIK / Inverse Kinematics logic here using 'target'
+        ikSolver.solve(
+                topRightArm,
+                targets.get(0).toVector3f(),
+                pose, // New Parameter: The Root Pose
+                10,
+                0.001f
+        );
 
-        pose.translate( 1f ,0,0);
+
+        pose.translate(1f, 0, 0);
 
         // Pass the Root Matrix (pose.last().pose())
         ikSolver.solve(
                 topLeftArm,
-                target2,
+                targets.get(1).toVector3f(),
                 pose, // New Parameter: The Root Pose
                 10,
                 0.001f

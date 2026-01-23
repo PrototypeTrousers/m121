@@ -16,21 +16,6 @@ public class NetworkRegistry {
     public static void register(RegisterPayloadHandlersEvent event) {
         PayloadRegistrar registrar = event.registrar("1");
 
-        registrar.playToClient(
-            OctoSuit.ArmTargetPayload.TYPE,
-            OctoSuit.ArmTargetPayload.STREAM_CODEC,
-            (payload, context) -> {
-                // This runs on the network thread, so we must enqueue work to the main thread
-                context.enqueueWork(() -> {
-                    // Update our client-side cache
-                    OctoSuit.ClientArmTargetCache.updateTarget(
-                            payload.entityId(),
-                            new Vec3(payload.x(), payload.y(), payload.z())
-                    );
-                });
-            }
-        );
-
         // Register for Server -> Client communication
         registrar.playToClient(
                 OctoSuit.RemoveFlywheelEffectPayload.TYPE,
