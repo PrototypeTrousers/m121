@@ -43,7 +43,6 @@ public class OctoSuitLogic {
     public static void tick(Player player) {
         if (player.level().isClientSide) return;
 
-        // 2. Load Data (Assumes you have a helper to get/set lists)
         List<Vec3> currentPositions = player.getData(MyAttachments.ARM_TARGETS);
         List<Vec3> lockedDestinations = player.getData(MyAttachments.ARM_DESTINATIONS);
 
@@ -60,7 +59,7 @@ public class OctoSuitLogic {
         }
 
         // 4. Process Each Arm
-        for (int i = 1; i < 2; i++) {
+        for (int i = 0; i < 4; i++) {
             Vec3 currentPos = currentPositions.get(i);
             Vec3 lockedDest = lockedDestinations.get(i);
 
@@ -78,7 +77,7 @@ public class OctoSuitLogic {
 //                if (currentlyMovingCount < MAX_MOVING_ARMS) {
 
                     // SEARCH: Find a solid block in that cone
-                    lockedDest = findSolidBlock(player); // 0.5 = ~60 degree cone
+                    lockedDest = findSolidBlock(player, i % 2 == 0); // 0.5 = ~60 degree cone
                     if (lockedDest == null) {
                         lockedDest = player.position();
                     }
@@ -99,19 +98,17 @@ public class OctoSuitLogic {
         player.setData(MyAttachments.ARM_DESTINATIONS, lockedDestinations);
 
         // 6. Flight Buff
-        updateFlightState(player, false);
+        updateFlightState(player, anchoredCount > 1);
     }
 
     /**
      * Optimized Block Search: Cone + Line of Sight + Sorted Sphere
      */
-    private static Vec3 findSolidBlock(Player player) {
+    private static Vec3 findSolidBlock(Player player, boolean isLeft) {
         BlockPos center = player.blockPosition();
         Level level = player.level();
         Vec3 eyePos = player.getEyePosition();
         Vec3 viewVec = player.getViewVector(1);
-
-        int checks = 0;
 
         // Iterate through our pre-sorted onion layers
         for (Vec3i offset : SearchPattern.OUTER_SHELL_7) {
@@ -130,8 +127,10 @@ public class OctoSuitLogic {
             if (dot < 0) {
                 continue; // Skip blocks behind
             }
-            if (cross > 0) {
+            if (cross > 0 && !isLeft) {
                 continue; // Skip blocks to the right
+            } else if (cross < 0 && isLeft) {
+                continue;
             }
             // 2. Solid Check (Memory access)
             ChunkAccess lc = level.getChunkSource().getChunk(targetPos.getX() >> 4, targetPos.getZ() >> 4, ChunkStatus.FULL, false);

@@ -54,9 +54,6 @@ public class OctoSuitVisual implements EffectVisual<OctoSuitEffect>, SimpleDynam
         topLeftArm.traverse(instance -> {
             instance.light(packedLight).setChanged();
         });
-
-        topRightArm.visible(false);
-
     }
 
     @Override
@@ -90,7 +87,7 @@ public class OctoSuitVisual implements EffectVisual<OctoSuitEffect>, SimpleDynam
 
         // Run your FABRIK / Inverse Kinematics logic here using 'target'
         ikSolver.solve(
-                topRightArm,
+                topLeftArm,
                 targets.get(0).toVector3f(),
                 pose, // New Parameter: The Root Pose
                 10,
@@ -102,7 +99,7 @@ public class OctoSuitVisual implements EffectVisual<OctoSuitEffect>, SimpleDynam
 
         // Pass the Root Matrix (pose.last().pose())
         ikSolver.solve(
-                topLeftArm,
+                topRightArm,
                 targets.get(1).toVector3f(),
                 pose, // New Parameter: The Root Pose
                 10,
