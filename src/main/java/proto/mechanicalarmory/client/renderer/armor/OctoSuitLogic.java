@@ -1,23 +1,29 @@
 package proto.mechanicalarmory.client.renderer.armor;
 
-import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.phys.Vec3;
-import net.minecraft.world.phys.BlockHitResult;
-import net.minecraft.world.level.ClipContext;
-import net.minecraft.world.level.Level;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Vec3i;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.entity.ai.attributes.AttributeModifier;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.level.ClipContext;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.state.BlockState;
-import net.neoforged.neoforge.common.NeoForgeMod;
+import net.minecraft.world.level.chunk.ChunkAccess;
+import net.minecraft.world.level.chunk.LevelChunkSection;
+import net.minecraft.world.level.chunk.status.ChunkStatus;
+import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.phys.Vec3;
 import proto.mechanicalarmory.client.renderer.util.SearchPattern;
 import proto.mechanicalarmory.common.items.armor.MyAttachments;
 
 import java.util.List;
-import java.util.ArrayList;
 
 import static net.neoforged.neoforge.common.NeoForgeMod.CREATIVE_FLIGHT;
+import static proto.mechanicalarmory.MechanicalArmory.MODID;
 
 public class OctoSuitLogic {
+
+    public static AttributeModifier flight = new AttributeModifier(ResourceLocation.fromNamespaceAndPath(MODID,"octosuit_flight"), 1, AttributeModifier.Operation.ADD_VALUE);
 
     // --- Configuration ---
     private static final int TOTAL_ARMS = 4;
@@ -31,38 +37,15 @@ public class OctoSuitLogic {
     private static final double SNAP_DIST_SQR = 0.1 * 0.1;
     private static final double STEP_TRIGGER_DIST_SQR = 16.0; // 4 blocks away -> trigger step
 
-    // Offsets: [Right/Left, Forward/Back]
-    // 0=TopRight, 1=TopLeft, 2=BotRight, 3=BotLeft
-    private static final double[][] ARM_OFFSETS = {
-            { 2.5,  2.0 },
-            {-2.5,  2.0 },
-            { 3.5, -1.5 },
-            {-3.5, -1.5 }
-    };
-
     /**
      * Call this from your Item's inventoryTick method.
      */
     public static void tick(Player player) {
         if (player.level().isClientSide) return;
 
-        // 1. Calculate Basis Vectors
-        Vec3 forward = new Vec3(player.getDirection().step().x, player.getDirection().step().y, player.getDirection().step().z);
-        Vec3 right = new Vec3 (player.getDirection().getClockWise().step().x, player.getDirection().getClockWise().step().y, player.getDirection().getClockWise().step().z);
-
         // 2. Load Data (Assumes you have a helper to get/set lists)
         List<Vec3> currentPositions = player.getData(MyAttachments.ARM_TARGETS);
         List<Vec3> lockedDestinations = player.getData(MyAttachments.ARM_DESTINATIONS);
-
-        // Initialization Safety
-        if (currentPositions.size() != TOTAL_ARMS) {
-            currentPositions = new ArrayList<>();
-            lockedDestinations = new ArrayList<>();
-            for (int i = 0; i < TOTAL_ARMS; i++) {
-                currentPositions.add(player.position());
-                lockedDestinations.add(player.position());
-            }
-        }
 
         // 3. Count Moving Arms (Gait Control)
         int currentlyMovingCount = 0;
@@ -81,41 +64,27 @@ public class OctoSuitLogic {
             Vec3 currentPos = currentPositions.get(i);
             Vec3 lockedDest = lockedDestinations.get(i);
 
-            // --- A. Calculate Ideal Air Position ---
-            double offX = ARM_OFFSETS[i][0];
-            double offZ = ARM_OFFSETS[i][1];
-
-            // Normalize vector to where the arm WANTS to be
-            Vec3 idealDir = forward.scale(offZ).add(right.scale(offX)).normalize();
-            // The point in the air 5 blocks away
-            Vec3 idealAirPoint = player.position().add(0, 1.0, 0).add(idealDir.scale(IDEAL_DISTANCE));
-
             // --- B. Trigger Logic ---
             double distToDest = currentPos.distanceToSqr(lockedDest);
             boolean isMoving = distToDest > SNAP_DIST_SQR;
 
             boolean isBehind = isBehindPlayer(player, currentPos);
             boolean isTooFar = currentPos.distanceToSqr(player.position()) > (MAX_REACH * MAX_REACH);
-            boolean needsStep = currentPos == player.position() || isBehind || isTooFar || currentPos.distanceToSqr(idealAirPoint) > STEP_TRIGGER_DIST_SQR;
+            boolean needsStep = currentPos == player.position() || isBehind || isTooFar;
 
-            // --- C. Step & Target Logic ---
-            if (needsStep && !isMoving) {
-                // GAIT CHECK: Can we join the moving queue?
-                if (currentlyMovingCount < MAX_MOVING_ARMS) {
-
-                    // CONE LOGIC: Right arms search Right, Left arms search Left
-                    // Indices 0, 2 are Right. Indices 1, 3 are Left.
-                    // We flip the 'Right' vector for left arms.
-                    Vec3 coneDir = (i % 2 == 0) ? right : right.scale(-1);
+//            // --- C. Step & Target Logic ---
+//            if (needsStep && !isMoving) {
+//                // GAIT CHECK: Can we join the moving queue?
+//                if (currentlyMovingCount < MAX_MOVING_ARMS) {
 
                     // SEARCH: Find a solid block in that cone
-                    lockedDest = findSolidBlock(player, idealAirPoint, coneDir, 0.5); // 0.5 = ~60 degree cone
+                    lockedDest = findSolidBlock(player); // 0.5 = ~60 degree cone
                     if (lockedDest == null) {
                         lockedDest = player.position();
                     }
-                    currentlyMovingCount++;
-                }
-            }
+//                    currentlyMovingCount++;
+//                }
+//            }
 
             // --- D. Movement ---
             // Using moveTowards for consistent linear logic (Server Side)
@@ -130,13 +99,13 @@ public class OctoSuitLogic {
         player.setData(MyAttachments.ARM_DESTINATIONS, lockedDestinations);
 
         // 6. Flight Buff
-        updateFlightState(player, anchoredCount >= MIN_ANCHORS_TO_FLY);
+        updateFlightState(player, false);
     }
 
     /**
      * Optimized Block Search: Cone + Line of Sight + Sorted Sphere
      */
-    private static Vec3 findSolidBlock(Player player, Vec3 idealPoint, Vec3 coneDir, double coneWidth) {
+    private static Vec3 findSolidBlock(Player player) {
         BlockPos center = player.blockPosition();
         Level level = player.level();
         Vec3 eyePos = player.getEyePosition();
@@ -145,7 +114,7 @@ public class OctoSuitLogic {
         int checks = 0;
 
         // Iterate through our pre-sorted onion layers
-        for (Vec3i offset : SearchPattern.SORTED_OFFSETS) {
+        for (Vec3i offset : SearchPattern.OUTER_SHELL_7) {
 
             BlockPos targetPos = center.offset(offset);
 
@@ -164,9 +133,17 @@ public class OctoSuitLogic {
             if (cross > 0) {
                 continue; // Skip blocks to the right
             }
-
             // 2. Solid Check (Memory access)
-            BlockState state = level.getBlockState(targetPos);
+            ChunkAccess lc = level.getChunkSource().getChunk(targetPos.getX() >> 4, targetPos.getZ() >> 4, ChunkStatus.FULL, false);
+            int si = lc.getSectionIndex(targetPos.getY() >> 4);
+            LevelChunkSection section = lc.getSection(si);
+
+            int localX = targetPos.getX() & 15;
+            int localY = targetPos.getY() & 15;
+            int localZ = targetPos.getZ() & 15;
+
+            BlockState state = section.getBlockState(localX, localY, localZ);
+
             if (!state.isAir() && state.isSolid()) {
 
                 // 3. Line of Sight Check (Raycast, expensive)
@@ -188,13 +165,16 @@ public class OctoSuitLogic {
         return null;
     }
 
-    // --- Helpers ---
-
     private static void updateFlightState(Player player, boolean canFly) {
-        boolean isFlying = player.getAttribute(CREATIVE_FLIGHT).getBaseValue() > 0;
+        boolean isFlying = player.getAttribute(CREATIVE_FLIGHT).getValue() > 0;
         // Only set if changed to avoid attribute syncing spam
-        if (canFly && !isFlying) player.getAttribute(CREATIVE_FLIGHT).setBaseValue(1);
-        else if (!canFly && isFlying) player.getAttribute(CREATIVE_FLIGHT).setBaseValue(0);
+        int i =2;
+        if (canFly && !isFlying){
+            if (!player.getAttribute(CREATIVE_FLIGHT).hasModifier(flight.id())) {
+                player.getAttribute(CREATIVE_FLIGHT).addTransientModifier(flight);
+            }
+        }
+        else if (!canFly && isFlying) player.getAttribute(CREATIVE_FLIGHT).removeModifier(flight);
     }
 
     private static Vec3 moveTowards(Vec3 current, Vec3 target, float maxDelta) {
