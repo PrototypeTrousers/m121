@@ -36,14 +36,17 @@ import net.neoforged.neoforge.registries.DeferredItem;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Vector3f;
 import proto.mechanicalarmory.client.renderer.armor.OctoSuitEffect;
+import proto.mechanicalarmory.client.renderer.armor.OctoSuitLogic;
 import proto.mechanicalarmory.client.renderer.armor.OctoSuitRenderer;
 import proto.mechanicalarmory.common.items.MAItems;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.WeakHashMap;
 import java.util.concurrent.ConcurrentHashMap;
 
+import static net.neoforged.neoforge.common.NeoForgeMod.CREATIVE_FLIGHT;
 import static proto.mechanicalarmory.MechanicalArmory.MODID;
 import static proto.mechanicalarmory.common.items.MAItems.ITEMS;
 
@@ -94,38 +97,8 @@ public class OctoSuit extends ArmorItem {
     public void inventoryTick(ItemStack stack, Level level, Entity entity, int slotId, boolean isSelected) {
         if (entity instanceof Player player) {
             if (player.getItemBySlot(EquipmentSlot.CHEST) == stack) {
-
                 if (!level.isClientSide) {
-                        // --- CHANGED SECTION START ---
-
-                    // 1. Calculate Target: 3 blocks Front, 3 blocks Left
-                    // We use pitch '0' so the arm stays level with the horizon even if player looks up/down.
-                    // If you want it to pitch with the head, replace '0' with 'player.getXRot()'
-                    Vector3f forw = player.getDirection().step().mul(3);
-                    Vector3f right = player.getDirection().getClockWise().step().mul(3);
-
-                    // Combine with Eye Position
-                    Vec3 desiredTarget = player.position()
-                            .add(forw.x, forw.y, forw.z)
-                            .add(right.x, right.y, right.z);
-
-                    // --- CHANGED SECTION END ---
-
-                    // 2. Where is the arm RIGHT NOW?
-                    // If null (first time equipping), snap to the target immediately
-                    List<Vec3> currentArmPositions = player.getData(MyAttachments.ARM_TARGETS);
-
-                    Vec3 currentTarget = currentArmPositions.get(0);
-
-                    currentArmPositions.set(0, currentTarget.lerp(desiredTarget, level.getGameTime() % 19 / 19f));
-
-                    desiredTarget = desiredTarget.add(-2 * right.x, -2 * right.y, -2 * right.z);
-
-                    currentTarget = currentArmPositions.get(1);
-                    currentArmPositions.set(1, currentTarget.lerp(desiredTarget, level.getGameTime() % 19 / 19f));
-
-                    // 4. Save the new position
-                    player.setData(MyAttachments.ARM_TARGETS, currentArmPositions);
+                    OctoSuitLogic.tick(player);
                 } else {
                     OctoSuitEffect effect = player.getData(MyAttachments.ARM_EFFECT_VISUAL);
                 }

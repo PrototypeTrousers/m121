@@ -55,6 +55,8 @@ public class OctoSuitVisual implements EffectVisual<OctoSuitEffect>, SimpleDynam
             instance.light(packedLight).setChanged();
         });
 
+        topRightArm.visible(false);
+
     }
 
     @Override

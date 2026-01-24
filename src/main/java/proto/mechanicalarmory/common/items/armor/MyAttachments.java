@@ -31,7 +31,27 @@ public class MyAttachments {
                         return newList;
                     })
                     // 2. Use .listOf() to handle the List structure
-                    .serialize(Vec3.CODEC.listOf().xmap(ArrayList::new, ArrayList::new))
+                    .serialize(Codec.list(Vec3.CODEC).xmap(ArrayList::new, ArrayList::new))
+                    .copyOnDeath()
+                    .sync(
+                            StreamCodec.composite(
+                                            ByteBufCodecs.DOUBLE, Vec3::x,
+                                            ByteBufCodecs.DOUBLE, Vec3::y,
+                                            ByteBufCodecs.DOUBLE, Vec3::z,
+                                            Vec3::new)
+                                    .apply(ByteBufCodecs.collection(ArrayList::new)))
+                    .build());
+
+    public static final Supplier<AttachmentType<List<Vec3>>> ARM_DESTINATIONS =
+            ATTACHMENT_TYPES.register("previousarm_targets", () -> AttachmentType.builder(() -> {
+                        List<Vec3> newList = new ArrayList<>();
+                        newList.add(Vec3.ZERO);
+                        newList.add(Vec3.ZERO);
+                        newList.add(Vec3.ZERO);
+                        newList.add(Vec3.ZERO);
+                        return newList;
+                    })// 2. Use .listOf() to handle the List structure
+                    .serialize(Codec.list(Vec3.CODEC).xmap(ArrayList::new, ArrayList::new))
                     .copyOnDeath()
                     .sync(
                             StreamCodec.composite(
