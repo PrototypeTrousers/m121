@@ -95,14 +95,26 @@ public class OctoSuitVisual implements EffectVisual<OctoSuitEffect>, SimpleDynam
                 0.001f
         );
 
-
-        //pose.translate(1f, 0, 0);
-
-        // Pass the Root Matrix (pose.last().pose())
         ikSolver.solve(
                 topRightArm,
                 targets.get(1).toVector3f(),
                 pose, // New Parameter: The Root Pose
+                10,
+                0.001f
+        );
+
+        ikSolver.solve(
+                bottomLeftArm,
+                targets.get(2).toVector3f(),
+                pose,
+                10,
+                0.001f
+        );
+
+        ikSolver.solve(
+                bottomRightArm,
+                targets.get(3).toVector3f(),
+                pose,
                 10,
                 0.001f
         );
