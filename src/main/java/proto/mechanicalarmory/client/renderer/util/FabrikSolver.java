@@ -12,7 +12,7 @@ public class FabrikSolver {
 
     // --- Constants ---
     private static final Vector3f BONE_AXIS = new Vector3f(0, 1, 0);
-    private static final float LIMIT_ANGLE = 12f; // Default limit
+    private static final float LIMIT_ANGLE = 24f; // Default limit
     private static final float LIMIT_COS = (float) Math.cos(Math.toRadians(LIMIT_ANGLE));
     private static final float LIMIT_RAD = (float) Math.toRadians(LIMIT_ANGLE);
     private final Vector3f localTarget = new Vector3f();
@@ -20,6 +20,34 @@ public class FabrikSolver {
     /**
      * Main entry point for the solver.
      */
+
+    public static void solveGeneric(Vector3f[] joints, float[] lengths, Matrix4f rootPose, Vector3f target, int iterations, float tolerance) {
+        // This is essentially your old 'runIterativeSolve' made public and static
+        Vector3f origin = new Vector3f(joints[0]);
+
+        // 1. Check reachability
+        float totalLen = 0;
+        for (float l : lengths) totalLen += l;
+
+        if (origin.distance(target) > totalLen) {
+            // Unreachable logic
+            Vector3f dir = new Vector3f(target).sub(origin).normalize();
+            for (int i = 1; i < joints.length; i++) {
+                joints[i].set(joints[i - 1]).add(new Vector3f(dir).mul(lengths[i - 1]));
+            }
+        } else {
+            // Reachable logic
+            for (int iter = 0; iter < iterations; iter++) {
+                if (joints[joints.length - 1].distance(target) < tolerance) break;
+
+                // You need to make backwardPass and forwardPass static too
+                backwardPass(joints, lengths, target);
+                forwardPass(joints, lengths, origin, rootPose);
+            }
+        }
+    }
+
+
     public void solve(InstanceTree2 rootNode, Vector3f inWorldTarget, Matrix4f rootPose, int iterations, float tolerance) {
         // 1. Gather the chain of bone instances
         List<InstanceTree2> chain = gatherChain(rootNode);
@@ -43,14 +71,23 @@ public class FabrikSolver {
         List<InstanceTree2> chain = new ArrayList<>();
         InstanceTree2 current = root;
 
-        while (current != null) {
-            chain.add(current);
-            int nextId = chain.size();
-            // Naming convention: RightArm.001, RightArm.002, etc.
-            String nextName = "RightArm.0" + (nextId < 10 ? "0" + nextId : nextId);
-            current = current.child(nextName);
+        for (int i =0; i < root.childCount(); i++) {
+            if (root.child(i).instance() == null) {
+                addChildren(root.child(i), chain);
+            }
         }
         return chain;
+    }
+
+    private void addChildren(InstanceTree2 root, List<InstanceTree2> children) {
+        if (root.instance() == null) {
+            children.add(root);
+        } else {
+            return;
+        }
+        for (int i =0; i < root.childCount(); i++) {
+            addChildren(root.child(i), children);
+        }
     }
 
     // --- Helper Step 2: Extract State ---
@@ -104,7 +141,7 @@ public class FabrikSolver {
         }
     }
 
-    private void backwardPass(Vector3f[] joints, float[] lengths, Vector3f target) {
+    private static void backwardPass(Vector3f[] joints, float[] lengths, Vector3f target) {
         joints[joints.length - 1].set(target);
         for (int i = joints.length - 2; i >= 0; i--) {
             Vector3f dir = new Vector3f(joints[i]).sub(joints[i + 1]).normalize();
@@ -112,7 +149,7 @@ public class FabrikSolver {
         }
     }
 
-    private void forwardPass(Vector3f[] joints, float[] lengths, Vector3f origin, Matrix4f rootPose) {
+    private static void forwardPass(Vector3f[] joints, float[] lengths, Vector3f origin, Matrix4f rootPose) {
         joints[0].set(origin);
 
         for (int i = 1; i < joints.length; i++) {
@@ -135,7 +172,7 @@ public class FabrikSolver {
     }
 
     // --- Helper Step 4: Constraints ---
-    private Vector3f constrainCone(Vector3f currentDir, Vector3f referenceDir) {
+    private static Vector3f constrainCone(Vector3f currentDir, Vector3f referenceDir) {
         // Fast Check
         if (currentDir.dot(referenceDir) >= LIMIT_COS) {
             return currentDir;

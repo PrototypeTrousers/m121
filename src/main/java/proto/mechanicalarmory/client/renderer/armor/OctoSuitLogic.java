@@ -7,15 +7,21 @@ import net.minecraft.world.entity.ai.attributes.AttributeModifier;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.ClipContext;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.ChunkAccess;
 import net.minecraft.world.level.chunk.LevelChunkSection;
 import net.minecraft.world.level.chunk.status.ChunkStatus;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.Vec3;
+import org.joml.Matrix4f;
+import org.joml.Vector3d;
+import org.joml.Vector3f;
+import proto.mechanicalarmory.client.renderer.util.FabrikSolver;
 import proto.mechanicalarmory.client.renderer.util.SearchPattern;
 import proto.mechanicalarmory.common.items.armor.MyAttachments;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import static net.neoforged.neoforge.common.NeoForgeMod.CREATIVE_FLIGHT;
@@ -36,6 +42,42 @@ public class OctoSuitLogic {
 
     private static final double SNAP_DIST_SQR = 0.1 * 0.1;
     private static final double STEP_TRIGGER_DIST_SQR = 16.0; // 4 blocks away -> trigger step
+
+
+    private static boolean updateArmPhysics(Arm arm, Player player, Vec3 targetVec3) {
+        int count = arm.segments.size();
+
+        // A. Convert Arm/Segments to Solver Data
+        Vector3f[] joints = new Vector3f[count + 1]; // +1 because N segments = N+1 joints
+        float[] lengths = new float[count];
+
+        // Assuming Segment.pos represents the START of the segment
+        for (int i = 0; i < count; i++) {
+            joints[i] = arm.segments.get(i).pos(); // Get current pos
+            lengths[i] = arm.segments.get(i).length();
+        }
+        // We need the tip position for the last joint.
+        // If Segment doesn't store endpoint, we calculate it:
+        Vector3f lastDir = arm.segments.get(count-1).direction();
+        float lastLen = arm.segments.get(count-1).length();
+        joints[count] = new Vector3f(joints[count-1]).add(lastDir.mul(lastLen, new Vector3f()));
+
+        // B. Prepare Context (Root Pose)
+        // We need the player's body rotation to constrain the shoulder
+        Matrix4f rootPose = new Matrix4f()
+                .translation((float)player.getX(), (float)player.getY(), (float)player.getZ())
+                .rotateY(-(float)Math.toRadians(player.yBodyRot)); // Minecraft Y-rotation is inverted/offset usually
+
+        Vector3f target = new Vector3f((float)targetVec3.x, (float)targetVec3.y, (float)targetVec3.z);
+
+        // C. RUN SOLVER
+        FabrikSolver.solveGeneric(joints, lengths, rootPose, target, 10, 0.01f);
+
+        if (joints[count + 1].equals(target, 0.01f)) {
+            return true;
+        }
+        return false;
+    }
 
     /**
      * Call this from your Item's inventoryTick method.
@@ -70,20 +112,24 @@ public class OctoSuitLogic {
             boolean isBehind = isBehindPlayer(player, currentPos);
             boolean isTooFar = currentPos.distanceToSqr(player.position()) > (MAX_REACH * MAX_REACH);
             boolean needsStep = currentPos == player.position() || isBehind || isTooFar;
+            if (player.level().getBlockState(
+                    new BlockPos((int) currentPos.x, (int) currentPos.y, (int) currentPos.z)).equals(Blocks.AIR.defaultBlockState())) {
+                needsStep = true;
+            }
 
 //            // --- C. Step & Target Logic ---
-//            if (needsStep && !isMoving) {
-//                // GAIT CHECK: Can we join the moving queue?
-//                if (currentlyMovingCount < MAX_MOVING_ARMS) {
+            if (needsStep && !isMoving) {
+                // GAIT CHECK: Can we join the moving queue?
+                if (currentlyMovingCount < MAX_MOVING_ARMS) {
 
-                    // SEARCH: Find a solid block in that cone
+//                  SEARCH: Find a solid block in that cone
                     lockedDest = findSolidBlock(player, i % 2 == 0); // 0.5 = ~60 degree cone
                     if (lockedDest == null) {
                         lockedDest = player.position();
                     }
-//                    currentlyMovingCount++;
-//                }
-//            }
+                    currentlyMovingCount++;
+                }
+            }
 
             // --- D. Movement ---
             // Using moveTowards for consistent linear logic (Server Side)
@@ -127,9 +173,9 @@ public class OctoSuitLogic {
             if (dot < 0) {
                 continue; // Skip blocks behind
             }
-            if (cross > 0 && !isLeft) {
+            if (cross < 0 && !isLeft) {
                 continue; // Skip blocks to the right
-            } else if (cross < 0 && isLeft) {
+            } else if (cross > 0 && isLeft) {
                 continue;
             }
             // 2. Solid Check (Memory access)
@@ -154,9 +200,9 @@ public class OctoSuitLogic {
                 ));
 
                 // If we hit the block we intended to, it's valid
-                if (hit.getBlockPos().equals(targetPos)) {
+                //if (hit.getBlockPos().equals(targetPos)) {
                     return targetCenter;
-                }
+                //}
             }
         }
 
@@ -189,5 +235,27 @@ public class OctoSuitLogic {
         // Dot < 0 means angle > 90 degrees (Behind)
         // -0.2 provides a bit of buffer so it doesn't snap instantly
         return toTarget.dot(player.getLookAngle()) < -0.2;
+    }
+
+    public record Segment(Vector3f pos, float length, Vector3f direction){}
+
+    static class Arm {
+        Vector3f UP = new Vector3f(0, 1, 0);
+        Vector3f DOWN = new Vector3f(0, -1, 0);
+        Vector3f LEFT = new Vector3f(-1, 0, 0);
+        Vector3f RIGHT = new Vector3f(1, 0, 0);
+
+        Arm TOP_LEFT_ARM = new Arm(16, 0.6f, UP);
+        Arm TOP_RIGHT_ARM = new Arm(16, 0.6f, UP);
+        Arm BOTTOM_LEFT_ARM = new Arm(16, 0.6f, LEFT);
+        Arm BOTTOM_RIGHT_ARM = new Arm(16, 0.6f, RIGHT);
+
+        List<Segment> segments = new ArrayList<>();
+
+        Arm(int amount, float length, Vector3f direction) {
+            for ( int i = 0; i < amount; i++) {
+                segments.add(new Segment(direction.mul(length * amount, new Vector3f()), length, direction));
+            }
+        }
     }
 }

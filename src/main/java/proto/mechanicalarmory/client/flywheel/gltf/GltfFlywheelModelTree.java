@@ -9,8 +9,10 @@ import java.util.Collections;
 import java.util.Map;
 
 public class GltfFlywheelModelTree {
+    static private int childidx;
 
     public static ModelTree create(GltfModel gltfModel) {
+        childidx = 0;
         Map<String, ModelTree> children = new Object2ObjectArrayMap<>();
         for (SceneModel sm : gltfModel.getSceneModels()) {
             for (NodeModel nm : sm.getNodeModels()) {
@@ -25,7 +27,9 @@ public class GltfFlywheelModelTree {
                 }
                 addNodeChildren(nm, newChildren);
                 ModelTree modelTree = new ModelTree(null, pp, newChildren);
-                children.put(nm.getName(), modelTree);
+
+                String nmName = nm.getName();
+                children.put(nmName != null ? nmName : String.valueOf(childidx++), modelTree);
             }
         }
         return new ModelTree(null, PartPose.ZERO, children);
@@ -35,7 +39,8 @@ public class GltfFlywheelModelTree {
         for (MeshModel mm : nm.getMeshModels()) {
             for (MeshPrimitiveModel pm : mm.getMeshPrimitiveModels()) {
                 ModelTree modelTree = new ModelTree(new GltfFlywheelModel(nm, pm), PartPose.ZERO, Collections.EMPTY_MAP);
-                children.put(mm.getName(), modelTree);
+                String mmName = mm.getName();
+                children.put(mmName != null ? mmName : String.valueOf(childidx++), modelTree);
             }
         }
 
@@ -49,7 +54,8 @@ public class GltfFlywheelModelTree {
             } else {
                 modelTree = new ModelTree(null, pp, newChildren);
             }
-            children.put(mm.getName(), modelTree);
+            String mmName = mm.getName();
+            children.put(mmName != null ? mmName : String.valueOf(childidx++), modelTree);
         }
     }
 }

@@ -27,7 +27,9 @@ public class OctoSuitVisual implements EffectVisual<OctoSuitEffect>, SimpleDynam
     private final InstanceTree2 instanceTree;
     private final InstanceTree2 back;
     private final InstanceTree2 topRightArm;
+    private final InstanceTree2 bottomRightArm;
     private final InstanceTree2 topLeftArm;
+    private final InstanceTree2 bottomLeftArm;
     Matrix4f pose = new Matrix4f();
 
 
@@ -40,19 +42,19 @@ public class OctoSuitVisual implements EffectVisual<OctoSuitEffect>, SimpleDynam
         instanceTree = InstanceTree2.create(ctx.instancerProvider(), modelTree);
 
         back = instanceTree.child("Cube");
-        topRightArm = instanceTree.child("RightArm");
-        instanceTree.updateInstancesStatic(pose);
+        topLeftArm = instanceTree.child("TopLeftArm");
+        bottomLeftArm = instanceTree.child("BottomLeftArm");
 
-        topLeftArm = InstanceTree2.create(ctx.instancerProvider(), topRightArm.getSource());
-        topLeftArm.updateInstancesStatic(pose);
+        topRightArm = instanceTree.child("TopRightArm");
+        bottomRightArm = instanceTree.child("BottomRightArm");
+
+
+        instanceTree.updateInstancesStatic(pose);
 
         var packedLight = LevelRenderer.getLightColor(holderEntity.level(), holderEntity.getOnPos().above());
         instanceTree.traverse(instance -> {
             instance.light(packedLight)
                     .setChanged();
-        });
-        topLeftArm.traverse(instance -> {
-            instance.light(packedLight).setChanged();
         });
     }
 
@@ -64,7 +66,6 @@ public class OctoSuitVisual implements EffectVisual<OctoSuitEffect>, SimpleDynam
     @Override
     public void delete() {
         instanceTree.delete();
-        topLeftArm.delete();
     }
 
     @Override
@@ -95,7 +96,7 @@ public class OctoSuitVisual implements EffectVisual<OctoSuitEffect>, SimpleDynam
         );
 
 
-        pose.translate(1f, 0, 0);
+        //pose.translate(1f, 0, 0);
 
         // Pass the Root Matrix (pose.last().pose())
         ikSolver.solve(
