@@ -36,7 +36,7 @@ public class OctoSuitLogic {
     private static final int MAX_MOVING_ARMS = 2;       // Spider Gait: Only 2 move at a time
     private static final int MIN_ANCHORS_TO_FLY = 2;    // Need 2 arms anchored to fly
 
-    private static final float MOVEMENT_SPEED = 0.6f;   // Speed of arm travel
+    private static final float MOVEMENT_SPEED = 5.8f;   // Speed of arm travel
     private static final double MAX_REACH = 9.0;
     private static final double IDEAL_DISTANCE = 5.0;   // How far out the arms float naturally
 
@@ -73,7 +73,7 @@ public class OctoSuitLogic {
         // C. RUN SOLVER
         FabrikSolver.solveGeneric(joints, lengths, rootPose, target, 10, 0.01f);
 
-        if (joints[count + 1].equals(target, 0.01f)) {
+        if (joints[count].equals(target, 0.01f)) {
             return true;
         }
         return false;
@@ -124,6 +124,12 @@ public class OctoSuitLogic {
 
 //                  SEARCH: Find a solid block in that cone
                     lockedDest = findSolidBlock(player, i % 2 == 0); // 0.5 = ~60 degree cone
+
+                    if (i == 0 && lockedDest != null) {
+                        if (!updateArmPhysics(Arm.TOP_LEFT_ARM, player, lockedDest)) {
+                            lockedDest = null;
+                        }
+                    }
                     if (lockedDest == null) {
                         lockedDest = player.position();
                     }
@@ -240,15 +246,15 @@ public class OctoSuitLogic {
     public record Segment(Vector3f pos, float length, Vector3f direction){}
 
     static class Arm {
-        Vector3f UP = new Vector3f(0, 1, 0);
-        Vector3f DOWN = new Vector3f(0, -1, 0);
-        Vector3f LEFT = new Vector3f(-1, 0, 0);
-        Vector3f RIGHT = new Vector3f(1, 0, 0);
+        static Vector3f UP = new Vector3f(0, 1, 0);
+        static Vector3f DOWN = new Vector3f(0, -1, 0);
+        static Vector3f LEFT = new Vector3f(-1, 0, 0);
+        static Vector3f RIGHT = new Vector3f(1, 0, 0);
 
-        Arm TOP_LEFT_ARM = new Arm(16, 0.6f, UP);
-        Arm TOP_RIGHT_ARM = new Arm(16, 0.6f, UP);
-        Arm BOTTOM_LEFT_ARM = new Arm(16, 0.6f, LEFT);
-        Arm BOTTOM_RIGHT_ARM = new Arm(16, 0.6f, RIGHT);
+        public static Arm TOP_LEFT_ARM = new Arm(16, 0.6f, UP);
+        public static Arm TOP_RIGHT_ARM = new Arm(16, 0.6f, UP);
+        public static Arm BOTTOM_LEFT_ARM = new Arm(16, 0.6f, LEFT);
+        public static Arm BOTTOM_RIGHT_ARM = new Arm(16, 0.6f, RIGHT);
 
         List<Segment> segments = new ArrayList<>();
 
