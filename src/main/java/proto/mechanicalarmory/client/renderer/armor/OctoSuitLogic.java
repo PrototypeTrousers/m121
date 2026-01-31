@@ -15,9 +15,8 @@ import net.minecraft.world.level.chunk.status.ChunkStatus;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.Vec3;
 import org.joml.Matrix4f;
-import org.joml.Vector3d;
 import org.joml.Vector3f;
-import proto.mechanicalarmory.client.renderer.util.FabrikSolver;
+import proto.mechanicalarmory.client.renderer.util.SnakeSolver;
 import proto.mechanicalarmory.client.renderer.util.SearchPattern;
 import proto.mechanicalarmory.common.items.armor.MyAttachments;
 
@@ -42,42 +41,6 @@ public class OctoSuitLogic {
 
     private static final double SNAP_DIST_SQR = 0.1 * 0.1;
     private static final double STEP_TRIGGER_DIST_SQR = 16.0; // 4 blocks away -> trigger step
-
-
-    private static boolean updateArmPhysics(Arm arm, Player player, Vec3 targetVec3) {
-        int count = arm.segments.size();
-
-        // A. Convert Arm/Segments to Solver Data
-        Vector3f[] joints = new Vector3f[count + 1]; // +1 because N segments = N+1 joints
-        float[] lengths = new float[count];
-
-        // Assuming Segment.pos represents the START of the segment
-        for (int i = 0; i < count; i++) {
-            joints[i] = arm.segments.get(i).pos(); // Get current pos
-            lengths[i] = arm.segments.get(i).length();
-        }
-        // We need the tip position for the last joint.
-        // If Segment doesn't store endpoint, we calculate it:
-        Vector3f lastDir = arm.segments.get(count-1).direction();
-        float lastLen = arm.segments.get(count-1).length();
-        joints[count] = new Vector3f(joints[count-1]).add(lastDir.mul(lastLen, new Vector3f()));
-
-        // B. Prepare Context (Root Pose)
-        // We need the player's body rotation to constrain the shoulder
-        Matrix4f rootPose = new Matrix4f()
-                .translation((float)player.getX(), (float)player.getY(), (float)player.getZ())
-                .rotateY(-(float)Math.toRadians(player.yBodyRot)); // Minecraft Y-rotation is inverted/offset usually
-
-        Vector3f target = new Vector3f((float)targetVec3.x, (float)targetVec3.y, (float)targetVec3.z);
-
-        // C. RUN SOLVER
-        FabrikSolver.solveGeneric(joints, lengths, rootPose, target, 10, 0.01f);
-
-        if (joints[count].equals(target, 0.01f)) {
-            return true;
-        }
-        return false;
-    }
 
     /**
      * Call this from your Item's inventoryTick method.
@@ -125,11 +88,6 @@ public class OctoSuitLogic {
 //                  SEARCH: Find a solid block in that cone
                     lockedDest = findSolidBlock(player, i % 2 == 0); // 0.5 = ~60 degree cone
 
-                    if (i == 0 && lockedDest != null) {
-                        if (!updateArmPhysics(Arm.TOP_LEFT_ARM, player, lockedDest)) {
-                            lockedDest = null;
-                        }
-                    }
                     if (lockedDest == null) {
                         lockedDest = player.position();
                     }
