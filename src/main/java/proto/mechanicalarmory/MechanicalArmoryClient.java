@@ -13,7 +13,6 @@ import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.packs.resources.Resource;
 import net.minecraft.world.entity.EntityType;
-import net.minecraft.world.level.block.CarrotBlock;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.EventPriority;
 import net.neoforged.bus.api.SubscribeEvent;
@@ -68,7 +67,7 @@ public class MechanicalArmoryClient {
     @SubscribeEvent(priority = EventPriority.LOWEST)
     static void onClientSetup(FMLClientSetupEvent event) {
         VisualizerRegistry.setVisualizer(MAEntities.ARM_ENTITY.get(), ArmVisualiser.ARM_VISUAL);
-        VisualizerRegistry.setVisualizer(MAEntities.CROP_BLOCK_ENTITY.get(), CropVisualiser.CROP_VISUAL);
+        VisualizerRegistry.setVisualizer(MAEntities.BUSH_BLOCK_ENTITY.get(), CropVisualiser.CROP_VISUAL);
         BuiltInRegistries.BLOCK_ENTITY_TYPE.forEach(c -> {
             if (VisualizerRegistry.getVisualizer(c) == null) {
                 VisualizerRegistry.setVisualizer(c, VanillaBlockVisualiser.VANILLA_BLOCK_VISUALISER);

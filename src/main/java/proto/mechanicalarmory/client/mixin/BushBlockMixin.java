@@ -6,16 +6,16 @@ import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import org.jetbrains.annotations.Nullable;
 import org.spongepowered.asm.mixin.Mixin;
-import proto.mechanicalarmory.common.blocks.CropBlockEntity;
+import proto.mechanicalarmory.common.blocks.BushBlockEntity;
 
-@Mixin(CropBlock.class)
-public abstract class CropBlockMixin extends Block implements EntityBlock {
-    public CropBlockMixin(Properties properties) {
+@Mixin(BushBlock.class)
+public abstract class BushBlockMixin extends Block implements EntityBlock {
+    public BushBlockMixin(Properties properties) {
         super(properties);
     }
 
     @Override
     public @Nullable BlockEntity newBlockEntity(BlockPos pos, BlockState state) {
-        return new CropBlockEntity(pos, state);
+        return new BushBlockEntity(pos, state);
     }
 }
