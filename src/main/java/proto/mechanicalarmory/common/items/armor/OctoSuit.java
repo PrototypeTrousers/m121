@@ -35,6 +35,9 @@ import static proto.mechanicalarmory.MechanicalArmory.MODID;
 
 @EventBusSubscriber(modid = MODID, value = Dist.CLIENT)
 public class OctoSuit extends ArmorItem {
+
+    OctoSuitLogic logic = new OctoSuitLogic();
+
     public OctoSuit(Holder<ArmorMaterial> material, Type type, Properties properties) {
         super(material, type, properties);
     }
@@ -81,7 +84,7 @@ public class OctoSuit extends ArmorItem {
         if (entity instanceof Player player) {
             if (player.getItemBySlot(EquipmentSlot.CHEST) == stack) {
                 if (!level.isClientSide) {
-                    OctoSuitLogic.tick(player);
+                    logic.tick(player);
                 } else {
                     OctoSuitEffect effect = player.getData(MyAttachments.ARM_EFFECT_VISUAL);
                 }

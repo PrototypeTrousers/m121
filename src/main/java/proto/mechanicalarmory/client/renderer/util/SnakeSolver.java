@@ -63,14 +63,14 @@ public class SnakeSolver {
         // 1. Calculate the total length of the spline (approximation)
         // This helps us map "Bone Index" to "Spline T"
         // For simplicity, we assume the spline segments are roughly equal length.
+        float boneLength = 1 / (float) bonesCount;
 
         for (int i = 0; i < bonesCount; i++) {
             // Normalized position of this bone in the chain (0.0 to 1.0)
-            float tGlobal = (float) i / (float) (bonesCount - 1);
 
             // 2. Sample the Catmull-Rom Spline at tGlobal
-            Vector3f pos = sampleSpline(pathWaypoints, tGlobal);
-            Vector3f nextPos = sampleSpline(pathWaypoints, tGlobal + 0.01f);
+            Vector3f pos = sampleSpline(pathWaypoints, boneLength * i);
+            Vector3f nextPos = sampleSpline(pathWaypoints, boneLength * (i + 1));
 
             // 3. Orient the bone
             Vector3f forward = new Vector3f(nextPos).sub(pos).normalize();

@@ -15,6 +15,7 @@ import proto.mechanicalarmory.client.renderer.util.SnakeSolver;
 
 import java.util.List;
 
+import static proto.mechanicalarmory.common.items.armor.MyAttachments.ARM_DESTINATIONS;
 import static proto.mechanicalarmory.common.items.armor.MyAttachments.ARM_TARGETS;
 
 public class OctoSuitVisual implements EffectVisual<OctoSuitEffect>, SimpleDynamicVisual {
@@ -92,27 +93,30 @@ public class OctoSuitVisual implements EffectVisual<OctoSuitEffect>, SimpleDynam
 
         back.child(0).instance().setTransform(pose).setChanged();
 
-        List<Vec3> targets = holderEntity.getData(ARM_TARGETS);
-
-        List<Vec3> rawTargets = holderEntity.getData(ARM_TARGETS);
+        List<Vec3> tipPos = holderEntity.getData(ARM_TARGETS);
+        List<Vec3> targetPos = holderEntity.getData(ARM_DESTINATIONS);
 
         Vector3f shoulderOrigin = new Vector3f();
-        shoulderOrigin.add((float) ePos.x, (float) ePos.y, (float) ePos.z);
-        shoulderOrigin.add((float) behind.x, (float) behind.y, (float) behind.z);
+
+        pose.getTranslation(shoulderOrigin);
+
+        shoulderOrigin.add(topLeftArm.initialPose().x / 16f,
+                topLeftArm.initialPose().y / 16f,
+                topLeftArm.initialPose().z / 16f);
 
         // 1. Update Planners
         // They will handle A* internally and store the result in .currentPath
-        plannerTopLeft.update(shoulderOrigin, rawTargets.get(0).toVector3f(), holderEntity.level());
-        plannerTopRight.update(shoulderOrigin, rawTargets.get(1).toVector3f(), holderEntity.level());
-        plannerBotLeft.update(shoulderOrigin, rawTargets.get(2).toVector3f(), holderEntity.level());
-        plannerBotRight.update(shoulderOrigin, rawTargets.get(3).toVector3f(), holderEntity.level());
+        plannerTopLeft.update(tipPos.get(0).toVector3f(), targetPos.get(0).toVector3f(), shoulderOrigin, holderEntity.level());
+//        plannerTopRight.update(shoulderOrigin, rawTargets.get(1).toVector3f(), holderEntity.level());
+//        plannerBotLeft.update(shoulderOrigin, rawTargets.get(2).toVector3f(), holderEntity.level());
+//        plannerBotRight.update(shoulderOrigin, rawTargets.get(3).toVector3f(), holderEntity.level());
 
         // 2. Draw
         // Just pass the planner's path to the solver
         snakeSolver.solveMultiSegment(topLeftArm, plannerTopLeft.currentPath, pose);
-        snakeSolver.solveMultiSegment(topRightArm, plannerTopRight.currentPath, pose);
-        snakeSolver.solveMultiSegment(bottomLeftArm, plannerBotLeft.currentPath, pose);
-        snakeSolver.solveMultiSegment(bottomRightArm, plannerBotRight.currentPath, pose);
+//        snakeSolver.solveMultiSegment(topRightArm, plannerTopRight.currentPath, pose);
+//        snakeSolver.solveMultiSegment(bottomLeftArm, plannerBotLeft.currentPath, pose);
+//        snakeSolver.solveMultiSegment(bottomRightArm, plannerBotRight.currentPath, pose);
 
         topRightArm.visible(false);
         bottomLeftArm.visible(false);

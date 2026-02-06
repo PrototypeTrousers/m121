@@ -19,6 +19,7 @@ import org.joml.Vector3f;
 import proto.mechanicalarmory.client.renderer.util.SnakeSolver;
 import proto.mechanicalarmory.client.renderer.util.SearchPattern;
 import proto.mechanicalarmory.common.items.armor.MyAttachments;
+import proto.mechanicalarmory.common.logic.OptimizedAStar;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -29,7 +30,7 @@ import static proto.mechanicalarmory.MechanicalArmory.MODID;
 public class OctoSuitLogic {
 
     public static AttributeModifier flight = new AttributeModifier(ResourceLocation.fromNamespaceAndPath(MODID,"octosuit_flight"), 1, AttributeModifier.Operation.ADD_VALUE);
-
+    List<BlockPos> blockTargets = new ArrayList<>();
     // --- Configuration ---
     private static final int TOTAL_ARMS = 4;
     private static final int MAX_MOVING_ARMS = 2;       // Spider Gait: Only 2 move at a time
@@ -45,7 +46,7 @@ public class OctoSuitLogic {
     /**
      * Call this from your Item's inventoryTick method.
      */
-    public static void tick(Player player) {
+    public void tick(Player player) {
         if (player.level().isClientSide) return;
 
         List<Vec3> currentPositions = player.getData(MyAttachments.ARM_TARGETS);
@@ -54,6 +55,14 @@ public class OctoSuitLogic {
         // 3. Count Moving Arms (Gait Control)
         int currentlyMovingCount = 0;
         int anchoredCount = 0;
+
+        BlockPos target;
+        if (blockTargets.isEmpty()) {
+            blockTargets = OptimizedAStar.findPath(player.level(), new BlockPos(0, 0, 0), new BlockPos(5, 0, 0));
+        }
+        if (!blockTargets.isEmpty()) {
+            target = blockTargets.removeFirst();
+        }
 
         for (int i = 0; i < TOTAL_ARMS; i++) {
             if (currentPositions.get(i).distanceToSqr(lockedDestinations.get(i)) > SNAP_DIST_SQR) {
@@ -89,7 +98,7 @@ public class OctoSuitLogic {
                     lockedDest = findSolidBlock(player, i % 2 == 0); // 0.5 = ~60 degree cone
 
                     if (lockedDest == null) {
-                        lockedDest = player.position();
+                        lockedDest = player.position().add(player.getViewVector(1).multiply(5,5,5));
                     }
                     currentlyMovingCount++;
                 }
