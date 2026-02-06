@@ -10,16 +10,19 @@
     "BlockEntityRenderersAccessor",
     "BufferBuilderAccessor",
     "BufferSourceAccessor",
+    "ClientLevelMixin",
     "CompositeRenderTypeAccessor",
     "EntityRenderDispatcherMixin",
     "EntityRenderersAccessor",
     "FullyBufferedMultiBufferSourceAccessor",
     "ItemRendererMixin",
+    "LevelRendererMixin",
     "ModelPartAccessor",
     "ModelPartMixin",
     "MultiBufferAccessor",
     "MultiBufferSourceMixin",
     "RenderTypeAccessor",
+    "SectionCompilerMixin",
     "SpriteCoordinateExpanderAccessor",
     "TextureStateShardAccessor"
   ],
@@ -27,6 +30,7 @@
     "defaultRequire": 1
   },
   "mixins": [
+    "CropBlockMixin",
     "GeoRenderMixin",
     "ItemModelsMixin",
     "SegmentedBufferBuilderAccessor",

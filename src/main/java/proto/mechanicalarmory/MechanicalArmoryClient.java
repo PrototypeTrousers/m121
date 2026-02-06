@@ -13,6 +13,7 @@ import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.packs.resources.Resource;
 import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.level.block.CarrotBlock;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.EventPriority;
 import net.neoforged.bus.api.SubscribeEvent;
@@ -29,6 +30,7 @@ import net.neoforged.neoforge.client.gui.ConfigurationScreen;
 import net.neoforged.neoforge.client.gui.IConfigScreenFactory;
 import proto.mechanicalarmory.client.flywheel.gltf.GltfFlywheelModelTree;
 import proto.mechanicalarmory.client.flywheel.instances.arm.ArmVisualiser;
+import proto.mechanicalarmory.client.flywheel.instances.crop.CropVisualiser;
 import proto.mechanicalarmory.client.flywheel.instances.generic.VanillaBlockVisualiser;
 import proto.mechanicalarmory.client.flywheel.instances.generic.VanillaEntityVisualiser;
 import proto.mechanicalarmory.client.renderer.arm.ArmRenderer;
@@ -66,11 +68,13 @@ public class MechanicalArmoryClient {
     @SubscribeEvent(priority = EventPriority.LOWEST)
     static void onClientSetup(FMLClientSetupEvent event) {
         VisualizerRegistry.setVisualizer(MAEntities.ARM_ENTITY.get(), ArmVisualiser.ARM_VISUAL);
+        VisualizerRegistry.setVisualizer(MAEntities.CROP_BLOCK_ENTITY.get(), CropVisualiser.CROP_VISUAL);
         BuiltInRegistries.BLOCK_ENTITY_TYPE.forEach(c -> {
             if (VisualizerRegistry.getVisualizer(c) == null) {
                 VisualizerRegistry.setVisualizer(c, VanillaBlockVisualiser.VANILLA_BLOCK_VISUALISER);
             }
         });
+
         BuiltInRegistries.ENTITY_TYPE.forEach(c -> {
             if (c == EntityType.PLAYER) return;
             if (VisualizerRegistry.getVisualizer(c) == null) {
