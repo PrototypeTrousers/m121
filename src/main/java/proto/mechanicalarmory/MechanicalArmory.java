@@ -2,11 +2,10 @@ package proto.mechanicalarmory;
 
 import com.mojang.logging.LogUtils;
 import com.mojang.serialization.MapCodec;
+import dev.architectury.registry.menu.MenuRegistry;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
-import net.minecraft.network.chat.Component;
 import net.minecraft.world.item.CreativeModeTab;
-import net.minecraft.world.item.CreativeModeTabs;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.neoforged.bus.api.IEventBus;
@@ -16,17 +15,16 @@ import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.config.ModConfig;
 import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent;
 import net.neoforged.neoforge.common.NeoForge;
-import net.neoforged.neoforge.event.BuildCreativeModeTabContentsEvent;
 import net.neoforged.neoforge.event.server.ServerStartingEvent;
-import net.neoforged.neoforge.registries.DeferredHolder;
 import net.neoforged.neoforge.registries.DeferredRegister;
 import org.slf4j.Logger;
+import proto.mechanicalarmory.client.screens.ArmScreen;
 import proto.mechanicalarmory.common.blocks.MABlocks;
 import proto.mechanicalarmory.common.entities.MAEntities;
 import proto.mechanicalarmory.common.items.MAItems;
 import proto.mechanicalarmory.common.items.armor.ArmorMaterials;
 import proto.mechanicalarmory.common.items.armor.MyAttachments;
-import proto.mechanicalarmory.common.items.armor.OctoSuit;
+import proto.mechanicalarmory.common.menu.MenuTypes;
 
 // The value here should match an entry in the META-INF/neoforge.mods.toml file
 @Mod(MechanicalArmory.MODID)
@@ -58,6 +56,7 @@ public class MechanicalArmory {
 
         MyAttachments.ATTACHMENT_TYPES.register(modEventBus);
         MAEntities.BLOCK_ENTITY_TYPES.register(modEventBus);
+        MenuTypes.register(modEventBus);
         // Register the Deferred Register to the mod event bus so tabs get registered
         CREATIVE_MODE_TABS.register(modEventBus);
 

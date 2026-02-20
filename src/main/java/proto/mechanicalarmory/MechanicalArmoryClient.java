@@ -22,6 +22,7 @@ import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.event.lifecycle.FMLClientSetupEvent;
 import net.neoforged.neoforge.client.event.EntityRenderersEvent;
 import net.neoforged.neoforge.client.event.ModelEvent;
+import net.neoforged.neoforge.client.event.RegisterMenuScreensEvent;
 import net.neoforged.neoforge.client.event.RenderFrameEvent;
 import net.neoforged.neoforge.client.extensions.common.IClientItemExtensions;
 import net.neoforged.neoforge.client.extensions.common.RegisterClientExtensionsEvent;
@@ -35,6 +36,7 @@ import proto.mechanicalarmory.client.flywheel.instances.generic.VanillaEntityVis
 import proto.mechanicalarmory.client.renderer.arm.ArmRenderer;
 import proto.mechanicalarmory.client.renderer.arm.MyCustomItemBakedModel;
 import proto.mechanicalarmory.client.renderer.arm.MyItemRenderer;
+import proto.mechanicalarmory.client.screens.ArmScreen;
 import proto.mechanicalarmory.common.entities.MAEntities;
 import proto.mechanicalarmory.common.items.MAItems;
 
@@ -43,6 +45,7 @@ import java.io.IOException;
 import java.util.Optional;
 
 import static proto.mechanicalarmory.MechanicalArmory.MODID;
+import static proto.mechanicalarmory.common.menu.MenuTypes.ARM_ENTITY_MENU;
 
 // This class will not load on dedicated servers. Accessing client side code from here is safe.
 @Mod(value = MODID, dist = Dist.CLIENT)
@@ -62,6 +65,7 @@ public class MechanicalArmoryClient {
         // The config screen is accessed by going to the Mods screen > clicking on your mod > clicking on config.
         // Do not forget to add translations for your config options to the en_us.json file.
         container.registerExtensionPoint(IConfigScreenFactory.class, ConfigurationScreen::new);
+
     }
 
     @SubscribeEvent(priority = EventPriority.LOWEST)
@@ -119,6 +123,12 @@ public class MechanicalArmoryClient {
             }
         };
         event.registerItem(itemExtensions , MAItems.ARM_ITEM);
+    }
+
+    @SubscribeEvent
+    public static void registerScreens(RegisterMenuScreensEvent event) {
+        // This links the MenuType ID to your owo-lib Screen
+        event.register(ARM_ENTITY_MENU.get(), ArmScreen::new);
     }
 
     @SubscribeEvent

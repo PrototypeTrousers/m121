@@ -27,11 +27,13 @@ import org.jetbrains.annotations.Nullable;
 import org.joml.Vector3d;
 import proto.mechanicalarmory.common.entities.MAEntities;
 import proto.mechanicalarmory.common.logic.*;
+import proto.mechanicalarmory.common.menu.ArmScreenHandler;
+import rearth.oritech.client.ui.ItemFilterScreenHandler;
 
 import static proto.mechanicalarmory.common.logic.Action.DELIVER;
 import static proto.mechanicalarmory.common.logic.Action.RETRIEVE;
 
-public class ArmEntity extends BlockEntity implements BlockEntityTicker<ArmEntity> {
+public class ArmEntity extends BlockEntity implements BlockEntityTicker<ArmEntity>, MenuProvider {
     private final Targeting targeting = new Targeting();
     private final MotorCortex motorCortex;
     private final WorkStatus workStatus = new WorkStatus();
@@ -97,6 +99,10 @@ public class ArmEntity extends BlockEntity implements BlockEntityTicker<ArmEntit
         targeting.deserializeNBT(registries, compound.getCompound("targeting"));
         workStatus.deserializeNBT(registries, compound.getCompound("workStatus"));
         itemHandler.deserializeNBT(registries, compound.getCompound("itemHandler"));
+    }
+
+    public ItemStackHandler getHandler() {
+        return itemHandler;
     }
 
     public ItemStack getItemStack() {
@@ -205,6 +211,16 @@ public class ArmEntity extends BlockEntity implements BlockEntityTicker<ArmEntit
 
     public boolean hasOutput() {
         return targeting.hasOutput();
+    }
+
+    @Override
+    public Component getDisplayName() {
+        return Component.nullToEmpty("");
+    }
+
+    @Override
+    public @Nullable AbstractContainerMenu createMenu(int containerId, Inventory playerInventory, Player player) {
+        return new ArmScreenHandler(containerId, playerInventory, this);
     }
 
     public class ArmItemHandler extends ItemStackHandler {

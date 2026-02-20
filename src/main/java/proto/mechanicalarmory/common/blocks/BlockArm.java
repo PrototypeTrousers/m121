@@ -1,9 +1,12 @@
 package proto.mechanicalarmory.common.blocks;
 
 import com.mojang.serialization.MapCodec;
+import dev.architectury.registry.menu.ExtendedMenuProvider;
+import dev.architectury.registry.menu.MenuRegistry;
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.MenuProvider;
 import net.minecraft.world.entity.player.Inventory;
@@ -79,15 +82,13 @@ public class BlockArm extends Block implements EntityBlock {
     }
 
     @Override
-    protected InteractionResult useWithoutItem(BlockState state, Level level, BlockPos pos, Player player, BlockHitResult hitResult) {
-        if (level.isClientSide) {
-            // Find the BlockEntity at this position
-            BlockEntity be = level.getBlockEntity(pos);
-            if (be instanceof ArmEntity arm) {
-                // Open the owo screen
-                Minecraft.getInstance().setScreen(new ArmScreen(arm));
-            }
+    public InteractionResult useWithoutItem(BlockState state, Level world, BlockPos pos, Player player, BlockHitResult hit) {
+
+        if (!world.isClientSide) {
+            var handler = (MenuProvider) world.getBlockEntity(pos);
+            player.openMenu(handler, pos);
         }
+
         return InteractionResult.SUCCESS;
     }
 }
