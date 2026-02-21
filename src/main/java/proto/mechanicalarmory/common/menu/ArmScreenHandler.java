@@ -27,7 +27,7 @@ public class ArmScreenHandler extends AbstractContainerMenu {
         this(syncId, playerInventory, Objects.requireNonNull(playerInventory.player.level().getBlockEntity(buf.readBlockPos())));
     }
 
-    public ArmScreenHandler(int syncId, Inventory playerInventory, BlockEntity blockEntity) {
+    public ArmScreenHandler(int syncId, @NotNull Inventory playerInventory, BlockEntity blockEntity) {
         super(MenuTypes.ARM_ENTITY_MENU.get(), syncId);
         this.inventory = playerInventory;
         this.blockPos = blockEntity.getBlockPos();
