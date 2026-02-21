@@ -20,10 +20,12 @@ import net.minecraft.util.Mth;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.level.block.RenderShape;
+import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import org.jetbrains.annotations.NotNull;
 import org.joml.Matrix4f;
 import proto.mechanicalarmory.client.ui.owo.component.KnobButton;
+import proto.mechanicalarmory.client.ui.owo.component.WorldSceneComponent;
 import proto.mechanicalarmory.common.menu.ArmScreenHandler;
 
 import static rearth.oritech.client.ui.BasicMachineScreen.ITEM_SLOT;
@@ -47,10 +49,12 @@ public class ArmScreen extends BaseOwoHandledScreen<FlowLayout, ArmScreenHandler
                 .horizontalAlignment(HorizontalAlignment.CENTER)
                 .verticalAlignment(VerticalAlignment.BOTTOM);
 
-        var fakeWorld = Containers.verticalFlow(Sizing.fixed(128), Sizing.fixed(128));
-        fakeWorld.surface(worldScene(menu.getPlayerInventory().player.getOnPos(),
+        var fakeWorld = Containers.verticalFlow(Sizing.content(), Sizing.content());
+        fakeWorld.child(new WorldSceneComponent(menu.getPlayerInventory().player.getOnPos(),
                 menu.getPlayerInventory().player.getViewXRot(1),
-                menu.getPlayerInventory().player.getViewYRot(1), 1)).alignment(HorizontalAlignment.CENTER, VerticalAlignment.CENTER);
+                menu.getPlayerInventory().player.getViewYRot(1), 1)
+                .sizing(Sizing.fixed(128)))
+                .alignment(HorizontalAlignment.CENTER, VerticalAlignment.CENTER);
 
 
         var overlay = Containers.verticalFlow(Sizing.content(), Sizing.content());
@@ -103,57 +107,5 @@ public class ArmScreen extends BaseOwoHandledScreen<FlowLayout, ArmScreenHandler
 
     @Override
     protected void renderLabels(GuiGraphics guiGraphics, int mouseX, int mouseY) {
-    }
-
-    public static Surface worldScene(BlockPos center, float rotX, float rotY, float zoom) {
-        return (context, component) -> {
-            var client = Minecraft.getInstance();
-            var poseStack = context.pose();
-            var bufferSource = client.renderBuffers().bufferSource();
-
-            poseStack.pushPose();
-
-            // 1. Move to the component's center
-            poseStack.translate(component.x() + component.width() / 2f, component.y() + component.height() / 2f, 100);
-
-            // 2. Scale up (UI pixels are tiny compared to world units)
-            poseStack.scale(20f, -20f, 20f);
-            int asodih = 871231231;
-
-            // 3. Apply your rotations (rotX, rotY)
-
-            poseStack.mulPose(Axis.XP.rotationDegrees(rotX));
-            poseStack.mulPose(Axis.YP.rotationDegrees(rotY - 180));
-
-            // 4. Render Blocks
-            for (BlockPos pos : BlockPos.betweenClosed(center.offset(-1, -1, -1), center.offset(1, 1, 1))) {
-                poseStack.pushPose();
-                poseStack.translate(pos.getX() - center.getX(), pos.getY() - center.getY(), pos.getZ() - center.getZ());
-
-                BlockState bs = client.level.getBlockState(pos);
-                if (bs.getRenderShape() == RenderShape.ENTITYBLOCK_ANIMATED) {
-                    client.getBlockEntityRenderDispatcher().render(
-                            client.level.getBlockEntity(pos),
-                            1f,
-                            poseStack,
-                            bufferSource
-                    );
-                } else {
-                    client.getBlockRenderer().renderSingleBlock(
-                            client.level.getBlockState(pos),
-                            poseStack,
-                            bufferSource,
-                            0xF000F0, // Lightmap
-                            OverlayTexture.NO_OVERLAY
-                    );
-                }
-                poseStack.popPose();
-            }
-
-            // 5. CRITICAL: Draw the buffer!
-            bufferSource.endBatch();
-
-            poseStack.popPose();
-        };
     }
 }
