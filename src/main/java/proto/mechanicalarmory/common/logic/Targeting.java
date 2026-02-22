@@ -13,7 +13,7 @@ import org.joml.Vector3d;
 
 import java.util.Optional;
 
-public class Targeting implements INBTSerializable<CompoundTag> {
+public class  Targeting implements INBTSerializable<CompoundTag> {
 
     Pair<BlockPos, Direction> source;
     Pair<BlockPos, Direction> target;

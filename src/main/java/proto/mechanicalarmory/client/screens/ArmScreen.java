@@ -23,6 +23,7 @@ import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.level.block.RenderShape;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
+import net.neoforged.neoforge.network.PacketDistributor;
 import org.jetbrains.annotations.NotNull;
 import org.joml.Matrix4f;
 import proto.mechanicalarmory.client.ui.owo.component.KnobButton;
@@ -64,11 +65,12 @@ public class ArmScreen extends BaseOwoHandledScreen<FlowLayout, ArmScreenHandler
                                         Direction clickedFace = hit.right();
 
                                         // Send to Server via NeoForge 1.21.1 PacketDistributor
-                                        net.neoforged.neoforge.network.PacketDistributor.sendToServer(
+                                        PacketDistributor.sendToServer(
                                                 new ArmClickPayload(armPos, clickedPos, clickedFace)
                                         );
                                     }
                                 })
+                                .targeting(menu.getBlockEntity().getTargeting())
                                 .sizing(Sizing.fixed(128)))
                 .alignment(HorizontalAlignment.CENTER, VerticalAlignment.CENTER);
 

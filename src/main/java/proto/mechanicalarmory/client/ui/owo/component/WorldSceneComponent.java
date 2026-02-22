@@ -1,24 +1,32 @@
 package proto.mechanicalarmory.client.ui.owo.component;
 
+import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.math.Axis;
 import io.wispforest.owo.ui.base.BaseComponent;
 import io.wispforest.owo.ui.core.OwoUIDrawContext;
 import it.unimi.dsi.fastutil.Pair;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.world.level.BlockGetter;
+import net.minecraft.world.level.ClipContext;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.RenderShape;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.material.FluidState;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.Vec3;
+import net.minecraft.world.phys.shapes.CollisionContext;
+import net.minecraft.world.phys.shapes.VoxelShape;
 import org.joml.Matrix4f;
+import org.joml.Vector3d;
 import org.joml.Vector4f;
+import proto.mechanicalarmory.common.logic.Targeting;
 
 import java.util.function.BiConsumer;
-import java.util.function.Consumer;
 
 public class WorldSceneComponent extends BaseComponent {
     protected BlockPos center;
@@ -34,6 +42,13 @@ public class WorldSceneComponent extends BaseComponent {
         this.rotX = rotX;
         this.rotY = rotY;
         this.zoom = zoom;
+    }
+
+    private Targeting targeting;
+
+    public WorldSceneComponent targeting(Targeting targeting) {
+        this.targeting = targeting;
+        return this;
     }
 
     @Override
@@ -60,7 +75,7 @@ public class WorldSceneComponent extends BaseComponent {
         lastModelViewMatrix.set(poseStack.last().pose());
 
         // 4. Render Blocks
-        for (BlockPos pos : BlockPos.betweenClosed(center.offset(-1, -1, -1), center.offset(1, 1, 1))) {
+        for (BlockPos pos : BlockPos.betweenClosed(center.offset(-2, -2, -2), center.offset(2, 2, 2))) {
             poseStack.pushPose();
             poseStack.translate(pos.getX() - center.getX() - 0.5f, 
                                pos.getY() - center.getY() - 0.5f, 
@@ -83,7 +98,38 @@ public class WorldSceneComponent extends BaseComponent {
             poseStack.popPose();
         }
 
+        if (this.targeting != null) {
+            if (this.targeting.hasInput()) {
+                renderIndicatorBlock(poseStack, bufferSource, client,
+                        this.targeting.getSourceVec(), this.targeting.getSourceFacing(),
+                        Blocks.BLUE_CONCRETE.defaultBlockState());
+            }
+            if (this.targeting.hasOutput()) {
+                renderIndicatorBlock(poseStack, bufferSource, client,
+                        this.targeting.getTargetVec(), this.targeting.getTargetFacing(),
+                        Blocks.GREEN_CONCRETE.defaultBlockState());
+            }
+        }
+
         bufferSource.endBatch();
+        poseStack.popPose();
+    }
+
+    private void renderIndicatorBlock(PoseStack poseStack, MultiBufferSource bufferSource, Minecraft client,
+                                      Vector3d vec, Direction facing, BlockState state) {
+        poseStack.pushPose();
+        poseStack.translate(vec.x, vec.y, vec.z);
+
+        // 3. Scale down to a tiny cube (20% of a standard block)
+        float scale = 0.2f;
+        poseStack.scale(scale, scale, scale);
+
+        // 4. Minecraft renders blocks from 0 to 1. Translate by -0.5 to center the model on our offset coordinate.
+        poseStack.translate(-0.5, -0.5, -0.5);
+
+        // 5. Render as a solid block at full brightness (0xF000F0)
+        client.getBlockRenderer().renderSingleBlock(state, poseStack, bufferSource, 0xF000F0, OverlayTexture.NO_OVERLAY);
+
         poseStack.popPose();
     }
 
@@ -127,8 +173,9 @@ public class WorldSceneComponent extends BaseComponent {
                 this.onBlockClicked.accept(hit, button);
                 return true;
             }
-            this.isDragging = false;
         }
+        this.isDragging = false;
+
         return super.onMouseUp(mouseX, mouseY, button);
     }
 
@@ -154,28 +201,58 @@ public class WorldSceneComponent extends BaseComponent {
         if (client.level == null) return null;
 
         Pair<BlockPos, Direction> closestHit = null;
-        double minDistance = Double.MAX_VALUE;
 
-        for (BlockPos pos : BlockPos.betweenClosed(center.offset(-1, -1, -1), center.offset(1, 1, 1))) {
-            BlockState state = client.level.getBlockState(pos);
-            if (state.isAir()) continue;
+        ClipContext context = new ClipContext(
+                worldRayStart,
+                worldRayEnd,
+                ClipContext.Block.OUTLINE,
+                ClipContext.Fluid.NONE,
+                CollisionContext.empty()
+        );
 
-            var shape = state.getShape(client.level, pos);
-            if (shape.isEmpty()) continue;
+        // Raycast but ignore everything further than 2 blocks away from the center
+        BlockHitResult hit = clipWithinRadius(client.level, context, this.center, 2.0);
 
-            // shape.clip() automatically calculates the hit location and the Direction (block face)
-            BlockHitResult hitResult = shape.clip(worldRayStart, worldRayEnd, pos);
-
-            if (hitResult != null) {
-                double dist = worldRayStart.distanceToSqr(hitResult.getLocation());
-                if (dist < minDistance) {
-                    minDistance = dist;
-                    closestHit = Pair.of(hitResult.getBlockPos().immutable(), hitResult.getDirection());
-                }
-            }
+        if (hit.getType() != BlockHitResult.Type.MISS) {
+            closestHit = Pair.of(hit.getBlockPos().immutable(), hit.getDirection());
         }
 
         return closestHit;
+    }
+
+    public BlockHitResult clipWithinRadius(BlockGetter level, ClipContext context, BlockPos center, double maxRadius) {
+        // Square the radius once for faster distance checking later
+        double maxRadiusSqr = maxRadius * maxRadius;
+
+        return BlockGetter.traverseBlocks(context.getFrom(), context.getTo(), context,
+                (ctx, pos) -> {
+                    if (pos.distSqr(center) > maxRadiusSqr) {
+                        return null;
+                    }
+
+                    // Standard Minecraft Clip Logic
+                    BlockState blockstate = level.getBlockState(pos);
+                    FluidState fluidstate = level.getFluidState(pos);
+                    Vec3 rayStart = ctx.getFrom();
+                    Vec3 rayEnd = ctx.getTo();
+
+                    VoxelShape blockShape = ctx.getBlockShape(blockstate, level, pos);
+                    BlockHitResult blockHit = level.clipWithInteractionOverride(rayStart, rayEnd, pos, blockShape, blockstate);
+
+                    VoxelShape fluidShape = ctx.getFluidShape(fluidstate, level, pos);
+                    BlockHitResult fluidHit = fluidShape.clip(rayStart, rayEnd, pos);
+
+                    double blockDist = blockHit == null ? Double.MAX_VALUE : rayStart.distanceToSqr(blockHit.getLocation());
+                    double fluidDist = fluidHit == null ? Double.MAX_VALUE : rayStart.distanceToSqr(fluidHit.getLocation());
+
+                    return blockDist <= fluidDist ? blockHit : fluidHit;
+                },
+                // 2. The On-Fail Function (Runs if the ray hits nothing)
+                (ctx) -> {
+                    Vec3 vec3 = ctx.getFrom().subtract(ctx.getTo());
+                    return BlockHitResult.miss(ctx.getTo(), Direction.getNearest(vec3.x, vec3.y, vec3.z), BlockPos.containing(ctx.getTo()));
+                }
+        );
     }
 
     public Vec3 getMouseRay(double mouseX, double mouseY, boolean far) {

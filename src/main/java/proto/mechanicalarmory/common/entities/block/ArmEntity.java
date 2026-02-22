@@ -228,6 +228,10 @@ public class ArmEntity extends BlockEntity implements BlockEntityTicker<ArmEntit
         return new ArmScreenHandler(containerId, playerInventory, this);
     }
 
+    public Targeting getTargeting() {
+        return targeting;
+    }
+
     public class ArmItemHandler extends ItemStackHandler {
         public ArmItemHandler(int i) {
             super(i);
