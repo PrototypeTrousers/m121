@@ -14,6 +14,7 @@ import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.renderer.GameRenderer;
 import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.core.NonNullList;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.Mth;
@@ -26,7 +27,9 @@ import org.jetbrains.annotations.NotNull;
 import org.joml.Matrix4f;
 import proto.mechanicalarmory.client.ui.owo.component.KnobButton;
 import proto.mechanicalarmory.client.ui.owo.component.WorldSceneComponent;
+import proto.mechanicalarmory.common.entities.block.ArmEntity;
 import proto.mechanicalarmory.common.menu.ArmScreenHandler;
+import proto.mechanicalarmory.common.network.ArmClickPayload;
 
 import static rearth.oritech.client.ui.BasicMachineScreen.ITEM_SLOT;
 import static rearth.oritech.client.ui.BasicMachineScreen.getItemFrame;
@@ -50,10 +53,23 @@ public class ArmScreen extends BaseOwoHandledScreen<FlowLayout, ArmScreenHandler
                 .verticalAlignment(VerticalAlignment.BOTTOM);
 
         var fakeWorld = Containers.verticalFlow(Sizing.content(), Sizing.content());
-        fakeWorld.child(new WorldSceneComponent(menu.getBlockEntity().getBlockPos(),
-                menu.getPlayerInventory().player.getViewXRot(1),
-                menu.getPlayerInventory().player.getViewYRot(1), 1)
-                .sizing(Sizing.fixed(128)))
+        fakeWorld.child(
+                        new WorldSceneComponent(menu.getBlockEntity().getBlockPos(),
+                                menu.getPlayerInventory().player.getViewXRot(1),
+                                menu.getPlayerInventory().player.getViewYRot(1), 1)
+                                .onBlockClicked((hit, button) -> {
+                                    if (button == 1) {
+                                        BlockPos armPos = menu.getBlockEntity().getBlockPos();
+                                        BlockPos clickedPos = hit.left();
+                                        Direction clickedFace = hit.right();
+
+                                        // Send to Server via NeoForge 1.21.1 PacketDistributor
+                                        net.neoforged.neoforge.network.PacketDistributor.sendToServer(
+                                                new ArmClickPayload(armPos, clickedPos, clickedFace)
+                                        );
+                                    }
+                                })
+                                .sizing(Sizing.fixed(128)))
                 .alignment(HorizontalAlignment.CENTER, VerticalAlignment.CENTER);
 
 

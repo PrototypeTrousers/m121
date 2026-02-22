@@ -88,8 +88,8 @@ public class Targeting implements INBTSerializable<CompoundTag> {
     @Override
     public void deserializeNBT(HolderLookup.Provider provider, CompoundTag compound) {
         Optional<BlockPos> src = NbtUtils.readBlockPos(compound, "sourcePos");
-        src.ifPresent(blockPos -> this.source = Pair.of(blockPos, Direction.from3DDataValue((compound.getInt("sourceFacing")))));
+        src.ifPresent(blockPos -> this.setSource(blockPos, Direction.from3DDataValue((compound.getInt("sourceFacing")))));
         Optional<BlockPos> target = NbtUtils.readBlockPos(compound, "targetPos");
-        target.ifPresent(blockPos -> this.target = Pair.of(blockPos, Direction.from3DDataValue((compound.getInt("targetFacing")))));
+        target.ifPresent(blockPos -> this.setTarget(blockPos, Direction.from3DDataValue((compound.getInt("targetFacing")))));
     }
 }

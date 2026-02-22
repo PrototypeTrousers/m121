@@ -45,8 +45,6 @@ public class ArmEntity extends BlockEntity implements BlockEntityTicker<ArmEntit
     public ArmEntity(BlockPos pos, BlockState state) {
         super(MAEntities.ARM_ENTITY.get(), pos, state);
         motorCortex = new MotorCortex(this, 1f, interactionType);
-        targeting.setSource(new BlockPos(2,0,0), Direction.UP);
-        targeting.setTarget(new BlockPos(-2,0,0), Direction.UP);
     }
 
     private int progress = 0;
@@ -150,6 +148,9 @@ public class ArmEntity extends BlockEntity implements BlockEntityTicker<ArmEntit
 
     @Override
     public void tick(Level level, BlockPos pos, BlockState state, ArmEntity blockEntity) {
+        if (!hasInput() || !hasOutput()) {
+            return;
+        }
         if (workStatus.getType() == ActionTypes.IDLING) {
             if (hasInput() && hasOutput()) {
                 updateWorkStatus(ActionTypes.MOVEMENT, RETRIEVE);
@@ -184,7 +185,7 @@ public class ArmEntity extends BlockEntity implements BlockEntityTicker<ArmEntit
         }
     }
 
-    private void updateWorkStatus(ActionTypes type, Action action) {
+    public void updateWorkStatus(ActionTypes type, Action action) {
         workStatus.setType(type);
         workStatus.setAction(action);
         level.markAndNotifyBlock(worldPosition, level.getChunkAt(worldPosition), getBlockState(), getBlockState(), 3, 3);
@@ -198,6 +199,10 @@ public class ArmEntity extends BlockEntity implements BlockEntityTicker<ArmEntit
     public void setSource(BlockPos sourcePos, Direction sourceFacing) {
         targeting.setSource(sourcePos.subtract(this.getBlockPos()) , sourceFacing);
 //        markDirty();
+    }
+
+    public Pair<BlockPos, Direction> getSource() {
+        return targeting.getSource();
     }
 
     public void setTarget(BlockPos targetPos, Direction targetFacing) {

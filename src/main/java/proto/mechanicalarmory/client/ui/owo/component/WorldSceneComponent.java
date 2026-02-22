@@ -3,16 +3,22 @@ package proto.mechanicalarmory.client.ui.owo.component;
 import com.mojang.math.Axis;
 import io.wispforest.owo.ui.base.BaseComponent;
 import io.wispforest.owo.ui.core.OwoUIDrawContext;
+import it.unimi.dsi.fastutil.Pair;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.RenderShape;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.Vec3;
 import org.joml.Matrix4f;
 import org.joml.Vector4f;
+
+import java.util.function.BiConsumer;
+import java.util.function.Consumer;
 
 public class WorldSceneComponent extends BaseComponent {
     protected BlockPos center;
@@ -21,6 +27,7 @@ public class WorldSceneComponent extends BaseComponent {
     protected float zoom;
     private final Matrix4f lastModelViewMatrix = new Matrix4f();
     private boolean isDragging;
+    private BiConsumer<Pair<BlockPos, Direction>, Integer> onBlockClicked = (hit, button) -> {};
 
     public WorldSceneComponent(BlockPos center, float rotX, float rotY, float zoom) {
         this.center = center;
@@ -111,17 +118,23 @@ public class WorldSceneComponent extends BaseComponent {
 
     @Override
     public boolean onMouseUp(double mouseX, double mouseY, int button) {
-        // If they let go of the left mouse button AND they didn't drag...
-        if (button == 0 && !this.isDragging) {
-            // It was a clean click! Do the block placement.
-            BlockPos hit = getTargetedBlock(mouseX, mouseY);
+        // If they let go of the left mouse button AND they didn't drag to rotate...
+        if (button == 1 && !this.isDragging) {
+            Pair<BlockPos, Direction> hit = getTargetedHitResult(mouseX, mouseY);
+
             if (hit != null) {
-                Minecraft.getInstance().level.setBlock(hit, Blocks.DIRT.defaultBlockState(), 3);
+                // Fire the callback with the hit data!
+                this.onBlockClicked.accept(hit, button);
                 return true;
             }
+            this.isDragging = false;
         }
-        this.isDragging = false;
         return super.onMouseUp(mouseX, mouseY, button);
+    }
+
+    public WorldSceneComponent onBlockClicked(BiConsumer<Pair<BlockPos, Direction>, Integer> callback) {
+        this.onBlockClicked = callback;
+        return this;
     }
 
     @Override
@@ -129,11 +142,10 @@ public class WorldSceneComponent extends BaseComponent {
         return true;
     }
 
-    public BlockPos getTargetedBlock(double mouseX, double mouseY) {
+    public Pair<BlockPos, Direction> getTargetedHitResult(double mouseX, double mouseY) {
         Vec3 localRayStart = getMouseRay(mouseX, mouseY, false);
         Vec3 localRayEnd = getMouseRay(mouseX, mouseY, true);
 
-        // Convert to absolute world coordinates, just like before
         Vec3 worldOffset = new Vec3(center.getX() + 0.5, center.getY() + 0.5, center.getZ() + 0.5);
         Vec3 worldRayStart = localRayStart.add(worldOffset);
         Vec3 worldRayEnd = localRayEnd.add(worldOffset);
@@ -141,33 +153,29 @@ public class WorldSceneComponent extends BaseComponent {
         var client = Minecraft.getInstance();
         if (client.level == null) return null;
 
-        BlockPos closestPos = null;
+        Pair<BlockPos, Direction> closestHit = null;
         double minDistance = Double.MAX_VALUE;
 
-        // Iterate ONLY over the blocks inside your 3x3x3 UI scene
         for (BlockPos pos : BlockPos.betweenClosed(center.offset(-1, -1, -1), center.offset(1, 1, 1))) {
             BlockState state = client.level.getBlockState(pos);
             if (state.isAir()) continue;
 
-            // Grab the true mathematical hitbox (VoxelShape) of this specific block
-            net.minecraft.world.phys.shapes.VoxelShape shape = state.getShape(client.level, pos);
+            var shape = state.getShape(client.level, pos);
             if (shape.isEmpty()) continue;
 
-            // Clip the ray against this specific block's shape.
-            // This ignores the rest of the Minecraft world completely!
-            var hitResult = shape.clip(worldRayStart, worldRayEnd, pos);
+            // shape.clip() automatically calculates the hit location and the Direction (block face)
+            BlockHitResult hitResult = shape.clip(worldRayStart, worldRayEnd, pos);
 
             if (hitResult != null) {
-                // If it hits, calculate how close it is to the camera to find the foreground block
                 double dist = worldRayStart.distanceToSqr(hitResult.getLocation());
                 if (dist < minDistance) {
                     minDistance = dist;
-                    closestPos = pos.immutable();
+                    closestHit = Pair.of(hitResult.getBlockPos().immutable(), hitResult.getDirection());
                 }
             }
         }
 
-        return closestPos;
+        return closestHit;
     }
 
     public Vec3 getMouseRay(double mouseX, double mouseY, boolean far) {
