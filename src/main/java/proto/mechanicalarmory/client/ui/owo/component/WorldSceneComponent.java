@@ -6,12 +6,10 @@ import io.wispforest.owo.ui.core.OwoUIDrawContext;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.minecraft.core.BlockPos;
-import net.minecraft.world.level.ClipContext;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.RenderShape;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import org.joml.Matrix4f;
 import org.joml.Vector4f;
@@ -22,6 +20,7 @@ public class WorldSceneComponent extends BaseComponent {
     protected float rotY;
     protected float zoom;
     private final Matrix4f lastModelViewMatrix = new Matrix4f();
+    private boolean isDragging;
 
     public WorldSceneComponent(BlockPos center, float rotX, float rotY, float zoom) {
         this.center = center;
@@ -82,16 +81,6 @@ public class WorldSceneComponent extends BaseComponent {
     }
 
     @Override
-    public boolean onMouseDrag(double mouseX, double mouseY, double deltaX, double deltaY, int button) {
-        if (button == 0) { // Left click drag to rotate
-            this.rotY += deltaX;
-            this.rotX += deltaY;
-            return true;
-        }
-        return super.onMouseDrag(mouseX, mouseY, deltaX, deltaY, button);
-    }
-
-    @Override
     public boolean onMouseScroll(double mouseX, double mouseY, double amount) {
         this.zoom += amount * 0.1f;
         this.zoom = Math.max(0.1f, this.zoom); // Prevent inverted zoom
@@ -100,19 +89,39 @@ public class WorldSceneComponent extends BaseComponent {
 
     @Override
     public boolean onMouseDown(double mouseX, double mouseY, int button) {
-        if (button == 0) { // Left Click
+        if (button == 0) {
+            // Reset the drag flag when the user first clicks down
+            this.isDragging = false;
+            return true; // Return true to capture the interaction
+        }
+        return super.onMouseDown(mouseX, mouseY, button);
+    }
+
+    @Override
+    public boolean onMouseDrag(double mouseX, double mouseY, double deltaX, double deltaY, int button) {
+        if (button == 0) {
+            // The user moved the mouse! Flag this as a drag and rotate the scene
+            this.isDragging = true;
+            this.rotY += deltaX;
+            this.rotX += deltaY;
+            return true;
+        }
+        return super.onMouseDrag(mouseX, mouseY, deltaX, deltaY, button);
+    }
+
+    @Override
+    public boolean onMouseUp(double mouseX, double mouseY, int button) {
+        // If they let go of the left mouse button AND they didn't drag...
+        if (button == 0 && !this.isDragging) {
+            // It was a clean click! Do the block placement.
             BlockPos hit = getTargetedBlock(mouseX, mouseY);
-            Vec3 rayStart = getMouseRay(mouseX, mouseY, false);
-            Vec3 rayEnd = getMouseRay(mouseX, mouseY, true);
-            System.out.println("GUI Click: " + mouseX + ", " + mouseY);
-            System.out.println("Local Ray Start: " + rayStart);
-            System.out.println("Local Ray End: " + rayEnd);
             if (hit != null) {
                 Minecraft.getInstance().level.setBlock(hit, Blocks.DIRT.defaultBlockState(), 3);
                 return true;
             }
         }
-        return super.onMouseDown(mouseX, mouseY, button);
+        this.isDragging = false;
+        return super.onMouseUp(mouseX, mouseY, button);
     }
 
     @Override
