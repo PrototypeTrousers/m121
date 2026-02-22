@@ -50,7 +50,7 @@ public class ArmScreen extends BaseOwoHandledScreen<FlowLayout, ArmScreenHandler
                 .verticalAlignment(VerticalAlignment.BOTTOM);
 
         var fakeWorld = Containers.verticalFlow(Sizing.content(), Sizing.content());
-        fakeWorld.child(new WorldSceneComponent(menu.getPlayerInventory().player.getOnPos(),
+        fakeWorld.child(new WorldSceneComponent(menu.getBlockEntity().getBlockPos(),
                 menu.getPlayerInventory().player.getViewXRot(1),
                 menu.getPlayerInventory().player.getViewYRot(1), 1)
                 .sizing(Sizing.fixed(128)))

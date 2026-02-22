@@ -21,7 +21,7 @@ public class ArmScreenHandler extends AbstractContainerMenu {
     @NotNull
     protected final ArmEntity blockEntity;
     @NotNull
-    protected final Inventory inventory;
+    protected final Inventory playerInventory;
 
     public ArmScreenHandler(int syncId, Inventory playerInventory, FriendlyByteBuf buf) {
         this(syncId, playerInventory, Objects.requireNonNull(playerInventory.player.level().getBlockEntity(buf.readBlockPos())));
@@ -29,7 +29,7 @@ public class ArmScreenHandler extends AbstractContainerMenu {
 
     public ArmScreenHandler(int syncId, @NotNull Inventory playerInventory, BlockEntity blockEntity) {
         super(MenuTypes.ARM_ENTITY_MENU.get(), syncId);
-        this.inventory = playerInventory;
+        this.playerInventory = playerInventory;
         this.blockPos = blockEntity.getBlockPos();
         this.blockEntity = (ArmEntity) blockEntity;
 
@@ -41,8 +41,12 @@ public class ArmScreenHandler extends AbstractContainerMenu {
 
     }
 
-    public Inventory getPlayerInventory() {
-        return inventory;
+    public @NotNull Inventory getPlayerInventory() {
+        return playerInventory;
+    }
+
+    public @NotNull ArmEntity getBlockEntity() {
+        return blockEntity;
     }
 
     @Override
