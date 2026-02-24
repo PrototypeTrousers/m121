@@ -87,12 +87,15 @@ public class WorldSceneComponent extends BaseComponent {
                 continue;
             }
 
-            if (bs.getRenderShape() == RenderShape.ENTITYBLOCK_ANIMATED) {
+            RenderShape ts = bs.getRenderShape();
+
+            if (ts == RenderShape.ENTITYBLOCK_ANIMATED || ts == RenderShape.MODEL) {
                 BlockEntity be = client.level.getBlockEntity(pos);
                 if (be != null) {
                     client.getBlockEntityRenderDispatcher().render(be, partialTicks, poseStack, bufferSource);
                 }
-            } else {
+            }
+            if (ts != RenderShape.ENTITYBLOCK_ANIMATED) {
                 client.getBlockRenderer().renderSingleBlock(bs, poseStack, bufferSource, 0xF000F0, OverlayTexture.NO_OVERLAY);
             }
             poseStack.popPose();
@@ -135,7 +138,7 @@ public class WorldSceneComponent extends BaseComponent {
 
     @Override
     public boolean onMouseScroll(double mouseX, double mouseY, double amount) {
-        this.zoom += amount * 0.1f;
+        this.zoom += (float) (amount * 0.1f);
         this.zoom = Math.max(0.1f, this.zoom); // Prevent inverted zoom
         return true;
     }
@@ -155,8 +158,8 @@ public class WorldSceneComponent extends BaseComponent {
         if (button == 0) {
             // The user moved the mouse! Flag this as a drag and rotate the scene
             this.isDragging = true;
-            this.rotY += deltaX;
-            this.rotX += deltaY;
+            this.rotY += (float) deltaX;
+            this.rotX += (float) deltaY;
             return true;
         }
         return super.onMouseDrag(mouseX, mouseY, deltaX, deltaY, button);
@@ -248,6 +251,38 @@ public class WorldSceneComponent extends BaseComponent {
                     return blockDist <= fluidDist ? blockHit : fluidHit;
                 },
                 // 2. The On-Fail Function (Runs if the ray hits nothing)
+                (ctx) -> {
+                    Vec3 vec3 = ctx.getFrom().subtract(ctx.getTo());
+                    return BlockHitResult.miss(ctx.getTo(), Direction.getNearest(vec3.x, vec3.y, vec3.z), BlockPos.containing(ctx.getTo()));
+                }
+        );
+    }
+
+    public BlockHitResult clipWithinBox(BlockGetter level, ClipContext context, BlockPos center, int radius) {
+        return BlockGetter.traverseBlocks(context.getFrom(), context.getTo(), context,
+                (ctx, pos) -> {
+                    if (Math.abs(pos.getX() - center.getX()) > radius ||
+                            Math.abs(pos.getY() - center.getY()) > radius ||
+                            Math.abs(pos.getZ() - center.getZ()) > radius) {
+                        return null;
+                    }
+
+                    BlockState blockstate = level.getBlockState(pos);
+                    FluidState fluidstate = level.getFluidState(pos);
+                    Vec3 rayStart = ctx.getFrom();
+                    Vec3 rayEnd = ctx.getTo();
+
+                    VoxelShape blockShape = ctx.getBlockShape(blockstate, level, pos);
+                    BlockHitResult blockHit = level.clipWithInteractionOverride(rayStart, rayEnd, pos, blockShape, blockstate);
+
+                    VoxelShape fluidShape = ctx.getFluidShape(fluidstate, level, pos);
+                    BlockHitResult fluidHit = fluidShape.clip(rayStart, rayEnd, pos);
+
+                    double blockDist = blockHit == null ? Double.MAX_VALUE : rayStart.distanceToSqr(blockHit.getLocation());
+                    double fluidDist = fluidHit == null ? Double.MAX_VALUE : rayStart.distanceToSqr(fluidHit.getLocation());
+
+                    return blockDist <= fluidDist ? blockHit : fluidHit;
+                },
                 (ctx) -> {
                     Vec3 vec3 = ctx.getFrom().subtract(ctx.getTo());
                     return BlockHitResult.miss(ctx.getTo(), Direction.getNearest(vec3.x, vec3.y, vec3.z), BlockPos.containing(ctx.getTo()));

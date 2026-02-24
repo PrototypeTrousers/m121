@@ -19,6 +19,7 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.entity.BlockEntityTicker;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.saveddata.SavedData;
 import net.neoforged.neoforge.capabilities.Capabilities;
 import net.neoforged.neoforge.items.IItemHandler;
 import net.neoforged.neoforge.items.ItemStackHandler;
@@ -28,7 +29,6 @@ import org.joml.Vector3d;
 import proto.mechanicalarmory.common.entities.MAEntities;
 import proto.mechanicalarmory.common.logic.*;
 import proto.mechanicalarmory.common.menu.ArmScreenHandler;
-import rearth.oritech.client.ui.ItemFilterScreenHandler;
 
 import static proto.mechanicalarmory.common.logic.Action.DELIVER;
 import static proto.mechanicalarmory.common.logic.Action.RETRIEVE;
@@ -82,7 +82,7 @@ public class ArmEntity extends BlockEntity implements BlockEntityTicker<ArmEntit
     }
 
     @Override
-    protected void saveAdditional(CompoundTag compound, HolderLookup.Provider registries) {
+    protected void saveAdditional(@NotNull CompoundTag compound, HolderLookup.@NotNull Provider registries) {
         super.saveAdditional(compound, registries);
         compound.put("rotation", motorCortex.serializeNBT(registries));
         compound.put("targeting", targeting.serializeNBT(registries));
@@ -91,7 +91,7 @@ public class ArmEntity extends BlockEntity implements BlockEntityTicker<ArmEntit
     }
 
     @Override
-    protected void loadAdditional(CompoundTag compound, HolderLookup.Provider registries) {
+    protected void loadAdditional(@NotNull CompoundTag compound, HolderLookup.@NotNull Provider registries) {
         super.loadAdditional(compound, registries);
         motorCortex.deserializeNBT(registries, compound.getList("rotation", CompoundTag.TAG_FLOAT));
         targeting.deserializeNBT(registries, compound.getCompound("targeting"));
@@ -147,7 +147,7 @@ public class ArmEntity extends BlockEntity implements BlockEntityTicker<ArmEntit
 
 
     @Override
-    public void tick(Level level, BlockPos pos, BlockState state, ArmEntity blockEntity) {
+    public void tick(@NotNull Level level, @NotNull BlockPos pos, @NotNull BlockState state, @NotNull ArmEntity blockEntity) {
         if (!hasInput() || !hasOutput()) {
             return;
         }
@@ -210,6 +210,10 @@ public class ArmEntity extends BlockEntity implements BlockEntityTicker<ArmEntit
 //        markDirty();
     }
 
+    public Pair<BlockPos, Direction> getTarget() {
+        return targeting.getTarget();
+    }
+
     public boolean hasInput() {
         return targeting.hasInput();
     }
@@ -219,12 +223,12 @@ public class ArmEntity extends BlockEntity implements BlockEntityTicker<ArmEntit
     }
 
     @Override
-    public Component getDisplayName() {
+    public @NotNull Component getDisplayName() {
         return Component.nullToEmpty("");
     }
 
     @Override
-    public @Nullable AbstractContainerMenu createMenu(int containerId, Inventory playerInventory, Player player) {
+    public @Nullable AbstractContainerMenu createMenu(int containerId, @NotNull Inventory playerInventory, @NotNull Player player) {
         return new ArmScreenHandler(containerId, playerInventory, this);
     }
 

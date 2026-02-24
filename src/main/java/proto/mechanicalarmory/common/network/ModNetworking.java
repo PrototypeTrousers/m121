@@ -1,5 +1,6 @@
 package proto.mechanicalarmory.common.network;
 
+import net.minecraft.core.Direction;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
@@ -34,15 +35,20 @@ public class ModNetworking {
                         BlockEntity be = level.getBlockEntity(payload.armPos());
                         
                         if (be instanceof ArmEntity arm) {
-                            var currentSource = arm.getSource();
-                            
-                            // The server processes the toggle logic
-                            if (currentSource != null && currentSource.key().equals(payload.clickedPos().subtract(arm.getBlockPos())) && currentSource.value().equals(payload.clickedFace())) {
+                            if (payload.action() == Action.RETRIEVE) {
+                                arm.setSource(payload.clickedPos(), payload.clickedFace());
+                            } else if(payload.action() == Action.DELIVER) {
                                 arm.setTarget(payload.clickedPos(), payload.clickedFace());
                             } else {
-                                arm.setSource(payload.clickedPos(), payload.clickedFace());
-                            }
+                                var currentSource = arm.getSource();
+                                var currentTarget = arm.getTarget();
 
+                                if (currentSource != null && currentSource.key().equals(payload.clickedPos().subtract(arm.getBlockPos())) && currentSource.value().equals(payload.clickedFace())) {
+                                    arm.setSource(arm.getBlockPos(), Direction.UP);
+                                } else if (currentTarget != null && currentTarget.key().equals(payload.clickedPos().subtract(arm.getBlockPos())) && currentTarget.value().equals(payload.clickedFace())) {
+                                    arm.setTarget(payload.armPos(), Direction.UP);
+                                }
+                            }
                             arm.updateWorkStatus(ActionTypes.IDLING, Action.IDLING);
                             
                             // Mark for saving and update tracking clients

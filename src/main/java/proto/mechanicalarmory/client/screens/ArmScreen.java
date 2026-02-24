@@ -1,34 +1,23 @@
 package proto.mechanicalarmory.client.screens;
 
-import com.mojang.blaze3d.platform.GlStateManager;
-import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.blaze3d.vertex.VertexSorting;
-import com.mojang.math.Axis;
 import io.wispforest.owo.ui.base.BaseOwoHandledScreen;
 import io.wispforest.owo.ui.component.Components;
+import io.wispforest.owo.ui.component.DropdownComponent;
 import io.wispforest.owo.ui.container.Containers;
 import io.wispforest.owo.ui.container.FlowLayout;
 import io.wispforest.owo.ui.core.*;
-import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.renderer.GameRenderer;
-import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.NonNullList;
 import net.minecraft.network.chat.Component;
-import net.minecraft.util.Mth;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.inventory.Slot;
-import net.minecraft.world.level.block.RenderShape;
-import net.minecraft.world.level.block.entity.BlockEntity;
-import net.minecraft.world.level.block.state.BlockState;
 import net.neoforged.neoforge.network.PacketDistributor;
 import org.jetbrains.annotations.NotNull;
-import org.joml.Matrix4f;
 import proto.mechanicalarmory.client.ui.owo.component.KnobButton;
 import proto.mechanicalarmory.client.ui.owo.component.WorldSceneComponent;
-import proto.mechanicalarmory.common.entities.block.ArmEntity;
+import proto.mechanicalarmory.common.logic.Action;
 import proto.mechanicalarmory.common.menu.ArmScreenHandler;
 import proto.mechanicalarmory.common.network.ArmClickPayload;
 
@@ -48,30 +37,53 @@ public class ArmScreen extends BaseOwoHandledScreen<FlowLayout, ArmScreenHandler
 
     @Override
     protected void build(FlowLayout rootComponent) {
+
+        //TODO add a hovering widget to select if a block is a source or a target with the mouse wheel
         rootComponent
                 .surface(Surface.VANILLA_TRANSLUCENT)
                 .horizontalAlignment(HorizontalAlignment.CENTER)
                 .verticalAlignment(VerticalAlignment.BOTTOM);
 
         var fakeWorld = Containers.verticalFlow(Sizing.content(), Sizing.content());
-        fakeWorld.child(
-                        new WorldSceneComponent(menu.getBlockEntity().getBlockPos(),
-                                menu.getPlayerInventory().player.getViewXRot(1),
-                                menu.getPlayerInventory().player.getViewYRot(1), 1)
-                                .onBlockClicked((hit, button) -> {
-                                    if (button == 1) {
-                                        BlockPos armPos = menu.getBlockEntity().getBlockPos();
-                                        BlockPos clickedPos = hit.left();
-                                        Direction clickedFace = hit.right();
+        WorldSceneComponent worldSceneComponent = new WorldSceneComponent(menu.getBlockEntity().getBlockPos(),
+                menu.getPlayerInventory().player.getViewXRot(1),
+                menu.getPlayerInventory().player.getViewYRot(1), 1)
+                .onBlockClicked((hit, button) -> {
+                    if (button == 1) {
+                        BlockPos armPos = menu.getBlockEntity().getBlockPos();
+                        BlockPos clickedPos = hit.left();
+                        Direction clickedFace = hit.right();
 
-                                        // Send to Server via NeoForge 1.21.1 PacketDistributor
-                                        PacketDistributor.sendToServer(
-                                                new ArmClickPayload(armPos, clickedPos, clickedFace)
-                                        );
-                                    }
-                                })
-                                .targeting(menu.getBlockEntity().getTargeting())
-                                .sizing(Sizing.fixed(128)))
+                        DropdownComponent inoutSelector = Components.dropdown(Sizing.content());
+                        inoutSelector.closeWhenNotHovered(true);
+
+                        inoutSelector
+                                .zIndex(200)
+                                .positioning(Positioning.absolute(getAbsoluteMouseX() - fakeWorld.x(), getAbsoluteMouseY() - fakeWorld.y()));
+                        inoutSelector.button(Component.literal("IN"), (c) -> {
+                            PacketDistributor.sendToServer(
+                                    new ArmClickPayload(armPos, clickedPos, clickedFace, Action.RETRIEVE)
+                            );
+                        });
+                        inoutSelector.button(Component.literal("NONE"), (c) -> {
+                            PacketDistributor.sendToServer(
+                                    new ArmClickPayload(armPos, clickedPos, clickedFace, Action.IDLING)
+                            );
+                        });
+                        inoutSelector.button(Component.literal("OUT"), (c) -> {
+                            PacketDistributor.sendToServer(
+                                    new ArmClickPayload(armPos, clickedPos, clickedFace, Action.DELIVER)
+                            );
+                        });
+
+                        fakeWorld.child(inoutSelector
+                        );
+                    }
+                });
+
+        fakeWorld.child(worldSceneComponent
+                        .targeting(menu.getBlockEntity().getTargeting())
+                        .sizing(Sizing.fixed(128)))
                 .alignment(HorizontalAlignment.CENTER, VerticalAlignment.CENTER);
 
 
@@ -125,5 +137,17 @@ public class ArmScreen extends BaseOwoHandledScreen<FlowLayout, ArmScreenHandler
 
     @Override
     protected void renderLabels(GuiGraphics guiGraphics, int mouseX, int mouseY) {
+    }
+
+    private int getAbsoluteMouseX() {
+        return (int) (this.minecraft.mouseHandler.xpos()
+                * (double) this.minecraft.getWindow().getGuiScaledWidth()
+                / (double) this.minecraft.getWindow().getScreenWidth());
+    }
+
+    private int getAbsoluteMouseY() {
+        return (int) (this.minecraft.mouseHandler.ypos()
+                * (double) this.minecraft.getWindow().getGuiScaledHeight()
+                / (double) this.minecraft.getWindow().getScreenHeight());
     }
 }
