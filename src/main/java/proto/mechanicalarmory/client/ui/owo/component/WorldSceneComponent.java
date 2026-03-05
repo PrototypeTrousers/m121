@@ -7,6 +7,7 @@ import io.wispforest.owo.ui.core.OwoUIDrawContext;
 import it.unimi.dsi.fastutil.Pair;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.MultiBufferSource;
+import net.minecraft.client.renderer.blockentity.BlockEntityRenderer;
 import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -92,7 +93,10 @@ public class WorldSceneComponent extends BaseComponent {
             if (ts == RenderShape.ENTITYBLOCK_ANIMATED || ts == RenderShape.MODEL) {
                 BlockEntity be = client.level.getBlockEntity(pos);
                 if (be != null) {
-                    client.getBlockEntityRenderDispatcher().render(be, partialTicks, poseStack, bufferSource);
+                    BlockEntityRenderer<BlockEntity> ber = client.getBlockEntityRenderDispatcher().getRenderer(be);
+                    if (ber != null) {
+                        ber.render(be, partialTicks, poseStack, bufferSource, 15728880, OverlayTexture.NO_OVERLAY);
+                    }
                 }
             }
             if (ts != RenderShape.ENTITYBLOCK_ANIMATED) {
