@@ -63,7 +63,7 @@ public class ItemContextFilter {
         @Override
         public void render(ArmScreen screen, EmiIngredient dragged, GuiGraphics draw, int mouseX, int mouseY, float delta) {
             screen.getFilterSlots().children().forEach(child -> {
-                draw.fill(child.x(), child.y(), child.x() + child.width(), child.y() + child.height(), 0x8822BB33);
+                draw.fill(child.x() + 1, child.y() +1, child.x() + child.width() - 1, child.y() + child.height() - 1, 0x8822BB33);
             });
         }
     }
