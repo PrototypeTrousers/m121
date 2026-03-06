@@ -1,6 +1,5 @@
 package proto.mechanicalarmory.common.items.armor;
 
-import net.minecraft.world.phys.Vec3;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;

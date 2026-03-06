@@ -1,5 +1,8 @@
 package proto.mechanicalarmory.client.screens;
 
+import dev.emi.emi.api.EmiDragDropHandler;
+import dev.emi.emi.api.stack.EmiIngredient;
+import dev.engine_room.flywheel.api.material.LightShader;
 import io.wispforest.owo.ui.base.BaseOwoHandledScreen;
 import io.wispforest.owo.ui.component.Components;
 import io.wispforest.owo.ui.component.DropdownComponent;
@@ -21,10 +24,21 @@ import proto.mechanicalarmory.common.logic.Action;
 import proto.mechanicalarmory.common.menu.ArmScreenHandler;
 import proto.mechanicalarmory.common.network.ArmClickPayload;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import static rearth.oritech.client.ui.BasicMachineScreen.ITEM_SLOT;
 import static rearth.oritech.client.ui.BasicMachineScreen.getItemFrame;
 
-public class ArmScreen extends BaseOwoHandledScreen<FlowLayout, ArmScreenHandler> {
+public class ArmScreen extends BaseOwoHandledScreen<FlowLayout, ArmScreenHandler> implements EmiDragDropHandler<ArmScreen> {
+
+    List<Slot> slotList =  new ArrayList<>();
+
+    public FlowLayout getFilterSlots() {
+        return filterSlots;
+    }
+
+    private FlowLayout filterSlots;
 
     public ArmScreen(ArmScreenHandler handler, Inventory inventory, Component title) {
         super(handler, inventory, title);
@@ -107,13 +121,15 @@ public class ArmScreen extends BaseOwoHandledScreen<FlowLayout, ArmScreenHandler
                         .margins(Insets.horizontal(4))
                 , 1, 0);
 
-        var filterSlots = Containers.horizontalFlow(Sizing.content(), Sizing.content());
+        this.filterSlots = Containers.horizontalFlow(Sizing.content(), Sizing.content());
         filterSlots.margins(Insets.horizontal(4));
 
-        for (int s = 0; s < 5; s++) {
+        for (int s = 37; s < menu.getFilterHandler().getSlots() + 36; s++) {
             var filterSlot = Containers.stack(Sizing.content(), Sizing.content());
             filterSlot.child(Components.texture(ITEM_SLOT, 0, 0, 18, 18, 18, 18));
-            //handSlot.child(slotAsComponent(36).positioning(Positioning.absolute(1,1)));
+            SlotComponent slotComponent = slotAsComponent(s);
+            slotComponent.positioning(Positioning.absolute(1,1));
+            filterSlot.child(slotComponent);
             filterSlots.child(filterSlot);
         }
         filterSettings.child(filterSlots, 1, 1);
@@ -135,6 +151,8 @@ public class ArmScreen extends BaseOwoHandledScreen<FlowLayout, ArmScreenHandler
         rootComponent.child(overlay);
     }
 
+
+
     @Override
     protected void renderLabels(GuiGraphics guiGraphics, int mouseX, int mouseY) {
     }
@@ -149,5 +167,15 @@ public class ArmScreen extends BaseOwoHandledScreen<FlowLayout, ArmScreenHandler
         return (int) (this.minecraft.mouseHandler.ypos()
                 * (double) this.minecraft.getWindow().getGuiScaledHeight()
                 / (double) this.minecraft.getWindow().getScreenHeight());
+    }
+
+    @Override
+    public boolean dropStack(ArmScreen screen, EmiIngredient stack, int x, int y) {
+        return false;
+    }
+
+    @Override
+    public void render(ArmScreen screen, EmiIngredient dragged, GuiGraphics draw, int mouseX, int mouseY, float delta) {
+        EmiDragDropHandler.super.render(screen, dragged, draw, mouseX, mouseY, delta);
     }
 }

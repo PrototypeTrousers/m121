@@ -95,7 +95,7 @@ public class WorldSceneComponent extends BaseComponent {
                 if (be != null) {
                     BlockEntityRenderer<BlockEntity> ber = client.getBlockEntityRenderDispatcher().getRenderer(be);
                     if (ber != null) {
-                        ber.render(be, partialTicks, poseStack, bufferSource, 15728880, OverlayTexture.NO_OVERLAY);
+                        ber.render(be, partialTicks, poseStack, bufferSource, 0xF000F0, OverlayTexture.NO_OVERLAY);
                     }
                 }
             }

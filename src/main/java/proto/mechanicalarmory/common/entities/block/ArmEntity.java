@@ -28,6 +28,7 @@ import org.jetbrains.annotations.Nullable;
 import org.joml.Vector3d;
 import proto.mechanicalarmory.common.entities.MAEntities;
 import proto.mechanicalarmory.common.logic.*;
+import proto.mechanicalarmory.common.logic.filter.ItemContextFilter;
 import proto.mechanicalarmory.common.menu.ArmScreenHandler;
 
 import static proto.mechanicalarmory.common.logic.Action.DELIVER;
@@ -38,6 +39,7 @@ public class ArmEntity extends BlockEntity implements BlockEntityTicker<ArmEntit
     private final MotorCortex motorCortex;
     private final WorkStatus workStatus = new WorkStatus();
     protected ItemStackHandler itemHandler = new ArmItemHandler(1);
+    protected ItemContextFilter itemContextFilter = new ItemContextFilter(5);
     private Vector3d armPoint;
     float armSize = 2f;
     InteractionType interactionType = InteractionType.ITEM;
@@ -105,6 +107,10 @@ public class ArmEntity extends BlockEntity implements BlockEntityTicker<ArmEntit
 
     public ItemStack getItemStack() {
         return itemHandler.getStackInSlot(0);
+    }
+
+    public ItemContextFilter getItemContextFilter() {
+        return itemContextFilter;
     }
 
     public ActionResult interact(Action action, Pair<BlockPos, Direction> blkFace) {
