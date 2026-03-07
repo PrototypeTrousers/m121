@@ -7,7 +7,9 @@ import io.wispforest.owo.ui.component.Components;
 import io.wispforest.owo.ui.component.DropdownComponent;
 import io.wispforest.owo.ui.container.Containers;
 import io.wispforest.owo.ui.container.FlowLayout;
+import io.wispforest.owo.ui.container.OverlayContainer;
 import io.wispforest.owo.ui.core.*;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -72,7 +74,7 @@ public class ArmScreen extends BaseOwoHandledScreen<FlowLayout, ArmScreenHandler
                 .verticalAlignment(VerticalAlignment.BOTTOM);
 
         var fakeWorld = Containers.verticalFlow(Sizing.content(), Sizing.content());
-        WorldSceneComponent worldSceneComponent = new WorldSceneComponent(menu.getBlockEntity().getBlockPos(),
+        WorldSceneComponent worldSceneComponent = new WorldSceneComponent(rootComponent, menu.getBlockEntity().getBlockPos(),
                 menu.getPlayerInventory().player.getViewXRot(1),
                 menu.getPlayerInventory().player.getViewYRot(1), 1)
                 .onBlockClicked((hit, button) -> {
@@ -162,6 +164,21 @@ public class ArmScreen extends BaseOwoHandledScreen<FlowLayout, ArmScreenHandler
         overlay.child(playerInventoryContainer);
 
         rootComponent.child(overlay);
+
+        Minecraft.getInstance().setScreen(new FilterLogicScreen(this));
+
+
+    }
+
+
+    io.wispforest.owo.ui.core.Component filterConfiguration() {
+        var overlay = Containers.verticalFlow(Sizing.content(), Sizing.content());
+        overlay.horizontalAlignment(HorizontalAlignment.CENTER);
+        overlay.surface(Surface.PANEL);
+        overlay.sizing(Sizing.fixed(128));
+        overlay.zIndex(300);
+
+        return overlay;
     }
 
 

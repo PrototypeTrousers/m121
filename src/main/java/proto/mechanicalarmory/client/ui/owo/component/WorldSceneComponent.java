@@ -4,6 +4,7 @@ import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.math.Axis;
 import io.wispforest.owo.ui.base.BaseComponent;
 import io.wispforest.owo.ui.core.OwoUIDrawContext;
+import io.wispforest.owo.ui.core.ParentComponent;
 import it.unimi.dsi.fastutil.Pair;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.MultiBufferSource;
@@ -38,7 +39,9 @@ public class WorldSceneComponent extends BaseComponent {
     private boolean isDragging;
     private BiConsumer<Pair<BlockPos, Direction>, Integer> onBlockClicked = (hit, button) -> {};
 
-    public WorldSceneComponent(BlockPos center, float rotX, float rotY, float zoom) {
+    public WorldSceneComponent(ParentComponent parent, BlockPos center, float rotX, float rotY, float zoom) {
+        super();
+//        this.parent = parent;
         this.center = center;
         this.rotX = rotX;
         this.rotY = rotY;
@@ -142,6 +145,7 @@ public class WorldSceneComponent extends BaseComponent {
 
     @Override
     public boolean onMouseScroll(double mouseX, double mouseY, double amount) {
+        var c = parent.childAt((int) mouseX +x, (int) mouseY + y);
         this.zoom += (float) (amount * 0.1f);
         this.zoom = Math.max(0.1f, this.zoom); // Prevent inverted zoom
         return true;
