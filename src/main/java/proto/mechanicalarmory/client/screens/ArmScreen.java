@@ -7,9 +7,7 @@ import io.wispforest.owo.ui.component.Components;
 import io.wispforest.owo.ui.component.DropdownComponent;
 import io.wispforest.owo.ui.container.Containers;
 import io.wispforest.owo.ui.container.FlowLayout;
-import io.wispforest.owo.ui.container.OverlayContainer;
 import io.wispforest.owo.ui.core.*;
-import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -40,6 +38,7 @@ public class ArmScreen extends BaseOwoHandledScreen<FlowLayout, ArmScreenHandler
     }
 
     private FlowLayout filterSlots;
+    private List<DisableableSlotItemHandler> actualSlots = new ArrayList<>();
 
     public ArmScreen(ArmScreenHandler handler, Inventory inventory, Component title) {
         super(handler, inventory, title);
@@ -71,7 +70,7 @@ public class ArmScreen extends BaseOwoHandledScreen<FlowLayout, ArmScreenHandler
         rootComponent
                 .surface(Surface.VANILLA_TRANSLUCENT)
                 .horizontalAlignment(HorizontalAlignment.CENTER)
-                .verticalAlignment(VerticalAlignment.BOTTOM);
+                .verticalAlignment(VerticalAlignment.CENTER);
 
         var fakeWorld = Containers.verticalFlow(Sizing.content(), Sizing.content());
         WorldSceneComponent worldSceneComponent = new WorldSceneComponent(rootComponent, menu.getBlockEntity().getBlockPos(),
@@ -123,6 +122,8 @@ public class ArmScreen extends BaseOwoHandledScreen<FlowLayout, ArmScreenHandler
         var handSlot = Containers.stack(Sizing.content(), Sizing.content());
         handSlot.child(Components.texture(ITEM_SLOT, 0, 0, 18, 18, 18, 18));
         handSlot.child(slotAsComponent(36).positioning(Positioning.absolute(1, 1)));
+        actualSlots.add((DisableableSlotItemHandler) menu.getSlot(36));
+
         handSlot.padding(Insets.vertical(3));
 
         var filterSettings = Containers.grid(Sizing.content(), Sizing.content(), 2, 2);
@@ -138,10 +139,12 @@ public class ArmScreen extends BaseOwoHandledScreen<FlowLayout, ArmScreenHandler
 
         this.filterSlots = Containers.horizontalFlow(Sizing.content(), Sizing.content());
         filterSlots.margins(Insets.horizontal(4));
+        filterSlots.id("filters");
 
         for (int s = 37; s < menu.getFilterHandler().getSlots() + 37; s++) {
             var filterSlot = Containers.stack(Sizing.content(), Sizing.content());
             filterSlot.child(Components.texture(ITEM_SLOT, 0, 0, 18, 18, 18, 18));
+            actualSlots.add((DisableableSlotItemHandler) menu.getSlot(s));
             SlotComponent slotComponent = slotAsComponent(s);
             slotComponent.positioning(Positioning.absolute(1,1));
             filterSlot.child(slotComponent);
@@ -163,9 +166,17 @@ public class ArmScreen extends BaseOwoHandledScreen<FlowLayout, ArmScreenHandler
         overlay.child(filterSettings);
         overlay.child(playerInventoryContainer);
 
+
+
         rootComponent.child(overlay);
 
-        Minecraft.getInstance().setScreen(new FilterLogicScreen(this));
+        actualSlots.forEach(DisableableSlotItemHandler::setInactive);
+        ConsumingOverlayContainer<io.wispforest.owo.ui.core.Component> co = new ConsumingOverlayContainer<>(filterConfiguration());
+        co.slotsToDisable(actualSlots);
+        rootComponent.child(co);
+
+
+        //Minecraft.getInstance().setScreen(new FilterLogicScreen(this));
 
 
     }

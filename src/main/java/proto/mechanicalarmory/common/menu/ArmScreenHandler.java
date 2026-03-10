@@ -11,6 +11,7 @@ import net.minecraft.world.level.block.entity.BlockEntity;
 import net.neoforged.neoforge.items.ItemStackHandler;
 import net.neoforged.neoforge.items.SlotItemHandler;
 import org.jetbrains.annotations.NotNull;
+import proto.mechanicalarmory.client.screens.DisableableSlotItemHandler;
 import proto.mechanicalarmory.common.entities.block.ArmEntity;
 
 import java.util.Objects;
@@ -46,12 +47,12 @@ public class ArmScreenHandler extends AbstractContainerMenu {
                 .playerInventory(playerInventory);
 
         handSlotIdx = 36;
-        addSlot(new SlotItemHandler(this.blockEntity.getHandler(), 0, 64, 64));
+        addSlot(new DisableableSlotItemHandler(this.blockEntity.getHandler(), 0, 64, 64));
 
         filterSlotIdx = 37;
         this.filterHandler = this.blockEntity.getItemContextFilter().getFilterHandler();
         for (int i = 0; i< filterHandler.getSlots(); i++) {
-            addSlot(new SlotItemHandler(filterHandler, i, 64 + i * 18, 18));
+            addSlot(new DisableableSlotItemHandler(filterHandler, i, 64 + i * 18, 18));
         }
 
     }
