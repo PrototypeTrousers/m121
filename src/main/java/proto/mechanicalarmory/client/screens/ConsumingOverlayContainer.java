@@ -61,11 +61,16 @@ public class ConsumingOverlayContainer<C extends Component> extends WrappingPare
 
         if (!handled && this.closeOnClick) {
             this.remove();
-            if (actualSlots != null) {
-                actualSlots.forEach(DisableableSlotItemHandler::setActive);
-            }
         }
         return true;
+    }
+
+    @Override
+    public void remove() {
+        if (actualSlots != null) {
+            actualSlots.forEach(DisableableSlotItemHandler::setActive);
+        }
+        super.remove();
     }
 
     @Override

@@ -3,6 +3,7 @@ package proto.mechanicalarmory.client.screens;
 import dev.emi.emi.api.EmiApi;
 import dev.emi.emi.api.stack.EmiStackInteraction;
 import io.wispforest.owo.ui.base.BaseOwoHandledScreen;
+import io.wispforest.owo.ui.component.ButtonComponent;
 import io.wispforest.owo.ui.component.Components;
 import io.wispforest.owo.ui.component.DropdownComponent;
 import io.wispforest.owo.ui.container.Containers;
@@ -142,13 +143,32 @@ public class ArmScreen extends BaseOwoHandledScreen<FlowLayout, ArmScreenHandler
         filterSlots.id("filters");
 
         for (int s = 37; s < menu.getFilterHandler().getSlots() + 37; s++) {
+            var filterContainer = Containers.verticalFlow(Sizing.content(), Sizing.content());
+            filterContainer.alignment(HorizontalAlignment.CENTER, VerticalAlignment.CENTER);
+
+            filterContainer.child(
+                    Components.wrapVanillaWidget(
+                            Components.button(
+                                    Component.literal(String.valueOf(s)),(buttonComponent) -> {
+                                        actualSlots.forEach(DisableableSlotItemHandler::setInactive);
+                                        ConsumingOverlayContainer<io.wispforest.owo.ui.core.Component> co = new ConsumingOverlayContainer<>(filterConfiguration());
+                                        co.slotsToDisable(actualSlots);
+                                        rootComponent.child(co);
+                                    }
+                            ).renderer(ButtonComponent.Renderer.flat(0xFF0000, 0xFFFF00, 0X000000))
+                    ).sizing(Sizing.content(), Sizing.content()
+            ));
+
             var filterSlot = Containers.stack(Sizing.content(), Sizing.content());
             filterSlot.child(Components.texture(ITEM_SLOT, 0, 0, 18, 18, 18, 18));
             actualSlots.add((DisableableSlotItemHandler) menu.getSlot(s));
             SlotComponent slotComponent = slotAsComponent(s);
             slotComponent.positioning(Positioning.absolute(1,1));
             filterSlot.child(slotComponent);
-            filterSlots.child(filterSlot);
+
+
+            filterContainer.child(filterSlot);
+            filterSlots.child(filterContainer);
         }
         filterSettings.child(filterSlots, 1, 1);
 
@@ -166,19 +186,7 @@ public class ArmScreen extends BaseOwoHandledScreen<FlowLayout, ArmScreenHandler
         overlay.child(filterSettings);
         overlay.child(playerInventoryContainer);
 
-
-
         rootComponent.child(overlay);
-
-        actualSlots.forEach(DisableableSlotItemHandler::setInactive);
-        ConsumingOverlayContainer<io.wispforest.owo.ui.core.Component> co = new ConsumingOverlayContainer<>(filterConfiguration());
-        co.slotsToDisable(actualSlots);
-        rootComponent.child(co);
-
-
-        //Minecraft.getInstance().setScreen(new FilterLogicScreen(this));
-
-
     }
 
 
