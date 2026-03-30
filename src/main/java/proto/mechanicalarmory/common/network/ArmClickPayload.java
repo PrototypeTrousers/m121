@@ -13,7 +13,7 @@ import proto.mechanicalarmory.common.entities.block.ArmEntity;
 import proto.mechanicalarmory.common.logic.Action;
 import proto.mechanicalarmory.common.logic.ActionTypes;
 
-public record ArmClickPayload(BlockPos armPos, BlockPos clickedPos, Direction clickedFace, Action action) implements CustomPacketPayload {
+public record ArmClickPayload(BlockPos armPos, BlockPos clickedPos, Direction clickedFace, Configuration action) implements CustomPacketPayload {
 
     // Unique ID for your packet
     public static final Type<ArmClickPayload> TYPE = new Type<>(
@@ -25,7 +25,7 @@ public record ArmClickPayload(BlockPos armPos, BlockPos clickedPos, Direction cl
             BlockPos.STREAM_CODEC, ArmClickPayload::armPos,
             BlockPos.STREAM_CODEC, ArmClickPayload::clickedPos,
             Direction.STREAM_CODEC, ArmClickPayload::clickedFace,
-            NeoForgeStreamCodecs.enumCodec(Action.class), ArmClickPayload::action,
+            NeoForgeStreamCodecs.enumCodec(ArmClickPayload.Configuration.class), ArmClickPayload::action,
             ArmClickPayload::new
     );
 
@@ -45,10 +45,12 @@ public record ArmClickPayload(BlockPos armPos, BlockPos clickedPos, Direction cl
                 BlockEntity be = level.getBlockEntity(payload.armPos());
 
                 if (be instanceof ArmEntity arm) {
-                    if (payload.action() == Action.RETRIEVE) {
+                    if (payload.action() == Configuration.SOURCE) {
                         arm.setSource(payload.clickedPos(), payload.clickedFace());
-                    } else if (payload.action() == Action.DELIVER) {
+                    } else if (payload.action() == Configuration.TARGET) {
                         arm.setTarget(payload.clickedPos(), payload.clickedFace());
+                    } else if (payload.action() == Configuration.LOGIC) {
+                        arm.addLogicSource(payload.clickedPos(), payload.clickedFace());
                     } else {
                         var currentSource = arm.getSource();
                         var currentTarget = arm.getTarget();
@@ -67,5 +69,12 @@ public record ArmClickPayload(BlockPos armPos, BlockPos clickedPos, Direction cl
                 }
             }
         });
+    }
+
+    public enum Configuration {
+        SOURCE,
+        TARGET,
+        LOGIC,
+        NONE
     }
 }

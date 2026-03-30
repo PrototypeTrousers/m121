@@ -5,6 +5,9 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.NbtUtils;
+import net.minecraft.nbt.Tag;
 import net.minecraft.network.Connection;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.protocol.Packet;
@@ -31,6 +34,9 @@ import proto.mechanicalarmory.common.logic.*;
 import proto.mechanicalarmory.common.logic.filter.ItemContextFilter;
 import proto.mechanicalarmory.common.menu.ArmScreenHandler;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import static proto.mechanicalarmory.common.logic.Action.DELIVER;
 import static proto.mechanicalarmory.common.logic.Action.RETRIEVE;
 
@@ -43,6 +49,8 @@ public class ArmEntity extends BlockEntity implements BlockEntityTicker<ArmEntit
     private Vector3d armPoint;
     float armSize = 2f;
     InteractionType interactionType = InteractionType.ITEM;
+
+    List<Pair<BlockPos, Direction>> logicSources = new ArrayList<>();
 
     public ArmEntity(BlockPos pos, BlockState state) {
         super(MAEntities.ARM_ENTITY.get(), pos, state);
@@ -90,6 +98,31 @@ public class ArmEntity extends BlockEntity implements BlockEntityTicker<ArmEntit
         compound.put("targeting", targeting.serializeNBT(registries));
         compound.put("workStatus", workStatus.serializeNBT(registries));
         compound.put("itemHandler", itemHandler.serializeNBT(registries));
+        compound.put("logic", serializeLogic(registries));
+    }
+
+    protected CompoundTag serializeLogic(HolderLookup.Provider provider) {
+        ListTag nbtTagList = new ListTag();
+        for (int i = 0; i < logicSources.size(); i++) {
+                CompoundTag compound = new CompoundTag();
+                compound.put("logicPos" + i, NbtUtils.writeBlockPos(logicSources.get(i).key()));
+                compound.putInt("logicFacing" + i, logicSources.get(i).value().ordinal());
+                nbtTagList.add(compound);
+        }
+        CompoundTag nbt = new CompoundTag();
+        nbt.put("Logic", nbtTagList);
+        return nbt;
+    }
+
+    protected void deSerializeLogic(HolderLookup.Provider provider, CompoundTag nbt) {
+        ListTag tagList = nbt.getList("Logic", Tag.TAG_COMPOUND);
+        logicSources.clear();
+        for (int i = 0; i < tagList.size(); i += 2) {
+            var pos = NbtUtils.readBlockPos(tagList.getCompound(i), "logicPos" + i);
+            if (pos.isPresent()) {
+                logicSources.add(Pair.of(pos.get(), Direction.from3DDataValue(tagList.getCompound(i + 1).getInt("logicFacing"))));
+            }
+        }
     }
 
     @Override
@@ -99,6 +132,7 @@ public class ArmEntity extends BlockEntity implements BlockEntityTicker<ArmEntit
         targeting.deserializeNBT(registries, compound.getCompound("targeting"));
         workStatus.deserializeNBT(registries, compound.getCompound("workStatus"));
         itemHandler.deserializeNBT(registries, compound.getCompound("itemHandler"));
+        deSerializeLogic(registries, compound.getCompound("logic"));
     }
 
     public ItemStackHandler getHandler() {
@@ -240,6 +274,14 @@ public class ArmEntity extends BlockEntity implements BlockEntityTicker<ArmEntit
 
     public Targeting getTargeting() {
         return targeting;
+    }
+
+    public void addLogicSource(BlockPos blockPos, Direction direction) {
+        logicSources.add(Pair.of(blockPos, direction));
+    }
+
+    public List<Pair<BlockPos, Direction>> getLogicList() {
+        return logicSources;
     }
 
     public class ArmItemHandler extends ItemStackHandler {

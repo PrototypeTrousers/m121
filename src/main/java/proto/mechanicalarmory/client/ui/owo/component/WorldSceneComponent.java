@@ -28,6 +28,7 @@ import org.joml.Vector3d;
 import org.joml.Vector4f;
 import proto.mechanicalarmory.common.logic.Targeting;
 
+import java.util.List;
 import java.util.function.BiConsumer;
 
 public class WorldSceneComponent extends BaseComponent {
@@ -38,6 +39,7 @@ public class WorldSceneComponent extends BaseComponent {
     private final Matrix4f lastModelViewMatrix = new Matrix4f();
     private boolean isDragging;
     private BiConsumer<Pair<BlockPos, Direction>, Integer> onBlockClicked = (hit, button) -> {};
+    private List<Pair<BlockPos, Direction>> logic;
 
     public WorldSceneComponent(ParentComponent parent, BlockPos center, float rotX, float rotY, float zoom) {
         super();
@@ -52,6 +54,11 @@ public class WorldSceneComponent extends BaseComponent {
 
     public WorldSceneComponent targeting(Targeting targeting) {
         this.targeting = targeting;
+        return this;
+    }
+
+    public WorldSceneComponent logic(List<Pair<BlockPos, Direction>> pairs) {
+        this.logic = pairs;
         return this;
     }
 
@@ -118,6 +125,17 @@ public class WorldSceneComponent extends BaseComponent {
                 renderIndicatorBlock(poseStack, bufferSource, client,
                         this.targeting.getTargetVec(), this.targeting.getTargetFacing(),
                         Blocks.GREEN_CONCRETE.defaultBlockState());
+            }
+        }
+
+        if (!logic.isEmpty()) {
+            int j = 0;
+            for (Pair<BlockPos, Direction> pair : logic) {
+                renderIndicatorBlock(poseStack, bufferSource, client,
+                        new Vector3d(pair.key().getX() - center.getX(),
+                                pair.key().getY() - center.getY(),
+                                pair.key().getZ() - center.getZ()),
+                        pair.right(),Blocks.YELLOW_CONCRETE.defaultBlockState());
             }
         }
 

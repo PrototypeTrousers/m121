@@ -20,7 +20,6 @@ import net.neoforged.neoforge.network.PacketDistributor;
 import org.jetbrains.annotations.NotNull;
 import proto.mechanicalarmory.client.ui.owo.component.KnobButton;
 import proto.mechanicalarmory.client.ui.owo.component.WorldSceneComponent;
-import proto.mechanicalarmory.common.logic.Action;
 import proto.mechanicalarmory.common.menu.ArmScreenHandler;
 import proto.mechanicalarmory.common.network.ArmClickPayload;
 
@@ -91,17 +90,22 @@ public class ArmScreen extends BaseOwoHandledScreen<FlowLayout, ArmScreenHandler
                                 .positioning(Positioning.absolute(getAbsoluteMouseX() - fakeWorld.x(), getAbsoluteMouseY() - fakeWorld.y()));
                         inoutSelector.button(Component.literal("IN"), (c) -> {
                             PacketDistributor.sendToServer(
-                                    new ArmClickPayload(armPos, clickedPos, clickedFace, Action.RETRIEVE)
+                                    new ArmClickPayload(armPos, clickedPos, clickedFace, ArmClickPayload.Configuration.SOURCE)
                             );
                         });
                         inoutSelector.button(Component.literal("NONE"), (c) -> {
                             PacketDistributor.sendToServer(
-                                    new ArmClickPayload(armPos, clickedPos, clickedFace, Action.IDLING)
+                                    new ArmClickPayload(armPos, clickedPos, clickedFace, ArmClickPayload.Configuration.NONE)
+                            );
+                        });
+                        inoutSelector.button(Component.literal("LOGIC"), (c) -> {
+                            PacketDistributor.sendToServer(
+                                    new ArmClickPayload(armPos, clickedPos, clickedFace, ArmClickPayload.Configuration.LOGIC)
                             );
                         });
                         inoutSelector.button(Component.literal("OUT"), (c) -> {
                             PacketDistributor.sendToServer(
-                                    new ArmClickPayload(armPos, clickedPos, clickedFace, Action.DELIVER)
+                                    new ArmClickPayload(armPos, clickedPos, clickedFace, ArmClickPayload.Configuration.TARGET)
                             );
                         });
 
@@ -112,6 +116,7 @@ public class ArmScreen extends BaseOwoHandledScreen<FlowLayout, ArmScreenHandler
 
         fakeWorld.child(worldSceneComponent
                         .targeting(menu.getBlockEntity().getTargeting())
+                        .logic(menu.getBlockEntity().getLogicList())
                         .sizing(Sizing.fixed(128)))
                 .alignment(HorizontalAlignment.CENTER, VerticalAlignment.CENTER);
 
