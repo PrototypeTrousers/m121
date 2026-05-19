@@ -16,6 +16,10 @@ import net.minecraft.core.NonNullList;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.inventory.Slot;
+import net.minecraft.world.item.crafting.Recipe;
+import net.minecraft.world.item.crafting.RecipeManager;
+import net.minecraft.world.level.block.PointedDripstoneBlock;
+import net.minecraft.world.level.levelgen.feature.DripstoneUtils;
 import net.neoforged.neoforge.network.PacketDistributor;
 import org.jetbrains.annotations.NotNull;
 import proto.mechanicalarmory.client.ui.owo.component.KnobButton;
@@ -150,7 +154,6 @@ public class ArmScreen extends BaseOwoHandledScreen<FlowLayout, ArmScreenHandler
         for (int s = 37; s < menu.getFilterHandler().getSlots() + 37; s++) {
             var filterContainer = Containers.verticalFlow(Sizing.content(), Sizing.content());
             filterContainer.alignment(HorizontalAlignment.CENTER, VerticalAlignment.CENTER);
-
             filterContainer.child(
                     Components.wrapVanillaWidget(
                             Components.button(

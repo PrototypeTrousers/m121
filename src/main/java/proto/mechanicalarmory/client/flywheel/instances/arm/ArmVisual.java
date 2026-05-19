@@ -36,11 +36,11 @@ import java.util.function.Consumer;
 public class ArmVisual extends AbstractBlockEntityVisual<ArmEntity> implements DynamicVisual, LightUpdatedVisual {
 
     private static Object2ObjectOpenCustomHashMap<ItemStack, CapturedModel> modelCache = new Object2ObjectOpenCustomHashMap<>(new ItemStackHasher());
-    private final InstanceTree instanceTree;
-    private final @Nullable InstanceTree firstArm;
-    private final @Nullable InstanceTree secondArm;
-    private final @Nullable InstanceTree baseMotor;
-    private final @Nullable InstanceTree itemAttachment;
+    private final InterpolatingInstanceTree instanceTree;
+    private final @Nullable InterpolatingInstanceTree firstArm;
+    private final @Nullable InterpolatingInstanceTree secondArm;
+    private final @Nullable InterpolatingInstanceTree baseMotor;
+    private final @Nullable InterpolatingInstanceTree itemAttachment;
     private final @Nullable TransformedInstance itemAttachmentInstance;
     private final Matrix4fc initialPose;
     ModelTree modelTree = MechanicalArmoryClient.fullArmModelTree;
@@ -52,12 +52,12 @@ public class ArmVisual extends AbstractBlockEntityVisual<ArmEntity> implements D
 
         initialPose = new Matrix4f().translate(visualPos.getX() + 0.5f, visualPos.getY(), visualPos.getZ() + 0.5f);
 
-        instanceTree = InstanceTree.create(instancerProvider(), modelTree);
+        instanceTree = InterpolatingInstanceTree.create(instancerProvider(), modelTree);
         baseMotor = instanceTree.child("BaseMotor");
         firstArm = baseMotor.child("FirstArm");
         secondArm = firstArm.child("SecondArm");
         itemAttachment = secondArm.child("ItemAttach");
-        itemAttachmentInstance = itemAttachment.instance();
+        itemAttachmentInstance = null;//itemAttachment.instance();
     }
 
     @Override
@@ -106,39 +106,39 @@ public class ArmVisual extends AbstractBlockEntityVisual<ArmEntity> implements D
             ItemStack holdingItem = blockEntity.getItemStack();
 
             CapturedModel capturedModel = modelCache.get(holdingItem);
-            if (capturedModel != null) {
-                instancerProvider().instancer(InstanceTypes.TRANSFORMED, capturedModel).stealInstance(itemAttachment.instance());
-
-                Vector4fc boundSphere = capturedModel.boundingSphere();
-                updateItemTransforms(0.375f / boundSphere.w(), -boundSphere.x(), -boundSphere.y(), -boundSphere.z());
-            } else {
-                RenderSystem.recordRenderCall(() -> {
-                    BakedModel itemModel = Minecraft.getInstance().getItemRenderer().getModel(holdingItem, level, null, 42);
-
-                    if (this.deleted) {
-                        return;
-                    }
-                    CapturingBufferSource cbs = new CapturingBufferSource();
-                    PoseStack pose = new PoseStack();
-
-                    Minecraft.getInstance().getItemRenderer().render(holdingItem, ItemDisplayContext.FIXED, false, pose, cbs, 0, 0, itemModel);
-                    cbs.endLastBatch();
-
-                    CapturedModel newCapturedModel = new CapturedModel(cbs);
-                    modelCache.put(holdingItem, newCapturedModel);
-                });
-            }
+//            if (capturedModel != null) {
+////                instancerProvider().instancer(InstanceTypes.TRANSFORMED, capturedModel).stealInstance(itemAttachment.instance());
+////
+////                Vector4fc boundSphere = capturedModel.boundingSphere();
+////                updateItemTransforms(0.375f / boundSphere.w(), -boundSphere.x(), -boundSphere.y(), -boundSphere.z());
+////            } else {
+////                RenderSystem.recordRenderCall(() -> {
+////                    BakedModel itemModel = Minecraft.getInstance().getItemRenderer().getModel(holdingItem, level, null, 42);
+////
+////                    if (this.deleted) {
+////                        return;
+////                    }
+////                    CapturingBufferSource cbs = new CapturingBufferSource();
+////                    PoseStack pose = new PoseStack();
+////
+////                    Minecraft.getInstance().getItemRenderer().render(holdingItem, ItemDisplayContext.FIXED, false, pose, cbs, 0, 0, itemModel);
+////                    cbs.endLastBatch();
+////
+////                    CapturedModel newCapturedModel = new CapturedModel(cbs);
+////                    modelCache.put(holdingItem, newCapturedModel);
+////                });
+////            }
 
             float p = context.partialTick();
-            firstArm.xRot(Mth.lerp(p, blockEntity.getAnimationRotation(0)[0], blockEntity.getRotation(0)[0]));
-            firstArm.yRot(Mth.lerp(p, blockEntity.getAnimationRotation(0)[1], blockEntity.getRotation(0)[1]));
+            firstArm.rotGoal.x = blockEntity.getRotation(0)[0];
+            firstArm.rotGoal.y = blockEntity.getRotation(0)[1];
 
-            secondArm.xRot(Mth.lerp(p, blockEntity.getAnimationRotation(1)[0], blockEntity.getRotation(1)[0]));
+            secondArm.rotGoal.x = blockEntity.getRotation(1)[0];
 
-            Vector4fc boundSphere = capturedModel.boundingSphere();
-            updateItemTransforms(0.375f / boundSphere.w(), -boundSphere.x(), -boundSphere.y(), -boundSphere.z());
+//            Vector4fc boundSphere = capturedModel.boundingSphere();
+//            updateItemTransforms(0.375f / boundSphere.w(), -boundSphere.x(), -boundSphere.y(), -boundSphere.z());
 
-            instanceTree.updateInstancesStatic(initialPose);
+            instanceTree.propagateAnimation(true);
         });
     }
 }

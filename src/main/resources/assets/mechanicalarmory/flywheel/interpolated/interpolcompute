@@ -1,0 +1,117 @@
+#version 430
+layout(local_size_x = 64) in; // Process 64 mechanical arm assemblies per workgroup
+
+// 1. Raw Input Layout (Matches your Java 80-byte InterpolatingInstancetype)
+struct InterpolatedInstance {
+    vec4 color;       // Offset 0
+    ivec2 overlay;    // Offset 16
+    vec2 light;       // Offset 24
+
+    // Previous Keyframe (Tick N)
+    vec3 posFrom;     // Offset 32
+    vec4 rotFrom;     // Offset 44 (Quaternion x,y,z,w)
+    vec3 scaleFrom;   // Offset 60
+
+    // Current Keyframe (Tick N+1 / Goal)
+    vec3 posGoal;     // Offset 72
+    vec4 rotGoal;     // Offset 84 (Quaternion x,y,z,w)
+    vec3 scaleGoal;   // Offset 100
+};
+
+// SSBO 1: Input stream uploaded via Flywheel's backend pipeline
+layout(std430, binding = 0) readonly buffer InputInstances {
+    InterpolatedInstance instances[];
+};
+
+// SSBO 2: Output matrix palette consumed by your Vertex Shader
+layout(std430, binding = 1) writeonly buffer OutputMatrices {
+    mat4 finalPartMatrices[]; // 3 matrices per arm sequence: [id*3+0]=Shoulder, [id*3+1]=Elbow...
+};
+
+// Global frame data uniform block
+layout(std140, binding = 0) uniform FlwFrameUniforms {
+    mat4 viewProjection;
+    vec4 flw_time; // x = renderTime (ticks + partialTicks), y = partialTick
+    vec3 cameraPos;
+};
+
+// --- Helper Functions ---
+
+// Normal linear quaternion interpolation (Fastest shortest-path path alignment)
+vec4 nlerp(vec4 q1, vec4 q2, float t) {
+    if (dot(q1, q2) < 0.0) q2 = -q2;
+    return normalize(mix(q1, q2, t));
+}
+
+// Reconstruct a standard 4x4 matrix from Position, Quaternion, and Scale
+mat4 buildMatrix(vec4 q, vec3 t, vec3 s) {
+    mat4 m = mat4(1.0);
+
+    m[0][0] = (1.0 - 2.0 * (q.y * q.y + q.z * q.z)) * s.x;
+    m[0][1] = (2.0 * (q.x * q.y + q.w * q.z)) * s.x;
+    m[0][2] = (2.0 * (q.x * q.z - q.w * q.y)) * s.x;
+    m[0][3] = 0.0;
+
+    m[1][0] = (2.0 * (q.x * q.y - q.w * q.z)) * s.y;
+    m[1][1] = (1.0 - 2.0 * (q.x * q.x + q.z * q.z)) * s.y;
+    m[1][2] = (2.0 * (q.y * q.z + q.w * q.x)) * s.y;
+    m[1][3] = 0.0;
+
+    m[2][0] = (2.0 * (q.x * q.z + q.w * q.y)) * s.z;
+    m[2][1] = (2.0 * (q.y * q.z - q.w * q.x)) * s.z;
+    m[2][2] = (1.0 - 2.0 * (q.x * q.x + q.y * q.y)) * s.z;
+    m[2][3] = 0.0;
+
+    m[3][0] = t.x;
+    m[3][1] = t.y;
+    m[3][2] = t.z;
+    m[3][3] = 1.0;
+
+    return m;
+}
+
+// Fetches an instance, blends its data, and constructs its local matrix
+mat4 getLocalMatrix(uint instanceIdx, float t) {
+    InterpolatedInstance inst = instances[instanceIdx];
+
+    vec3 pos   = mix(inst.posFrom, inst.posGoal, t);
+    vec4 rot   = nlerp(inst.rotFrom, inst.rotGoal, t);
+    vec3 scale = mix(inst.scaleFrom, inst.scaleGoal, t);
+
+    return buildMatrix(rot, pos, scale);
+}
+
+// --- Execution Entrypoint ---
+void main() {
+    // Each thread evaluates 1 complete mechanical arm asset grouping
+    uint armIdx = gl_GlobalInvocationID.x;
+
+    // Safety exit bounds check against input array limits
+    if ((armIdx * 3) >= instances.length()) return;
+
+    // Extract the partial tick frame delta balance factor (0.0 -> 1.0)
+    float t = fract(flw_time.x);
+
+    // --- PHASE 1: THE SHOULDER (Root / Parent Element) ---
+    uint shoulderInstanceId = armIdx * 3 + 0;
+    mat4 mShoulder = getLocalMatrix(shoulderInstanceId, t);
+
+    // Write out finished shoulder world space orientation matrix
+    finalPartMatrices[shoulderInstanceId] = mShoulder;
+
+    // --- PHASE 2: THE ELBOW (First Child Element) ---
+    uint elbowInstanceId = armIdx * 3 + 1;
+    mat4 mLocalElbow = getLocalMatrix(elbowInstanceId, t);
+
+    // Forward Kinematics multiplication: Parent World * Child Local
+    mat4 mWorldElbow = mShoulder * mLocalElbow;
+    finalPartMatrices[elbowInstanceId] = mWorldElbow;
+
+    // --- PHASE 3: THE HAND / CLAW (Grandchild Element) ---
+    uint handInstanceId = armIdx * 3 + 2;
+    mat4 mLocalHand = getLocalMatrix(handInstanceId, t);
+
+    // Forward Kinematics multiplication: Elbow World * Hand Local
+    mat4 mWorldHand = mWorldElbow * mLocalHand;
+    finalPartMatrices[handInstanceId] = mWorldHand;
+}

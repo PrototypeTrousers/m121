@@ -32,6 +32,7 @@
   "mixins": [
     "BushBlockMixin",
     "GeoRenderMixin",
+    "IndirectDrawManagerMixin",
     "ItemModelsMixin",
     "SegmentedBufferBuilderAccessor",
     "StorageMixinAccessor"
