@@ -29,6 +29,7 @@ import proto.mechanicalarmory.common.menu.MenuTypes;
 // The value here should match an entry in the META-INF/neoforge.mods.toml file
 @Mod(MechanicalArmory.MODID)
 public class MechanicalArmory {
+    public static int computeShaderId = -1;
     // Define mod id in a common place for everything to reference
     public static final String MODID = "mechanicalarmory";
     // Directly reference a slf4j logger

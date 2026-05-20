@@ -30,9 +30,11 @@
     "defaultRequire": 1
   },
   "mixins": [
+    "BackendShaderCompilerMixin",
     "BushBlockMixin",
     "GeoRenderMixin",
-    "IndirectDrawManagerMixin",
+    "IndirectCullingGroupBufferMixin",
+    "IndirectCullingGroupDispatchMixin",
     "ItemModelsMixin",
     "SegmentedBufferBuilderAccessor",
     "StorageMixinAccessor"

@@ -23,9 +23,7 @@ import net.minecraft.util.Mth;
 import net.minecraft.world.item.ItemDisplayContext;
 import net.minecraft.world.item.ItemStack;
 import org.jetbrains.annotations.Nullable;
-import org.joml.Matrix4f;
-import org.joml.Matrix4fc;
-import org.joml.Vector4fc;
+import org.joml.*;
 import proto.mechanicalarmory.MechanicalArmoryClient;
 import proto.mechanicalarmory.client.flywheel.CapturedModel;
 import proto.mechanicalarmory.client.flywheel.instances.capturing.CapturingBufferSource;
@@ -42,7 +40,6 @@ public class ArmVisual extends AbstractBlockEntityVisual<ArmEntity> implements D
     private final @Nullable InterpolatingInstanceTree baseMotor;
     private final @Nullable InterpolatingInstanceTree itemAttachment;
     private final @Nullable TransformedInstance itemAttachmentInstance;
-    private final Matrix4fc initialPose;
     ModelTree modelTree = MechanicalArmoryClient.fullArmModelTree;
     int packedLight;
 
@@ -50,9 +47,9 @@ public class ArmVisual extends AbstractBlockEntityVisual<ArmEntity> implements D
         super(ctx, blockEntity, partialTick);
         packedLight = LevelRenderer.getLightColor(level, pos.above());
 
-        initialPose = new Matrix4f().translate(visualPos.getX() + 0.5f, visualPos.getY(), visualPos.getZ() + 0.5f);
-
         instanceTree = InterpolatingInstanceTree.create(instancerProvider(), modelTree);
+
+        instanceTree.setChanged();
         baseMotor = instanceTree.child("BaseMotor");
         firstArm = baseMotor.child("FirstArm");
         secondArm = firstArm.child("SecondArm");
@@ -95,48 +92,25 @@ public class ArmVisual extends AbstractBlockEntityVisual<ArmEntity> implements D
     @Override
     public Plan<DynamicVisual.Context> planFrame() {
         return RunnablePlan.of((context) -> {
-            if (!isVisible(context.frustum())) {
-                return;
-            }
+            if (!isVisible(context.frustum())) return;
+            if (doDistanceLimitThisFrame(context)) return;
 
-            if (doDistanceLimitThisFrame(context)) {
-                return;
-            }
+            // --- 1. SET LOCAL ANIMATIONS FIRST ---
+            // Set local rotations based on block entity variables here before cascading.
+            // (e.g., baseMotor.rotGoal.rotationY(blockEntity.getRotation(0)); )
 
-            ItemStack holdingItem = blockEntity.getItemStack();
+            // --- 2. DEFINE THE ROOT WORLD POSITION ---
+            // Create the starting matrix right at the center of the BlockEntity
+            Matrix4f rootWorldMatrix = new Matrix4f()
+                    .translate(
+                            visualPos.getX() + 0.5f,
+                            visualPos.getY(),
+                            visualPos.getZ() + 0.5f
+                    );
 
-            CapturedModel capturedModel = modelCache.get(holdingItem);
-//            if (capturedModel != null) {
-////                instancerProvider().instancer(InstanceTypes.TRANSFORMED, capturedModel).stealInstance(itemAttachment.instance());
-////
-////                Vector4fc boundSphere = capturedModel.boundingSphere();
-////                updateItemTransforms(0.375f / boundSphere.w(), -boundSphere.x(), -boundSphere.y(), -boundSphere.z());
-////            } else {
-////                RenderSystem.recordRenderCall(() -> {
-////                    BakedModel itemModel = Minecraft.getInstance().getItemRenderer().getModel(holdingItem, level, null, 42);
-////
-////                    if (this.deleted) {
-////                        return;
-////                    }
-////                    CapturingBufferSource cbs = new CapturingBufferSource();
-////                    PoseStack pose = new PoseStack();
-////
-////                    Minecraft.getInstance().getItemRenderer().render(holdingItem, ItemDisplayContext.FIXED, false, pose, cbs, 0, 0, itemModel);
-////                    cbs.endLastBatch();
-////
-////                    CapturedModel newCapturedModel = new CapturedModel(cbs);
-////                    modelCache.put(holdingItem, newCapturedModel);
-////                });
-////            }
-
-            float p = context.partialTick();
-            firstArm.rotGoal.x = blockEntity.getRotation(0)[0];
-            firstArm.rotGoal.y = blockEntity.getRotation(0)[1];
-
-            secondArm.rotGoal.x = blockEntity.getRotation(1)[0];
-
-//            Vector4fc boundSphere = capturedModel.boundingSphere();
-//            updateItemTransforms(0.375f / boundSphere.w(), -boundSphere.x(), -boundSphere.y(), -boundSphere.z());
+            // --- 3. CASCADE ALL TRANSFORMS ---
+            // This calculates every child's world position and pushes it to VRAM!
+            instanceTree.cascadeWorldTransforms(rootWorldMatrix);
 
             instanceTree.propagateAnimation(true);
         });

@@ -6,8 +6,11 @@ import dev.engine_room.flywheel.api.layout.IntegerRepr;
 import dev.engine_room.flywheel.api.layout.LayoutBuilder;
 import dev.engine_room.flywheel.lib.instance.SimpleInstanceType;
 import dev.engine_room.flywheel.lib.util.ExtraMemoryOps;
+import dev.engine_room.flywheel.lib.util.ResourceUtil;
 import net.minecraft.resources.ResourceLocation;
 import org.lwjgl.system.MemoryUtil;
+
+import static proto.mechanicalarmory.MechanicalArmory.MODID;
 
 public class InterpolatingInstancetype {
     public static final InstanceType<InterpolatedInstance> INTERPOLATED = SimpleInstanceType.builder(InterpolatedInstance::new)
@@ -46,8 +49,8 @@ public class InterpolatingInstancetype {
                 ExtraMemoryOps.putVector3f(ptr + 80, instance.scaleGoal);
             })
             // Maps to your mod's local asset directory path
-            .vertexShader(ResourceLocation.fromNamespaceAndPath("mechanicalarmory", "interpolated/interpolatedtransformed.vert"))
+            .vertexShader(ResourceLocation.fromNamespaceAndPath(MODID, "interpolated/interpolatedtransformed.vert"))
             // Points to your custom hierarchy compute culling logic
-            //.cullShader(ResourceLocation.fromNamespaceAndPath("mechanicalarmory", "instance/cull/interpolated_arm.glsl"))
+            .cullShader(ResourceLocation.fromNamespaceAndPath(MODID, "interpolated/cull/transformed.glsl"))
             .build();
 }
