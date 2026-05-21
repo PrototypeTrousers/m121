@@ -48,7 +48,7 @@ public class ArmVisual extends AbstractBlockEntityVisual<ArmEntity> implements D
         packedLight = LevelRenderer.getLightColor(level, pos.above());
 
         instanceTree = InterpolatingInstanceTree.create(instancerProvider(), modelTree);
-
+        InterpolatingInstanceTree.idx = 0;
         instanceTree.setChanged();
         baseMotor = instanceTree.child("BaseMotor");
         firstArm = baseMotor.child("FirstArm");

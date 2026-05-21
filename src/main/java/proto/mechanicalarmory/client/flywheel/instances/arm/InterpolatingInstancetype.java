@@ -28,6 +28,7 @@ public class InterpolatingInstancetype {
                     .vector("posGoal", FloatRepr.FLOAT, 3)                  // 12 bytes
                     .vector("rotGoal", FloatRepr.FLOAT, 4)                  // 16 bytes (Quaternion)
                     .vector("scaleGoal", FloatRepr.FLOAT, 3)                // 12 bytes
+                    .scalar("partIdx", IntegerRepr.INT)
                     .build()) // Total struct window size = 80 bytes
             .writer((ptr, instance) -> {
                 // Common Lit Overlay attributes (0 - 11)
@@ -47,6 +48,7 @@ public class InterpolatingInstancetype {
                 ExtraMemoryOps.putVector3f(ptr + 52, instance.posGoal);
                 ExtraMemoryOps.putQuaternionf(ptr + 64, instance.rotGoal);
                 ExtraMemoryOps.putVector3f(ptr + 80, instance.scaleGoal);
+                MemoryUtil.memPutInt(ptr + 92, instance.partIdx);
             })
             // Maps to your mod's local asset directory path
             .vertexShader(ResourceLocation.fromNamespaceAndPath(MODID, "interpolated/interpolatedtransformed.vert"))

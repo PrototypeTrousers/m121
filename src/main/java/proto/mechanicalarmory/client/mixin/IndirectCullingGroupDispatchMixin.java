@@ -18,27 +18,26 @@ import proto.mechanicalarmory.client.flywheel.IMechanicalArmoryCullGroup;
 public class IndirectCullingGroupDispatchMixin {
     @Shadow @Final private IndirectBuffers buffers;
 
-    @Inject(method = "dispatchCull", at = @At("HEAD"))
+    @Inject(method = "dispatchCull", at = @At(value = "INVOKE", target = "Ldev/engine_room/flywheel/backend/gl/shader/GlProgram;bind()V"))
     private void onBeforeDispatchCull(CallbackInfo ci) {
         var bufferMixin = (IMechanicalArmoryCullGroup) this;
         int targetSsboId = bufferMixin.mechanicalArmory$getMatrixSsboId();
         if (targetSsboId == 0) return;
 
-        // Use TOTAL INSTANCES, not assemblies. Flywheel operates per-model piece here.
-        int totalInstances = bufferMixin.mechanicalArmory$getInstanceCount();
-        if (totalInstances <= 0) return;
+        int armsCount = bufferMixin.mechanicalArmory$getInstanceCount() / 4;
+        if (armsCount <= 0) return;
 
         int computeProgramId = MechanicalArmory.computeShaderId;
         GL43C.glUseProgram(computeProgramId);
 
         // Upload the instance count to location 50 directly to the shader
-        GL43C.glUniform1ui(50, totalInstances);
+        GL43C.glUniform1ui(50, armsCount);
 
         GL43C.glBindBufferBase(GL43C.GL_SHADER_STORAGE_BUFFER, 0, buffers.objectStorage.objectBuffer.handle());
         GL43C.glBindBufferBase(GL43C.GL_SHADER_STORAGE_BUFFER, 12, targetSsboId);
 
         // Dispatch based on absolute instances
-        int workGroupsX = (totalInstances + 63) / 64;
+        int workGroupsX = (armsCount + 63) / 64;
         GL43C.glDispatchCompute(workGroupsX, 1, 1);
 
         GL43C.glMemoryBarrier(GL43C.GL_SHADER_STORAGE_BARRIER_BIT);

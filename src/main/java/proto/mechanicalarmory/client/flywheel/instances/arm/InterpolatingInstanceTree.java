@@ -32,6 +32,7 @@ public class InterpolatingInstanceTree {
     private boolean visible = true;
     private boolean skipDraw = false;
     private boolean changed;
+    protected static int idx;
 
     private InterpolatingInstanceTree(ModelTree source, @Nullable InterpolatedInstance instance, InterpolatingInstanceTree[] children) {
         this.source = source;
@@ -42,19 +43,20 @@ public class InterpolatingInstanceTree {
     }
 
     public static InterpolatingInstanceTree create(InstancerProvider provider, ModelTree meshTree) {
-        InterpolatingInstanceTree[] children = new InterpolatingInstanceTree[meshTree.childCount()];
-        for (int i = 0; i < meshTree.childCount(); i++) {
-            children[i] = create(provider, meshTree.child(i));
-        }
-
         Model model = meshTree.model();
         InterpolatedInstance instance;
         if (model != null) {
             // Instantiates your custom InterpolatingInstancetype layout instead of standard Transformed
             instance = provider.instancer(InterpolatingInstancetype.INTERPOLATED, model)
                     .createInstance();
+            instance.partIdx = idx++;
         } else {
             instance = null;
+        }
+
+        InterpolatingInstanceTree[] children = new InterpolatingInstanceTree[meshTree.childCount()];
+        for (int i = 0; i < meshTree.childCount(); i++) {
+            children[i] = create(provider, meshTree.child(i));
         }
 
         return new InterpolatingInstanceTree(meshTree, instance, children);

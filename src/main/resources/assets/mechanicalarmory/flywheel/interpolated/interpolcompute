@@ -9,17 +9,79 @@ layout(std430, binding = 12) writeonly buffer OutputMatrices {
     mat4 finalPartMatrices[];
 };
 
-layout(std140, binding = 0) uniform FlwFrameUniforms {
-    mat4 viewProjection;
-    vec4 flw_time;
-    vec3 cameraPos;
+struct FrustumPlanes {
+    vec4 xyX; // <nx.x, px.x, ny.x, py.x>
+    vec4 xyY; // <nx.y, px.y, ny.y, py.y>
+    vec4 xyZ; // <nx.z, px.z, ny.z, py.z>
+    vec4 xyW; // <nx.w, px.w, ny.w, py.w>
+    vec2 zX; // <nz.x, pz.x>
+    vec2 zY; // <nz.y, pz.y>
+    vec2 zZ; // <nz.z, pz.z>
+    vec2 zW; // <nz.w, pz.w>
+};
+
+struct _FlwCullData {
+    float znear;
+    float zfar;
+    float P00;
+    float P11;
+    float pyramidWidth;
+    float pyramidHeight;
+    int pyramidLevels;
+    uint useMin;
+};
+
+layout(std140) uniform _FlwFrameUniforms {
+    FrustumPlanes flw_frustumPlanes;
+
+    _FlwCullData _flw_cullData;
+
+    mat4 flw_view;
+    mat4 flw_viewInverse;
+    mat4 flw_viewPrev;
+    mat4 flw_projection;
+    mat4 flw_projectionInverse;
+    mat4 flw_projectionPrev;
+    mat4 flw_viewProjection;
+    mat4 flw_viewProjectionInverse;
+    mat4 flw_viewProjectionPrev;
+
+    ivec4 _flw_renderOrigin;
+
+    vec4 _flw_cameraPos;
+    vec4 _flw_cameraPosPrev;
+    vec4 _flw_cameraLook;
+    vec4 _flw_cameraLookPrev;
+    vec2 flw_cameraRot;
+    vec2 flw_cameraRotPrev;
+
+    vec2 flw_viewportSize;
+    float flw_aspectRatio;
+    float flw_defaultLineWidth;
+    float flw_viewDistance;
+
+    uint flw_ticks;
+    float flw_partialTick;
+    float flw_renderTicks;
+    float flw_renderSeconds;
+    float flw_systemSeconds;
+    uint flw_systemMillis;
+
+    /** 0 means no fluid. Use FLW_CAMERA_IN_FLUID_* defines to detect fluid type. */
+    uint flw_cameraInFluid;
+    /** 0 means no block. Use FLW_CAMERA_IN_BLOCK_* defines to detect block type. */
+    uint flw_cameraInBlock;
+
+    uint _flw_debugMode;
+
+    float _flw_oitNoise;
 };
 
 // Target the exact manual location from our Mixin
 layout(location = 50) uniform uint totalInstancesCount;
 
 // Exactly 23 floats, matching your Java extra memory layout size perfectly
-const uint STRIDE = 23u;
+const uint STRIDE = 24u;
 const uint OFF_POS_FROM   = 3u;
 const uint OFF_ROT_FROM   = 6u;
 const uint OFF_SCALE_FROM = 10u;
@@ -75,13 +137,31 @@ mat4 buildMatrix(vec3 pos, vec4 q, vec3 scale) {
     return m;
 }
 
+mat4 getLocalMatrix(uint index, float t) {
+    uint base = index * STRIDE;
+
+    vec3 posFrom   = vec3(instances[base + OFF_POS_FROM],     instances[base + OFF_POS_FROM + 1u],   instances[base + OFF_POS_FROM + 2u]);
+    vec4 rotFrom   = vec4(instances[base + OFF_ROT_FROM],     instances[base + OFF_ROT_FROM + 1u],   instances[base + OFF_ROT_FROM + 2u],   instances[base + OFF_ROT_FROM + 3u]);
+    vec3 scaleFrom = vec3(instances[base + OFF_SCALE_FROM],   instances[base + OFF_SCALE_FROM + 1u], instances[base + OFF_SCALE_FROM + 2u]);
+
+    vec3 posGoal   = vec3(instances[base + OFF_POS_GOAL],     instances[base + OFF_POS_GOAL + 1u],   instances[base + OFF_POS_GOAL + 2u]);
+    vec4 rotGoal   = vec4(instances[base + OFF_ROT_GOAL],     instances[base + OFF_ROT_GOAL + 1u],   instances[base + OFF_ROT_GOAL + 2u],   instances[base + OFF_ROT_GOAL + 3u]);
+    vec3 scaleGoal = vec3(instances[base + OFF_SCALE_GOAL],   instances[base + OFF_SCALE_GOAL + 1u], instances[base + OFF_SCALE_GOAL + 2u]);
+
+    vec3 mixedPos   = mix(posFrom, posGoal, t);
+    vec4 mixedRot   = slerp(rotFrom, rotGoal, t);
+    vec3 mixedScale = mix(scaleFrom, scaleGoal, t);
+
+    return buildMatrix(mixedPos, mixedRot, mixedScale);
+}
+
 void main() {
     uint idx = gl_GlobalInvocationID.x;
 
     // Completely bound-safe. Processes every uploaded part effortlessly.
     if (idx >= totalInstancesCount) return;
 
-    float t = fract(flw_time.x);
+    float t = flw_partialTick;
     uint base = idx * STRIDE;
 
     vec3 posFrom   = vec3(instances[base + OFF_POS_FROM],     instances[base + OFF_POS_FROM + 1u],   instances[base + OFF_POS_FROM + 2u]);
@@ -97,5 +177,8 @@ void main() {
     vec3 mixedScale = mix(scaleFrom, scaleGoal, t);
 
     // Write 1 matrix per instance smoothly. No cross-indexing bounds needed!
-    finalPartMatrices[idx] = buildMatrix(mixedPos, mixedRot, mixedScale);
+    finalPartMatrices[idx * 4] = buildMatrix(mixedPos, mixedRot, mixedScale);
+    finalPartMatrices[idx * 4 + 1] = buildMatrix(mixedPos, mixedRot, mixedScale);
+    finalPartMatrices[idx * 4 + 2] = buildMatrix(mixedPos, mixedRot, mixedScale);
+    finalPartMatrices[idx * 4 + 3] = buildMatrix(mixedPos, mixedRot, mixedScale);
 }
