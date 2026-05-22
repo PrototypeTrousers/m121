@@ -17,7 +17,7 @@ void flw_instanceVertex(in FlwInstance i) {
     #endif
 
     // 2. Fetch the pre-computed matrix using that precise index marker
-    mat4 partWorldMatrix = finalPartMatrices[i.partIdx];
+    mat4 partWorldMatrix = finalPartMatrices[0];
 
     // 3. Transform geometry positions
     flw_vertexPos = partWorldMatrix * flw_vertexPos;

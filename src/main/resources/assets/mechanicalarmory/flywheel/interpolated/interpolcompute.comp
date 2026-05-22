@@ -1,9 +1,5 @@
 layout(local_size_x = 64) in;
 
-layout(std430, binding = 0) readonly buffer InputInstances {
-    float instances[];
-};
-
 layout(std430, binding = 12) writeonly buffer OutputMatrices {
     mat4 finalPartMatrices[];
 };
@@ -12,52 +8,6 @@ layout(std430, binding = 12) writeonly buffer OutputMatrices {
 layout(location = 50) uniform uint totalInstancesCount;
 
 const uint STRIDE = 24u;
-
-struct FlwInstance {
-    vec4  color;
-    ivec2 overlay;
-    vec2  light;
-    vec3  posFrom;
-    vec4  rotFrom;
-    vec3  scaleFrom;
-    vec3  posGoal;
-    vec4  rotGoal;
-    vec3  scaleGoal;
-    int   partIdx;
-};
-
-FlwInstance unpackInstance(uint index) {
-    uint base = index * STRIDE;
-
-    FlwInstance i;
-
-    uint c = floatBitsToUint(instances[base + 0u]);
-    i.color = vec4(
-        float((c      ) & 0xFFu) / 255.0,
-        float((c >>  8) & 0xFFu) / 255.0,
-        float((c >> 16) & 0xFFu) / 255.0,
-        float((c >> 24) & 0xFFu) / 255.0
-    );
-
-    uint o = floatBitsToUint(instances[base + 1u]);
-    i.overlay = ivec2(
-        int(o & 0xFFFFu) ^ 0x8000 - 0x8000,
-        int(o >> 16)     ^ 0x8000 - 0x8000
-    );
-
-    uint l = floatBitsToUint(instances[base + 2u]);
-    i.light = vec2(float(l & 0xFFFFu), float(l >> 16));
-
-    i.posFrom   = vec3(instances[base +  3u], instances[base +  4u], instances[base +  5u]);
-    i.rotFrom   = vec4(instances[base +  6u], instances[base +  7u], instances[base +  8u], instances[base +  9u]);
-    i.scaleFrom = vec3(instances[base + 10u], instances[base + 11u], instances[base + 12u]);
-    i.posGoal   = vec3(instances[base + 13u], instances[base + 14u], instances[base + 15u]);
-    i.rotGoal   = vec4(instances[base + 16u], instances[base + 17u], instances[base + 18u], instances[base + 19u]);
-    i.scaleGoal = vec3(instances[base + 20u], instances[base + 21u], instances[base + 22u]);
-    i.partIdx   = int(floatBitsToUint(instances[base + 23u]));
-
-    return i;
-}
 
 vec4 slerp(vec4 v0, vec4 v1, float t) {
     v0 = normalize(v0);
@@ -108,7 +58,7 @@ mat4 buildMatrix(vec3 pos, vec4 q, vec3 scale) {
 }
 
 mat4 getLocalMatrix(uint index, float t) {
-    FlwInstance i = unpackInstance(index);
+    FlwInstance i = _flw_unpackInstance(index);
 
     vec3 mixedPos   = mix(vec3(0,index,0),   vec3(0,index,0),   t);
     vec4 mixedRot   = slerp(i.rotFrom, i.rotGoal,   t);
@@ -130,12 +80,13 @@ void main() {
         uint secondIdx = idx + totalInstancesCount * 2;
         uint itemIdx   = idx + totalInstancesCount * 3;
 
-        mat4 base   = getLocalMatrix(baseIdx,   flw_partialTick);
+        //mat4 base   = getLocalMatrix(baseIdx,   flw_partialTick);
+        mat4 base   = buildMatrix(vec3(0,1,0), vec4(0), vec3(1));
         mat4 first  = base   * getLocalMatrix(firstIdx,  flw_partialTick);
         mat4 second = first  * getLocalMatrix(secondIdx, flw_partialTick);
         mat4 item   = second * getLocalMatrix(itemIdx,   flw_partialTick);
 
-        finalPartMatrices[idx]   = base;
+        finalPartMatrices[0]   = base;
         finalPartMatrices[idx+1]  = first;
         finalPartMatrices[idx+2] = second;
         finalPartMatrices[idx+3]   = item;
