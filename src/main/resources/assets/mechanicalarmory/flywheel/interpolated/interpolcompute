@@ -80,14 +80,53 @@ layout(std140) uniform _FlwFrameUniforms {
 // Target the exact manual location from our Mixin
 layout(location = 50) uniform uint totalInstancesCount;
 
-// Exactly 23 floats, matching your Java extra memory layout size perfectly
 const uint STRIDE = 24u;
-const uint OFF_POS_FROM   = 3u;
-const uint OFF_ROT_FROM   = 6u;
-const uint OFF_SCALE_FROM = 10u;
-const uint OFF_POS_GOAL   = 13u;
-const uint OFF_ROT_GOAL   = 16u;
-const uint OFF_SCALE_GOAL = 20u;
+
+struct FlwInstance {
+    vec4  color;
+    ivec2 overlay;
+    vec2  light;
+    vec3  posFrom;
+    vec4  rotFrom;
+    vec3  scaleFrom;
+    vec3  posGoal;
+    vec4  rotGoal;
+    vec3  scaleGoal;
+    int   partIdx;
+};
+
+FlwInstance unpackInstance(uint index) {
+    uint base = index * STRIDE;
+
+    FlwInstance i;
+
+    uint c = floatBitsToUint(instances[base + 0u]);
+    i.color = vec4(
+        float((c      ) & 0xFFu) / 255.0,
+        float((c >>  8) & 0xFFu) / 255.0,
+        float((c >> 16) & 0xFFu) / 255.0,
+        float((c >> 24) & 0xFFu) / 255.0
+    );
+
+    uint o = floatBitsToUint(instances[base + 1u]);
+    i.overlay = ivec2(
+        int(o & 0xFFFFu) ^ 0x8000 - 0x8000,
+        int(o >> 16)     ^ 0x8000 - 0x8000
+    );
+
+    uint l = floatBitsToUint(instances[base + 2u]);
+    i.light = vec2(float(l & 0xFFFFu), float(l >> 16));
+
+    i.posFrom   = vec3(instances[base +  3u], instances[base +  4u], instances[base +  5u]);
+    i.rotFrom   = vec4(instances[base +  6u], instances[base +  7u], instances[base +  8u], instances[base +  9u]);
+    i.scaleFrom = vec3(instances[base + 10u], instances[base + 11u], instances[base + 12u]);
+    i.posGoal   = vec3(instances[base + 13u], instances[base + 14u], instances[base + 15u]);
+    i.rotGoal   = vec4(instances[base + 16u], instances[base + 17u], instances[base + 18u], instances[base + 19u]);
+    i.scaleGoal = vec3(instances[base + 20u], instances[base + 21u], instances[base + 22u]);
+    i.partIdx   = int(floatBitsToUint(instances[base + 23u]));
+
+    return i;
+}
 
 vec4 slerp(vec4 v0, vec4 v1, float t) {
     v0 = normalize(v0);
@@ -138,19 +177,11 @@ mat4 buildMatrix(vec3 pos, vec4 q, vec3 scale) {
 }
 
 mat4 getLocalMatrix(uint index, float t) {
-    uint base = index * STRIDE;
+    FlwInstance i = unpackInstance(index);
 
-    vec3 posFrom   = vec3(instances[base + OFF_POS_FROM],     instances[base + OFF_POS_FROM + 1u],   instances[base + OFF_POS_FROM + 2u]);
-    vec4 rotFrom   = vec4(instances[base + OFF_ROT_FROM],     instances[base + OFF_ROT_FROM + 1u],   instances[base + OFF_ROT_FROM + 2u],   instances[base + OFF_ROT_FROM + 3u]);
-    vec3 scaleFrom = vec3(instances[base + OFF_SCALE_FROM],   instances[base + OFF_SCALE_FROM + 1u], instances[base + OFF_SCALE_FROM + 2u]);
-
-    vec3 posGoal   = vec3(instances[base + OFF_POS_GOAL],     instances[base + OFF_POS_GOAL + 1u],   instances[base + OFF_POS_GOAL + 2u]);
-    vec4 rotGoal   = vec4(instances[base + OFF_ROT_GOAL],     instances[base + OFF_ROT_GOAL + 1u],   instances[base + OFF_ROT_GOAL + 2u],   instances[base + OFF_ROT_GOAL + 3u]);
-    vec3 scaleGoal = vec3(instances[base + OFF_SCALE_GOAL],   instances[base + OFF_SCALE_GOAL + 1u], instances[base + OFF_SCALE_GOAL + 2u]);
-
-    vec3 mixedPos   = mix(posFrom, posGoal, t);
-    vec4 mixedRot   = slerp(rotFrom, rotGoal, t);
-    vec3 mixedScale = mix(scaleFrom, scaleGoal, t);
+    vec3 mixedPos   = mix(i.posFrom,   i.posGoal,   t);
+    vec4 mixedRot   = slerp(i.rotFrom, i.rotGoal,   t);
+    vec3 mixedScale = mix(i.scaleFrom, i.scaleGoal, t);
 
     return buildMatrix(mixedPos, mixedRot, mixedScale);
 }
@@ -162,23 +193,19 @@ void main() {
     if (idx >= totalInstancesCount) return;
 
     float t = flw_partialTick;
-    uint base = idx * STRIDE;
 
-    vec3 posFrom   = vec3(instances[base + OFF_POS_FROM],     instances[base + OFF_POS_FROM + 1u],   instances[base + OFF_POS_FROM + 2u]);
-    vec4 rotFrom   = vec4(instances[base + OFF_ROT_FROM],     instances[base + OFF_ROT_FROM + 1u],   instances[base + OFF_ROT_FROM + 2u],   instances[base + OFF_ROT_FROM + 3u]);
-    vec3 scaleFrom = vec3(instances[base + OFF_SCALE_FROM],   instances[base + OFF_SCALE_FROM + 1u], instances[base + OFF_SCALE_FROM + 2u]);
+        uint baseIdx   = idx;
+        uint firstIdx  = idx + totalInstancesCount;
+        uint secondIdx = idx + totalInstancesCount * 2;
+        uint itemIdx   = idx + totalInstancesCount * 3;
 
-    vec3 posGoal   = vec3(instances[base + OFF_POS_GOAL],     instances[base + OFF_POS_GOAL + 1u],   instances[base + OFF_POS_GOAL + 2u]);
-    vec4 rotGoal   = vec4(instances[base + OFF_ROT_GOAL],     instances[base + OFF_ROT_GOAL + 1u],   instances[base + OFF_ROT_GOAL + 2u],   instances[base + OFF_ROT_GOAL + 3u]);
-    vec3 scaleGoal = vec3(instances[base + OFF_SCALE_GOAL],   instances[base + OFF_SCALE_GOAL + 1u], instances[base + OFF_SCALE_GOAL + 2u]);
+        mat4 base   = getLocalMatrix(baseIdx,   flw_partialTick);
+        mat4 first  = base   * getLocalMatrix(firstIdx,  flw_partialTick);
+        mat4 second = first  * getLocalMatrix(secondIdx, flw_partialTick);
+        mat4 item   = second * getLocalMatrix(itemIdx,   flw_partialTick);
 
-    vec3 mixedPos   = mix(posFrom, posGoal, t);
-    vec4 mixedRot   = slerp(rotFrom, rotGoal, t);
-    vec3 mixedScale = mix(scaleFrom, scaleGoal, t);
-
-    // Write 1 matrix per instance smoothly. No cross-indexing bounds needed!
-    finalPartMatrices[idx * 4] = buildMatrix(mixedPos, mixedRot, mixedScale);
-    finalPartMatrices[idx * 4 + 1] = buildMatrix(mixedPos, mixedRot, mixedScale);
-    finalPartMatrices[idx * 4 + 2] = buildMatrix(mixedPos, mixedRot, mixedScale);
-    finalPartMatrices[idx * 4 + 3] = buildMatrix(mixedPos, mixedRot, mixedScale);
+        finalPartMatrices[baseIdx]   = base;
+        finalPartMatrices[firstIdx]  = first;
+        finalPartMatrices[secondIdx] = second;
+        finalPartMatrices[itemIdx]   = item;
 }
