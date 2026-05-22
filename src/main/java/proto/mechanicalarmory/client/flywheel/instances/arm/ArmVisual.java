@@ -6,6 +6,7 @@ import dev.engine_room.flywheel.api.instance.Instance;
 import dev.engine_room.flywheel.api.task.Plan;
 import dev.engine_room.flywheel.api.visual.DynamicVisual;
 import dev.engine_room.flywheel.api.visual.LightUpdatedVisual;
+import dev.engine_room.flywheel.api.visual.TickableVisual;
 import dev.engine_room.flywheel.api.visualization.VisualizationContext;
 import dev.engine_room.flywheel.lib.instance.InstanceTypes;
 import dev.engine_room.flywheel.lib.instance.TransformedInstance;
@@ -31,7 +32,7 @@ import proto.mechanicalarmory.common.entities.block.ArmEntity;
 
 import java.util.function.Consumer;
 
-public class ArmVisual extends AbstractBlockEntityVisual<ArmEntity> implements DynamicVisual, LightUpdatedVisual {
+public class ArmVisual extends AbstractBlockEntityVisual<ArmEntity> implements TickableVisual, LightUpdatedVisual {
 
     private static Object2ObjectOpenCustomHashMap<ItemStack, CapturedModel> modelCache = new Object2ObjectOpenCustomHashMap<>(new ItemStackHasher());
     private final InterpolatingInstanceTree instanceTree;
@@ -90,29 +91,15 @@ public class ArmVisual extends AbstractBlockEntityVisual<ArmEntity> implements D
     }
 
     @Override
-    public Plan<DynamicVisual.Context> planFrame() {
+    public Plan<Context> planTick() {
         return RunnablePlan.of((context) -> {
-            if (!isVisible(context.frustum())) return;
-            if (doDistanceLimitThisFrame(context)) return;
-
-            // --- 1. SET LOCAL ANIMATIONS FIRST ---
-            // Set local rotations based on block entity variables here before cascading.
-            // (e.g., baseMotor.rotGoal.rotationY(blockEntity.getRotation(0)); )
-
-            // --- 2. DEFINE THE ROOT WORLD POSITION ---
-            // Create the starting matrix right at the center of the BlockEntity
-            Matrix4f rootWorldMatrix = new Matrix4f()
-                    .translate(
-                            visualPos.getX() + 0.5f,
-                            visualPos.getY(),
-                            visualPos.getZ() + 0.5f
-                    );
-
-            // --- 3. CASCADE ALL TRANSFORMS ---
-            // This calculates every child's world position and pushes it to VRAM!
-            instanceTree.cascadeWorldTransforms(rootWorldMatrix);
-
-            instanceTree.propagateAnimation(true);
+//            if (!isVisible(context.frustum())) return;
+//            if (doDistanceLimitThisFrame(context)) return;
+            baseMotor.child(0).instance().posGoal.set(visualPos.getX(), visualPos.getY(), visualPos.getZ());
+            firstArm.child(0).instance().posGoal.set(visualPos.getX(), visualPos.getY() + 1, visualPos.getZ());
+            firstArm.child(0).instance().posFrom.set(visualPos.getX(), visualPos.getY(), visualPos.getZ());
+            instanceTree.cascadeWorldTransforms();
+            InterpolatingInstanceTree.idx = 0;
         });
     }
 }

@@ -4,8 +4,6 @@ layout(std430, binding = 12) readonly buffer OutputMatrices {
     mat4 finalPartMatrices[];
 };
 
-layout(location = 50) uniform uint totalInstancesCount;
-
 void flw_instanceVertex(in FlwInstance i) {
     uint absoluteInstanceIndex;
 
@@ -19,7 +17,7 @@ void flw_instanceVertex(in FlwInstance i) {
     #endif
 
     // 2. Fetch the pre-computed matrix using that precise index marker
-    mat4 partWorldMatrix = finalPartMatrices[absoluteInstanceIndex + totalInstancesCount * i.partIdx];
+    mat4 partWorldMatrix = finalPartMatrices[gl_InstanceID * 4 + i.partIdx];
 
     // 3. Transform geometry positions
     flw_vertexPos = partWorldMatrix * flw_vertexPos;
