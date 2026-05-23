@@ -1,92 +1,116 @@
-layout(local_size_x = 64) in;
+// Flywheel injects FlwInstance, _flw_unpackInstance, and all uniforms
+// (flw_partialTick etc.) automatically based on instance type registration.
+
+layout(local_size_x = 32) in;
+
+// Bound by bindForCull() at slot 1 — contains packed instance data.
+// Accessed via _flw_unpackInstance(globalIdx) — do NOT declare your own buffer here.
+
+// The virtual→real page mapping from ObjectStorage.Mapping.
+// Uploaded from Java each frame before dispatch.
+// pages[virtualPageIndex] = real page index in the objectBuffer.
+layout(std430, binding = 13) readonly buffer MappingPages {
+    uint mappingPages[];
+};
 
 layout(std430, binding = 12) writeonly buffer OutputMatrices {
     mat4 finalPartMatrices[];
 };
 
-// Target the exact manual location from our Mixin
-layout(location = 50) uniform uint totalInstancesCount;
+// Total number of arms (NOT total instances — totalInstances = armsCount * 4).
+layout(location = 50) uniform uint armsCount;
 
-const uint STRIDE = 24u;
+// ─── Quaternion slerp ────────────────────────────────────────────────────────
 
 vec4 slerp(vec4 v0, vec4 v1, float t) {
     v0 = normalize(v0);
     v1 = normalize(v1);
-    float dotProduct = dot(v0, v1);
-
-    if (dotProduct < 0.0) {
-        v1 = -v1;
-        dotProduct = -dotProduct;
-    }
-
-    if (dotProduct > 0.9995) {
-        return normalize(mix(v0, v1, t));
-    }
-
-    float theta_0 = acos(dotProduct);
-    float theta = theta_0 * t;
-    float sin_theta = sin(theta);
-    float sin_theta_0 = sin(theta_0);
-
-    float s0 = cos(theta) - dotProduct * sin_theta / sin_theta_0;
-    float s1 = sin_theta / sin_theta_0;
-    return (s0 * v0) + (s1 * v1);
+    float d = dot(v0, v1);
+    if (d < 0.0) { v1 = -v1; d = -d; }
+    if (d > 0.9995) return normalize(mix(v0, v1, t));
+    float theta0    = acos(d);
+    float theta     = theta0 * t;
+    float sinTheta  = sin(theta);
+    float sinTheta0 = sin(theta0);
+    float s0 = cos(theta) - d * sinTheta / sinTheta0;
+    float s1 = sinTheta / sinTheta0;
+    return s0 * v0 + s1 * v1;
 }
+
+// ─── TRS → mat4 ─────────────────────────────────────────────────────────────
 
 mat4 buildMatrix(vec3 pos, vec4 q, vec3 scale) {
     mat4 m;
-    m[0][0] = (1.0 - 2.0 * (q.y * q.y + q.z * q.z)) * scale.x;
-    m[0][1] = (2.0 * (q.x * q.y + q.w * q.z)) * scale.x;
-    m[0][2] = (2.0 * (q.x * q.z - q.w * q.y)) * scale.x;
+    m[0][0] = (1.0 - 2.0*(q.y*q.y + q.z*q.z)) * scale.x;
+    m[0][1] = (2.0*(q.x*q.y + q.w*q.z))        * scale.x;
+    m[0][2] = (2.0*(q.x*q.z - q.w*q.y))        * scale.x;
     m[0][3] = 0.0;
 
-    m[1][0] = (2.0 * (q.x * q.y - q.w * q.z)) * scale.y;
-    m[1][1] = (1.0 - 2.0 * (q.x * q.x + q.z * q.z)) * scale.y;
-    m[1][2] = (2.0 * (q.y * q.z + q.w * q.x)) * scale.y;
+    m[1][0] = (2.0*(q.x*q.y - q.w*q.z))        * scale.y;
+    m[1][1] = (1.0 - 2.0*(q.x*q.x + q.z*q.z)) * scale.y;
+    m[1][2] = (2.0*(q.y*q.z + q.w*q.x))        * scale.y;
     m[1][3] = 0.0;
 
-    m[2][0] = (2.0 * (q.x * q.z + q.w * q.y)) * scale.z;
-    m[2][1] = (2.0 * (q.y * q.z - q.w * q.x)) * scale.z;
-    m[2][2] = (1.0 - 2.0 * (q.x * q.x + q.y * q.y)) * scale.z;
+    m[2][0] = (2.0*(q.x*q.z + q.w*q.y))        * scale.z;
+    m[2][1] = (2.0*(q.y*q.z - q.w*q.x))        * scale.z;
+    m[2][2] = (1.0 - 2.0*(q.x*q.x + q.y*q.y)) * scale.z;
     m[2][3] = 0.0;
 
-    m[3][0] = pos.x;
-    m[3][1] = pos.y;
-    m[3][2] = pos.z;
-    m[3][3] = 1.0;
+    m[3] = vec4(pos, 1.0);
     return m;
 }
 
-mat4 getLocalMatrix(uint index, float t) {
-    FlwInstance i = _flw_unpackInstance(0);
+// ─── Page-aware index resolution ─────────────────────────────────────────────
+//
+// ObjectStorage stores instances in pages of 32. Pages are allocated by a
+// free-list arena so their positions in the GPU buffer are NOT guaranteed to be
+// contiguous. mappingPages[] translates a virtual page index (sequential) to
+// the real page index inside objectBuffer, exactly mirroring
+// ObjectStorage.Mapping.objectIndex2GlobalIndex() on the Java side.
 
-    vec3 mixedPos   = mix(i.posFrom,   i.posGoal,   t);
-    vec4 mixedRot   = slerp(i.rotFrom, i.rotGoal,   t);
-    vec3 mixedScale = mix(i.scaleFrom, i.scaleGoal, t);
-
-    return buildMatrix(mixedPos, mixedRot, mixedScale);
+uint logicalToGlobal(uint logicalIdx) {
+    uint virtualPage = logicalIdx >> 5u;        // logicalIdx / 32
+    uint slotInPage  = logicalIdx & 31u;         // logicalIdx % 32
+    uint realPage    = mappingPages[virtualPage];
+    return (realPage << 5u) | slotInPage;
 }
 
-void main() {
-    uint idx = gl_GlobalInvocationID.x;
+// ─── Per-arm local matrix ─────────────────────────────────────────────────────
 
-    // Completely bound-safe. Processes every uploaded part effortlessly.
-    if (idx >= totalInstancesCount) return;
+mat4 getLocalMatrix(uint logicalIdx, float t) {
+    FlwInstance i = _flw_unpackInstance(logicalToGlobal(logicalIdx));
+    return buildMatrix(
+    mix(i.posFrom, i.posGoal, t),
+    slerp(i.rotFrom, i.rotGoal, t),
+    mix(i.scaleFrom, i.scaleGoal, t)
+    );
+}
+
+// ─── Main ────────────────────────────────────────────────────────────────────
+//
+// Layout of instances in the buffer (set up on the Java side):
+//   [0 .. armsCount-1]          → base joints
+//   [armsCount .. 2N-1]         → first joints
+//   [2N .. 3N-1]                → second joints
+//   [3N .. 4N-1]                → item joints
+//
+// One thread per arm. Each thread chains the 4 joints and writes 4 matrices.
+
+void main() {
+    uint armIdx = gl_GlobalInvocationID.x;
+    if (armIdx >= armsCount) return;
 
     float t = flw_partialTick;
 
-        uint baseIdx   = idx;
-        uint firstIdx  = idx + totalInstancesCount;
-        uint secondIdx = idx + totalInstancesCount * 2;
-        uint itemIdx   = idx + totalInstancesCount * 3;
+    mat4 base   = getLocalMatrix(armIdx,                    t);
+    mat4 first  = base   * getLocalMatrix(armIdx + armsCount,      t);
+    mat4 second = first  * getLocalMatrix(armIdx + armsCount * 2u, t);
+    mat4 item   = second * getLocalMatrix(armIdx + armsCount * 3u, t);
 
-        mat4 base   = getLocalMatrix(baseIdx,   flw_partialTick);
-        mat4 first  = base   * getLocalMatrix(firstIdx,  flw_partialTick);
-        mat4 second = first  * getLocalMatrix(secondIdx, flw_partialTick);
-        mat4 item   = second * getLocalMatrix(itemIdx,   flw_partialTick);
-
-        finalPartMatrices[0]   = base;
-        finalPartMatrices[idx+1]  = first;
-        finalPartMatrices[idx+2] = second;
-        finalPartMatrices[idx+3]   = item;
+    // Each arm owns 4 consecutive output slots — no inter-thread collisions.
+    uint aout = armIdx * 4;
+finalPartMatrices[aout + 0u] = base;
+finalPartMatrices[aout + 1u] = first;
+finalPartMatrices[aout + 2u] = second;
+finalPartMatrices[aout + 3u] = item;
 }

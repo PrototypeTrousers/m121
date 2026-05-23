@@ -41,6 +41,7 @@ public class ArmVisual extends AbstractBlockEntityVisual<ArmEntity> implements T
     private final @Nullable InterpolatingInstanceTree baseMotor;
     private final @Nullable InterpolatingInstanceTree itemAttachment;
     private final @Nullable TransformedInstance itemAttachmentInstance;
+    private final @Nullable InterpolatingInstanceTree base;
     ModelTree modelTree = MechanicalArmoryClient.fullArmModelTree;
     int packedLight;
 
@@ -52,6 +53,7 @@ public class ArmVisual extends AbstractBlockEntityVisual<ArmEntity> implements T
         InterpolatingInstanceTree.idx = 0;
         instanceTree.setChanged();
         baseMotor = instanceTree.child("BaseMotor");
+        base = instanceTree.child("Base");
         firstArm = baseMotor.child("FirstArm");
         secondArm = firstArm.child("SecondArm");
         itemAttachment = secondArm.child("ItemAttach");
@@ -97,6 +99,8 @@ public class ArmVisual extends AbstractBlockEntityVisual<ArmEntity> implements T
 //            if (doDistanceLimitThisFrame(context)) return;
             baseMotor.child(0).instance().posGoal.set(visualPos.getX(), visualPos.getY(), visualPos.getZ());
             baseMotor.child(0).instance().posFrom.set(visualPos.getX(), visualPos.getY(), visualPos.getZ());
+                       base.child(0).instance().posGoal.set(visualPos.getX(), visualPos.getY()-1, visualPos.getZ());
+            base.child(0).instance().posFrom.set(visualPos.getX(), visualPos.getY()-1, visualPos.getZ());
             firstArm.child(0).instance().posGoal.set(visualPos.getX(), visualPos.getY() + 1, visualPos.getZ());
             firstArm.child(0).instance().posFrom.set(visualPos.getX(), visualPos.getY()+ 1, visualPos.getZ());
             instanceTree.cascadeWorldTransforms();

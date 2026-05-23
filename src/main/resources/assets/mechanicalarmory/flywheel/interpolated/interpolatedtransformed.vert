@@ -1,23 +1,24 @@
 #include "flywheel:internal/indirect/buffer_bindings.glsl"
 
+layout(std430, binding = _FLW_DRAW_INSTANCE_INDEX_BUFFER_BINDING) restrict readonly buffer TargetBuffer2 {
+    uint instanceIndices[];
+};
+
 layout(std430, binding = 12) readonly buffer OutputMatrices {
     mat4 finalPartMatrices[];
 };
 
+#if __VERSION__ < 460
+#define flw_baseInstance gl_BaseInstanceARB
+#define flw_drawId gl_DrawIDARB
+#else
+#define flw_baseInstance gl_BaseInstance
+#define flw_drawId gl_DrawID
+#endif
+
 void flw_instanceVertex(in FlwInstance i) {
-    uint absoluteInstanceIndex;
-
-    // Isolate the backends completely using Flywheel's core pipeline definitions
-    #if defined(FLW_BACKEND_INDIRECT)
-        // INDIRECT PATHWAY: Safe to look up redirection indexes
-        absoluteInstanceIndex = _flw_instanceIndices[flw_baseInstance + gl_InstanceID];
-    #else
-        // INSTANCING PATHWAY: Direct 1:1 mapping (the indirect array code is never scanned)
-        absoluteInstanceIndex = gl_InstanceID;
-    #endif
-
-    // 2. Fetch the pre-computed matrix using that precise index marker
-    mat4 partWorldMatrix = finalPartMatrices[absoluteInstanceIndex + i.partIdx];
+    uint instanceIndex = instanceIndices[flw_baseInstance + gl_InstanceID];
+    mat4 partWorldMatrix = finalPartMatrices[0];
 
     // 3. Transform geometry positions
     flw_vertexPos = partWorldMatrix * flw_vertexPos;
