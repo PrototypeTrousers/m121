@@ -96,10 +96,10 @@ public class ArmVisual extends AbstractBlockEntityVisual<ArmEntity> implements T
 //            if (!isVisible(context.frustum())) return;
 //            if (doDistanceLimitThisFrame(context)) return;
             baseMotor.child(0).instance().posGoal.set(visualPos.getX(), visualPos.getY(), visualPos.getZ());
+            baseMotor.child(0).instance().posFrom.set(visualPos.getX(), visualPos.getY(), visualPos.getZ());
             firstArm.child(0).instance().posGoal.set(visualPos.getX(), visualPos.getY() + 1, visualPos.getZ());
-            firstArm.child(0).instance().posFrom.set(visualPos.getX(), visualPos.getY(), visualPos.getZ());
+            firstArm.child(0).instance().posFrom.set(visualPos.getX(), visualPos.getY()+ 1, visualPos.getZ());
             instanceTree.cascadeWorldTransforms();
-            InterpolatingInstanceTree.idx = 0;
         });
     }
 }

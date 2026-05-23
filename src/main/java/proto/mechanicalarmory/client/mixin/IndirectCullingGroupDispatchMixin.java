@@ -33,7 +33,7 @@ public class IndirectCullingGroupDispatchMixin {
         // Upload the instance count to location 50 directly to the shader
         GL43C.glUniform1ui(50, armsCount);
 
-        GL43C.glBindBufferBase(GL43C.GL_SHADER_STORAGE_BUFFER, 0, buffers.objectStorage.objectBuffer.handle());
+        buffers.bindForCull();
         GL43C.glBindBufferBase(GL43C.GL_SHADER_STORAGE_BUFFER, 12, targetSsboId);
 
         // Dispatch based on absolute instances

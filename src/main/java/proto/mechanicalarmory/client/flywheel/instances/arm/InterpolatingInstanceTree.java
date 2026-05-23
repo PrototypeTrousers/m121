@@ -150,14 +150,11 @@ public class InterpolatingInstanceTree {
 
         // 5. Upload absolute coordinates to the GPU instance memory
         if (this.instance != null) {
-            idx++;
             // Shift old state
 
-            //this.instance.posFrom.set(this.instance.posGoal);
-            this.instance.posFrom.set(new Vector3f(0,idx,0));
-            this.instance.posGoal.set(new Vector3f(0,idx,0));
-            this.instance.rotFrom.set(this.instance.rotGoal);
-            this.instance.scaleFrom.set(this.instance.scaleGoal);
+//            this.instance.posFrom.set(this.instance.posGoal);
+//            this.instance.rotFrom.set(this.instance.rotGoal);
+//            this.instance.scaleFrom.set(this.instance.scaleGoal);
 
             this.instance.setChanged();
         }
