@@ -18,16 +18,14 @@ layout(std430, binding = 12) readonly buffer OutputMatrices {
 
 void flw_instanceVertex(in FlwInstance i) {
     uint instanceIndex = instanceIndices[flw_baseInstance + gl_InstanceID];
-    mat4 partWorldMatrix = finalPartMatrices[0];
 
-    // 3. Transform geometry positions
-    flw_vertexPos = partWorldMatrix * flw_vertexPos;
+    // instanceIndex is the logical buffer position, which matches the slot
+    // the compute shader wrote the pre-chained matrix into.
+    mat4 partWorldMatrix = finalPartMatrices[instanceIndex];
 
-    // 4. Transform normals securely
+    flw_vertexPos    = partWorldMatrix * flw_vertexPos;
     flw_vertexNormal = normalize(mat3(partWorldMatrix) * flw_vertexNormal);
-
-    // 5. Apply vertex characteristics
-    flw_vertexColor *= i.color;
-    flw_vertexOverlay = i.overlay;
-    flw_vertexLight = max(vec2(i.light) / 256.0, flw_vertexLight);
+    flw_vertexColor   *= i.color;
+    flw_vertexOverlay  = i.overlay;
+    flw_vertexLight    = max(vec2(i.light) / 256.0, flw_vertexLight);
 }

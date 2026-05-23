@@ -1,26 +1,12 @@
-// Flywheel injects FlwInstance, _flw_unpackInstance, and all uniforms
-// (flw_partialTick etc.) automatically based on instance type registration.
+// Flywheel injects FlwInstance, _flw_unpackInstance, and all uniforms automatically.
 
-layout(local_size_x = 32) in;
-
-// Bound by bindForCull() at slot 1 — contains packed instance data.
-// Accessed via _flw_unpackInstance(globalIdx) — do NOT declare your own buffer here.
-
-// The virtual→real page mapping from ObjectStorage.Mapping.
-// Uploaded from Java each frame before dispatch.
-// pages[virtualPageIndex] = real page index in the objectBuffer.
-layout(std430, binding = 13) readonly buffer MappingPages {
-    uint mappingPages[];
-};
+layout(local_size_x = 4) in; // one thread per arm
 
 layout(std430, binding = 12) writeonly buffer OutputMatrices {
     mat4 finalPartMatrices[];
 };
 
-// Total number of arms (NOT total instances — totalInstances = armsCount * 4).
 layout(location = 50) uniform uint armsCount;
-
-// ─── Quaternion slerp ────────────────────────────────────────────────────────
 
 vec4 slerp(vec4 v0, vec4 v1, float t) {
     v0 = normalize(v0);
@@ -32,12 +18,9 @@ vec4 slerp(vec4 v0, vec4 v1, float t) {
     float theta     = theta0 * t;
     float sinTheta  = sin(theta);
     float sinTheta0 = sin(theta0);
-    float s0 = cos(theta) - d * sinTheta / sinTheta0;
-    float s1 = sinTheta / sinTheta0;
-    return s0 * v0 + s1 * v1;
+    return (cos(theta) - d * sinTheta / sinTheta0) * v0
+    + (sinTheta / sinTheta0) * v1;
 }
-
-// ─── TRS → mat4 ─────────────────────────────────────────────────────────────
 
 mat4 buildMatrix(vec3 pos, vec4 q, vec3 scale) {
     mat4 m;
@@ -45,56 +28,28 @@ mat4 buildMatrix(vec3 pos, vec4 q, vec3 scale) {
     m[0][1] = (2.0*(q.x*q.y + q.w*q.z))        * scale.x;
     m[0][2] = (2.0*(q.x*q.z - q.w*q.y))        * scale.x;
     m[0][3] = 0.0;
-
     m[1][0] = (2.0*(q.x*q.y - q.w*q.z))        * scale.y;
     m[1][1] = (1.0 - 2.0*(q.x*q.x + q.z*q.z)) * scale.y;
     m[1][2] = (2.0*(q.y*q.z + q.w*q.x))        * scale.y;
     m[1][3] = 0.0;
-
     m[2][0] = (2.0*(q.x*q.z + q.w*q.y))        * scale.z;
     m[2][1] = (2.0*(q.y*q.z - q.w*q.x))        * scale.z;
     m[2][2] = (1.0 - 2.0*(q.x*q.x + q.y*q.y)) * scale.z;
     m[2][3] = 0.0;
-
-    m[3] = vec4(pos, 1.0);
+    m[3]    = vec4(pos, 1.0);
     return m;
 }
 
-// ─── Page-aware index resolution ─────────────────────────────────────────────
-//
-// ObjectStorage stores instances in pages of 32. Pages are allocated by a
-// free-list arena so their positions in the GPU buffer are NOT guaranteed to be
-// contiguous. mappingPages[] translates a virtual page index (sequential) to
-// the real page index inside objectBuffer, exactly mirroring
-// ObjectStorage.Mapping.objectIndex2GlobalIndex() on the Java side.
-
-uint logicalToGlobal(uint logicalIdx) {
-    uint virtualPage = logicalIdx >> 5u;        // logicalIdx / 32
-    uint slotInPage  = logicalIdx & 31u;         // logicalIdx % 32
-    uint realPage    = mappingPages[virtualPage];
-    return (realPage << 5u) | slotInPage;
-}
-
-// ─── Per-arm local matrix ─────────────────────────────────────────────────────
-
 mat4 getLocalMatrix(uint logicalIdx, float t) {
-    FlwInstance i = _flw_unpackInstance(logicalToGlobal(logicalIdx));
+    // 16 instances (4 arms x 4 segments) always fit in page 0,
+    // so logical index == global buffer index directly.
+    FlwInstance i = _flw_unpackInstance(logicalIdx);
     return buildMatrix(
     mix(i.posFrom, i.posGoal, t),
     slerp(i.rotFrom, i.rotGoal, t),
     mix(i.scaleFrom, i.scaleGoal, t)
     );
 }
-
-// ─── Main ────────────────────────────────────────────────────────────────────
-//
-// Layout of instances in the buffer (set up on the Java side):
-//   [0 .. armsCount-1]          → base joints
-//   [armsCount .. 2N-1]         → first joints
-//   [2N .. 3N-1]                → second joints
-//   [3N .. 4N-1]                → item joints
-//
-// One thread per arm. Each thread chains the 4 joints and writes 4 matrices.
 
 void main() {
     uint armIdx = gl_GlobalInvocationID.x;
@@ -103,14 +58,14 @@ void main() {
     float t = flw_partialTick;
 
     mat4 base   = getLocalMatrix(armIdx,                    t);
-    mat4 first  = base   * getLocalMatrix(armIdx + armsCount,      t);
-    mat4 second = first  * getLocalMatrix(armIdx + armsCount * 2u, t);
-    mat4 item   = second * getLocalMatrix(armIdx + armsCount * 3u, t);
+    mat4 first  = base   * getLocalMatrix(armIdx + armsCount,       t);
+    mat4 second = first  * getLocalMatrix(armIdx + armsCount * 2u,  t);
+    mat4 item   = second * getLocalMatrix(armIdx + armsCount * 3u,  t);
 
-    // Each arm owns 4 consecutive output slots — no inter-thread collisions.
-    uint aout = armIdx * 4;
-finalPartMatrices[aout + 0u] = base;
-finalPartMatrices[aout + 1u] = first;
-finalPartMatrices[aout + 2u] = second;
-finalPartMatrices[aout + 3u] = item;
+    // Write at the same logical index the instance occupies in the buffer.
+    // The vertex shader reads finalPartMatrices[instanceIndex] directly.
+    finalPartMatrices[armIdx]                  = base;
+    finalPartMatrices[armIdx + armsCount]      = first;
+    finalPartMatrices[armIdx + armsCount * 2u] = second;
+    finalPartMatrices[armIdx + armsCount * 3u] = item;
 }
