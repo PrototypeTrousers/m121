@@ -1,18 +1,12 @@
 // Flywheel injects FlwInstance, _flw_unpackInstance, and all uniforms automatically.
 
-layout(local_size_x = 4) in; // one thread per segment (base/first/second/item)
+layout(local_size_x = 32) in; // one thread per arm
 
-// No page descriptor buffer needed — globalIdx is computed directly as
-// segIdx * PAGE_SIZE + armIdx, which matches the observed layout.
-
-layout(std430, binding = 12) buffer OutputMatrices {
+layout(std430, binding = 12) writeonly buffer OutputMatrices {
     mat4 finalPartMatrices[];
 };
 
 layout(location = 50) uniform uint armsCount;
-
-// Shared within a workgroup = shared within one arm's 4 threads.
-shared mat4 localMats[4];
 
 vec4 slerp(vec4 v0, vec4 v1, float t) {
     if (dot(v0, v0) < 0.0001) v0 = vec4(0.0, 0.0, 0.0, 1.0);
@@ -48,42 +42,50 @@ mat4 buildMatrix(vec3 pos, vec4 q, vec3 scale) {
     return m;
 }
 
-void main() {
-    uint armIdx = gl_WorkGroupID.x;       // one workgroup per arm
-    uint segIdx = gl_LocalInvocationID.x; // 0=base, 1=first, 2=second, 3=item
-
-    if (armIdx >= armsCount) return;
-
-    // Each segment group occupies one page of PAGE_SIZE=32 slots.
-    // Segment s of arm a → globalIdx = s * 32 + a.
-    uint globalIdx = segIdx * 32u + armIdx;
-
+mat4 interpolate(uint globalIdx, float t) {
     FlwInstance i = _flw_unpackInstance(globalIdx);
-
-    float t = flw_partialTick;
-
-    // base: posFrom/posGoal are world-space   → world matrix directly.
-    // others: posFrom/posGoal are local-space  → local matrix, chained below.
-    localMats[segIdx] = buildMatrix(
+    return buildMatrix(
         mix(i.posFrom, i.posGoal, t),
         slerp(i.rotFrom, i.rotGoal, t),
         mix(i.scaleFrom, i.scaleGoal, t)
     );
+}
 
-    // Wait for all 4 threads to finish writing their local matrix.
-    barrier();
-    memoryBarrierShared();
+void main() {
+    uint armIdx = gl_GlobalInvocationID.x;
+    if (armIdx >= armsCount) return;
 
-    // Thread 0 chains and writes world-space matrices for all 4 segments.
-    if (segIdx == 0u) {
-        mat4 base   = localMats[0];
-        mat4 first  = base   * localMats[1];
-        mat4 second = first  * localMats[2];
-        mat4 item   = second * localMats[3];
+    float t = flw_partialTick;
 
-        finalPartMatrices[armIdx]        = base;
-        finalPartMatrices[32u + armIdx]  = first;
-        finalPartMatrices[64u + armIdx]  = second;
-        finalPartMatrices[96u + armIdx]  = item;
-    }
+    // Pages are allocated per-segment in batches of PAGE_SIZE=32 arms.
+    // Within a batch, all 4 segment groups are laid out consecutively,
+    // each occupying one full page of 32 slots:
+    //
+    //   batch 0 (arms  0-31): pages 0-3  → globalIdx   0-127
+    //   batch 1 (arms 32-63): pages 4-7  → globalIdx 128-255
+    //   batch B (arms B*32..): pages B*4  → globalIdx B*128
+    //
+    // globalIdx for segment S of arm A:
+    //   batch      = A / 32
+    //   slot       = A % 32
+    //   globalIdx  = batch * 128 + S * 32 + slot
+
+    uint batch       = armIdx / 32u;
+    uint slot        = armIdx & 31u;
+    uint batchOffset = batch * 128u; // 4 segments * PAGE_SIZE = 4 * 32 = 128
+
+    uint baseIdx   = batchOffset +  0u + slot;
+    uint firstIdx  = batchOffset + 32u + slot;
+    uint secondIdx = batchOffset + 64u + slot;
+    uint itemIdx   = batchOffset + 96u + slot;
+
+    mat4 base   = interpolate(baseIdx,   t); // world-space
+    mat4 first  = base   * interpolate(firstIdx,  t); // local → world
+    mat4 second = first  * interpolate(secondIdx, t);
+    mat4 item   = second * interpolate(itemIdx,   t);
+
+    finalPartMatrices[baseIdx]   = base;
+    finalPartMatrices[firstIdx]  = first;
+    finalPartMatrices[secondIdx] = second;
+    finalPartMatrices[itemIdx]   = item;
 }
