@@ -19,8 +19,8 @@ layout(std430, binding = 12) readonly buffer OutputMatrices {
 void flw_instanceVertex(in FlwInstance i) {
     uint instanceIndex = instanceIndices[flw_baseInstance + gl_InstanceID];
 
-    // Each matrix is already a world-space transform — no chaining needed.
-    // instanceIndex IS the globalIdx the compute shader wrote to.
+    // Compute shader already output world-space matrices — no chaining needed here.
+    // instanceIndex == globalIdx == the slot the compute shader wrote to.
     mat4 result = finalPartMatrices[instanceIndex];
 
     flw_vertexPos    = result * flw_vertexPos;

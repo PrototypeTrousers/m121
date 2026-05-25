@@ -97,12 +97,12 @@ public class ArmVisual extends AbstractBlockEntityVisual<ArmEntity> implements T
         return RunnablePlan.of((context) -> {
 //            if (!isVisible(context.frustum())) return;
 //            if (doDistanceLimitThisFrame(context)) return;
-            baseMotor.child(0).instance().posGoal.set(visualPos.getX(), visualPos.getY(), visualPos.getZ());
-            baseMotor.child(0).instance().posFrom.set(visualPos.getX(), visualPos.getY(), visualPos.getZ());
-            base.child(0).instance().posGoal.set(visualPos.getX(), visualPos.getY()-1, visualPos.getZ());
-            base.child(0).instance().posFrom.set(visualPos.getX(), visualPos.getY()-1, visualPos.getZ());
-            firstArm.child(0).instance().posGoal.set(visualPos.getX(), visualPos.getY() + 1, visualPos.getZ());
-            firstArm.child(0).instance().posFrom.set(visualPos.getX(), visualPos.getY()+ 1, visualPos.getZ());
+            baseMotor.child(0).instance().posGoal.set(0, 0.5f, 0);
+            baseMotor.child(0).instance().posFrom.set(0, 0.5f, 0);
+            base.child(0).instance().posGoal.set(visualPos.getX(), visualPos.getY(), visualPos.getZ());
+            base.child(0).instance().posFrom.set(visualPos.getX(), visualPos.getY(), visualPos.getZ());
+            firstArm.child(0).instance().posGoal.set(0, 1, 0);
+            firstArm.child(0).instance().posFrom.set(0, 1, 0);
             instanceTree.cascadeWorldTransforms();
         });
     }
