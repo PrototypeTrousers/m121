@@ -38,8 +38,6 @@ public class InterpolatingInstanceTree {
         this.source = source;
         this.instance = instance;
         this.children = children;
-
-        resetPose();
     }
 
     public static InterpolatingInstanceTree create(InstancerProvider provider, ModelTree meshTree) {
@@ -72,74 +70,6 @@ public class InterpolatingInstanceTree {
         if (instance != null) {
             instance.setChanged();
         }
-    }
-
-    /**
-     * Shifts old goal data into 'From' variables and updates 'Goal' references.
-     * This should be executed once every 50ms game tick.
-     */
-    public void pushKeyframes(Vector3fc nextPos, Quaternionfc nextRot, Vector3fc nextScale) {
-        // 1. Shift current states back to the old keyframe slot
-        this.posFrom.set(this.posGoal);
-        this.rotFrom.set(this.rotGoal);
-        this.scaleFrom.set(this.scaleGoal);
-
-        // 2. Assign the fresh simulation ticks to the target goals
-        this.posGoal.set(nextPos);
-        this.rotGoal.set(nextRot);
-        this.scaleGoal.set(nextScale);
-
-        setChanged();
-
-        // If your custom Instance class has explicit vectors, map them directly here:
-        if (instance != null) {
-            instance.posFrom.set(this.posFrom);
-            instance.rotFrom.set(this.rotFrom);
-            instance.scaleFrom.set(this.scaleFrom);
-
-            instance.posGoal.set(this.posGoal);
-            instance.rotGoal.set(this.rotGoal);
-            instance.scaleGoal.set(this.scaleGoal);
-            instance.setChanged();
-        }
-    }
-
-    /**
-     * Propagates changes down the hierarchy tree structure.
-     * Matrix math calculations are omitted completely; the GPU processes transformations.
-     */
-    public void propagateAnimation(boolean forceUpdate) {
-        if (!visible) {
-            return;
-        }
-
-        if (changed || forceUpdate) {
-            if (instance != null && !skipDraw) {
-                instance.setChanged();
-            }
-            forceUpdate = true;
-            changed = false;
-        }
-
-        for (InterpolatingInstanceTree child : children) {
-            child.propagateAnimation(forceUpdate);
-        }
-    }
-
-    public void resetPose() {
-        PartPose initial = source.initialPose();
-
-        // Zero out From
-        this.posFrom.set(initial.x, initial.y, initial.z);
-        this.rotFrom.rotationXYZ(initial.xRot, initial.yRot, initial.zRot);
-        this.scaleFrom.set(1.0f, 1.0f, 1.0f);
-
-        // Zero out Goal
-        this.posGoal.set(this.posFrom);
-        this.rotGoal.set(this.rotFrom);
-        this.scaleGoal.set(this.scaleFrom);
-
-        setChanged();
     }
 
     /**

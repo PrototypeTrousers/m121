@@ -99,7 +99,7 @@ public class ArmVisual extends AbstractBlockEntityVisual<ArmEntity> implements T
 //            if (doDistanceLimitThisFrame(context)) return;
             baseMotor.child(0).instance().posGoal.set(visualPos.getX(), visualPos.getY(), visualPos.getZ());
             baseMotor.child(0).instance().posFrom.set(visualPos.getX(), visualPos.getY(), visualPos.getZ());
-                       base.child(0).instance().posGoal.set(visualPos.getX(), visualPos.getY()-1, visualPos.getZ());
+            base.child(0).instance().posGoal.set(visualPos.getX(), visualPos.getY()-1, visualPos.getZ());
             base.child(0).instance().posFrom.set(visualPos.getX(), visualPos.getY()-1, visualPos.getZ());
             firstArm.child(0).instance().posGoal.set(visualPos.getX(), visualPos.getY() + 1, visualPos.getZ());
             firstArm.child(0).instance().posFrom.set(visualPos.getX(), visualPos.getY()+ 1, visualPos.getZ());

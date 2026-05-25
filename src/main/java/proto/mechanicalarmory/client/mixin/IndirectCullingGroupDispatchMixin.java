@@ -13,10 +13,14 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import proto.mechanicalarmory.MechanicalArmory;
 import proto.mechanicalarmory.client.flywheel.IMechanicalArmoryCullGroup;
+import proto.mechanicalarmory.client.flywheel.instances.arm.ComputeDebugger;
 
 @Mixin(value = IndirectCullingGroup.class, remap = false)
 public class IndirectCullingGroupDispatchMixin {
     @Shadow @Final private IndirectBuffers buffers;
+
+    @Unique private static final int DEBUG_INTERVAL = 60;
+    @Unique private int mechanicalArmory$frameCount = 0;
 
     @Inject(
             method = "dispatchCull",
@@ -32,22 +36,30 @@ public class IndirectCullingGroupDispatchMixin {
         if (armsCount <= 0) return;
 
         GL43C.glUseProgram(MechanicalArmory.computeShaderId);
-        GL43C.glUniform1ui(50, armsCount);
 
         // bindForCull() binds:
-        //   slot 0 = page frame descriptors
-        //   slot 1 = instance buffer  (_flw_unpackInstance reads from here)
+        //   slot 0 = page frame descriptors  ← shader reads validBits and modelIndex here
+        //   slot 1 = instance buffer          ← _flw_unpackInstance reads here
         //   slot 2 = draw-instance index
         //   slot 3 = model buffer
         buffers.bindForCull();
-
         GL43C.glBindBufferBase(GL43C.GL_SHADER_STORAGE_BUFFER, 12, targetSsboId);
 
-        // One workgroup of 4 threads — one thread per arm.
-        GL43C.glDispatchCompute(1, 1, 1);
+        // Each segment group (base/first/second/item) gets its own page.
+        // pagesPerSegment = ceil(armsCount / PAGE_SIZE), total pages = 4 * pagesPerSegment.
+        // For armsCount <= 32, this is always 4 workgroups.
+        int pagesPerSegment = (armsCount + 31) / 32;
+        int totalPages      = 4 * pagesPerSegment;
+        GL43C.glDispatchCompute(totalPages, 1, 1);
 
         GL43C.glMemoryBarrier(GL43C.GL_SHADER_STORAGE_BARRIER_BIT);
         GL43C.glUseProgram(0);
+
+        // Debug readback — remove when confirmed working.
+        if (mechanicalArmory$frameCount++ % DEBUG_INTERVAL == 0) {
+            GL43C.glFinish();
+            ComputeDebugger.checkAll(buffers, targetSsboId, armsCount, true);
+        }
     }
 
     @Inject(

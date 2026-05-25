@@ -1,14 +1,23 @@
 // Flywheel injects FlwInstance, _flw_unpackInstance, and all uniforms automatically.
 
-layout(local_size_x = 4) in; // one thread per arm
+layout(local_size_x = 32) in; // one thread per page slot (PAGE_SIZE = 32)
 
+// Bound at slot 0 by bindForCull(). Format per page: [modelIndex (u32), validBits (u32)]
+layout(std430, binding = 0) readonly buffer PageFrameDescriptors {
+    uint _flw_pageFrameDescriptors[];
+};
+
+// Output: unchained local matrices at finalPartMatrices[globalIdx].
+// The vertex shader chains them using partIdx and globalIdx.
 layout(std430, binding = 12) writeonly buffer OutputMatrices {
     mat4 finalPartMatrices[];
 };
 
-layout(location = 50) uniform uint armsCount;
-
 vec4 slerp(vec4 v0, vec4 v1, float t) {
+    // Guard: zero quaternion means uninitialized — fall back to identity.
+    if (dot(v0, v0) < 0.0001) v0 = vec4(0.0, 0.0, 0.0, 1.0);
+    if (dot(v1, v1) < 0.0001) v1 = vec4(0.0, 0.0, 0.0, 1.0);
+
     v0 = normalize(v0);
     v1 = normalize(v1);
     float d = dot(v0, v1);
@@ -19,7 +28,7 @@ vec4 slerp(vec4 v0, vec4 v1, float t) {
     float sinTheta  = sin(theta);
     float sinTheta0 = sin(theta0);
     return (cos(theta) - d * sinTheta / sinTheta0) * v0
-    + (sinTheta / sinTheta0) * v1;
+         + (sinTheta / sinTheta0) * v1;
 }
 
 mat4 buildMatrix(vec3 pos, vec4 q, vec3 scale) {
@@ -40,32 +49,26 @@ mat4 buildMatrix(vec3 pos, vec4 q, vec3 scale) {
     return m;
 }
 
-mat4 getLocalMatrix(uint logicalIdx, float t) {
-    // 16 instances (4 arms x 4 segments) always fit in page 0,
-    // so logical index == global buffer index directly.
-    FlwInstance i = _flw_unpackInstance(logicalIdx);
-    return buildMatrix(
-    mix(i.posFrom, i.posGoal, t),
-    slerp(i.rotFrom, i.rotGoal, t),
-    mix(i.scaleFrom, i.scaleGoal, t)
-    );
-}
-
 void main() {
-    uint armIdx = gl_GlobalInvocationID.x;
-    if (armIdx >= armsCount) return;
+    uint pageIndex  = gl_WorkGroupID.x;
+    uint slotInPage = gl_LocalInvocationID.x;
+
+    uint validBits = _flw_pageFrameDescriptors[pageIndex * 2u + 1u];
+    if (((1u << slotInPage) & validBits) == 0u) return;
+
+    // Real position in the instance buffer — no contiguous assumption needed.
+    uint globalIdx = pageIndex * 32u + slotInPage;
+
+    FlwInstance i = _flw_unpackInstance(globalIdx);
 
     float t = flw_partialTick;
 
-    mat4 base   = getLocalMatrix(armIdx,                    t);
-    mat4 first  = base   * getLocalMatrix(armIdx + armsCount,       t);
-    mat4 second = first  * getLocalMatrix(armIdx + armsCount * 2u,  t);
-    mat4 item   = second * getLocalMatrix(armIdx + armsCount * 3u,  t);
-
-    // Write at the same logical index the instance occupies in the buffer.
-    // The vertex shader reads finalPartMatrices[instanceIndex] directly.
-    finalPartMatrices[armIdx]                  = base;
-    finalPartMatrices[armIdx + armsCount]      = first;
-    finalPartMatrices[armIdx + armsCount * 2u] = second;
-    finalPartMatrices[armIdx + armsCount * 3u] = item;
+    // Write the unchained local matrix at this instance's exact globalIdx slot.
+    // The vertex shader reads this slot via instanceIndices[] and chains up
+    // to its segment depth using partIdx.
+    finalPartMatrices[globalIdx] = buildMatrix(
+        mix(i.posFrom, i.posGoal, t),
+        slerp(i.rotFrom, i.rotGoal, t),
+        mix(i.scaleFrom, i.scaleGoal, t)
+    );
 }
