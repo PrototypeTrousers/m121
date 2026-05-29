@@ -29,10 +29,11 @@ public class InterpolatingInstanceTree {
     public final Quaternionf rotGoal = new Quaternionf();
     public final Vector3f scaleGoal = new Vector3f(1.0f, 1.0f, 1.0f);
 
+    int nodes;
+
     private boolean visible = true;
     private boolean skipDraw = false;
     private boolean changed;
-    protected static int idx;
 
     private InterpolatingInstanceTree(ModelTree source, @Nullable InterpolatedInstance instance, InterpolatingInstanceTree[] children) {
         this.source = source;
@@ -41,23 +42,31 @@ public class InterpolatingInstanceTree {
     }
 
     public static InterpolatingInstanceTree create(InstancerProvider provider, ModelTree meshTree) {
+        int[] counter = {0};
+        return create(provider, meshTree, 0, counter);
+    }
+
+    private static InterpolatingInstanceTree create(InstancerProvider provider, ModelTree meshTree, int parentIdx, int[] counter) {
         Model model = meshTree.model();
         InterpolatedInstance instance;
+
+        int currentIdx = counter[0]++;
+
         if (model != null) {
-            // Instantiates your custom InterpolatingInstancetype layout instead of standard Transformed
             instance = provider.instancer(InterpolatingInstancetype.INTERPOLATED, model)
                     .createInstance();
-            instance.partIdx = idx++;
+            instance.parentIdx = parentIdx;
+            instance.partIdx = currentIdx;
             instance.model = model;
         } else {
             instance = null;
         }
 
+        int myIdx = currentIdx;
         InterpolatingInstanceTree[] children = new InterpolatingInstanceTree[meshTree.childCount()];
         for (int i = 0; i < meshTree.childCount(); i++) {
-            children[i] = create(provider, meshTree.child(i));
+            children[i] = create(provider, meshTree.child(i), myIdx, counter);
         }
-
         return new InterpolatingInstanceTree(meshTree, instance, children);
     }
 

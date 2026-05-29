@@ -13,6 +13,7 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import proto.mechanicalarmory.MechanicalArmory;
 import proto.mechanicalarmory.client.flywheel.IMechanicalArmoryCullGroup;
+import proto.mechanicalarmory.client.flywheel.instances.arm.ArmVisual;
 
 @Mixin(value = IndirectCullingGroup.class, remap = false)
 public class IndirectCullingGroupDispatchMixin {
@@ -28,7 +29,7 @@ public class IndirectCullingGroupDispatchMixin {
         int targetSsboId = self.mechanicalArmory$getMatrixSsboId();
         if (targetSsboId == 0) return;
 
-        int armsCount = self.mechanicalArmory$getInstanceCount() / 4;
+        int armsCount = ArmVisual.visuals;
         if (armsCount <= 0) return;
 
         GL43C.glUseProgram(MechanicalArmory.computeShaderId);

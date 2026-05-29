@@ -21,6 +21,7 @@ public class InterpolatedInstance extends ColoredLitOverlayInstance {
     public final Quaternionf rotGoal = new Quaternionf();
     public final Vector3f scaleGoal = new Vector3f(1.0f, 1.0f, 1.0f);
     public int partIdx;
+    public int parentIdx;
     public Model model;
 
     public InterpolatedInstance(InstanceType<? extends InterpolatedInstance> type, InstanceHandle handle) {

@@ -12,11 +12,11 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import proto.mechanicalarmory.client.flywheel.IMechanicalArmoryCullGroup;
+import proto.mechanicalarmory.client.flywheel.instances.arm.ArmVisual;
 
 @Mixin(value = IndirectCullingGroup.class, remap = false)
 public class IndirectCullingGroupBufferMixin implements IMechanicalArmoryCullGroup {
     @Shadow @Final private InstanceType<?> instanceType;
-    @Shadow private int instanceCountThisFrame;
 
     @Unique private int mechanicalArmory$matrixSsboId     = 0;
     @Unique private int mechanicalArmory$allocatedSlots   = 0; // in mat4 slots, not instances
@@ -33,9 +33,9 @@ public class IndirectCullingGroupBufferMixin implements IMechanicalArmoryCullGro
 
     @Inject(method = "upload", at = @At("TAIL"))
     private void onUploadTail(StagingBuffer stagingBuffer, CallbackInfo ci) {
-        if (mechanicalArmory$matrixSsboId == 0 || instanceCountThisFrame <= 0) return;
+        if (mechanicalArmory$matrixSsboId == 0 || ArmVisual.visuals <= 0) return;
 
-        int armsCount = instanceCountThisFrame / 4;
+        int armsCount = ArmVisual.visuals;
 
         // Each segment group (base/first/second/item) gets its own page of PAGE_SIZE slots.
         // The compute shader writes at globalIdx = pageIndex * PAGE_SIZE + slotInPage,
@@ -68,5 +68,4 @@ public class IndirectCullingGroupBufferMixin implements IMechanicalArmoryCullGro
     }
 
     @Unique public int mechanicalArmory$getMatrixSsboId()  { return mechanicalArmory$matrixSsboId; }
-    @Unique public int mechanicalArmory$getInstanceCount() { return instanceCountThisFrame; }
 }

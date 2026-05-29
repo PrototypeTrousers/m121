@@ -9,6 +9,7 @@ import dev.engine_room.flywheel.api.visualization.VisualizationContext;
 import dev.engine_room.flywheel.backend.engine.InstanceHandleImpl;
 import dev.engine_room.flywheel.backend.engine.indirect.IndirectInstancer;
 import dev.engine_room.flywheel.lib.instance.TransformedInstance;
+import dev.engine_room.flywheel.lib.model.part.InstanceTree;
 import dev.engine_room.flywheel.lib.model.part.ModelTree;
 import dev.engine_room.flywheel.lib.task.RunnablePlan;
 import dev.engine_room.flywheel.lib.visual.AbstractBlockEntityVisual;
@@ -34,6 +35,8 @@ public class ArmVisual extends AbstractBlockEntityVisual<ArmEntity> implements T
     private final @Nullable InterpolatingInstanceTree itemAttachment;
     private final @Nullable TransformedInstance itemAttachmentInstance;
     private final @Nullable InterpolatingInstanceTree base;
+
+    public static int visuals;
     ModelTree modelTree = MechanicalArmoryClient.fullArmModelTree;
     int packedLight;
 
@@ -42,14 +45,14 @@ public class ArmVisual extends AbstractBlockEntityVisual<ArmEntity> implements T
         packedLight = LevelRenderer.getLightColor(level, pos.above());
 
         instanceTree = InterpolatingInstanceTree.create(instancerProvider(), modelTree);
-        InterpolatingInstanceTree.idx = 0;
         instanceTree.setChanged();
         baseMotor = instanceTree.child("BaseMotor");
         base = instanceTree.child("Base");
-        firstArm = baseMotor.child("FirstArm");
-        secondArm = firstArm.child("SecondArm");
-        itemAttachment = secondArm.child("ItemAttach");
+        firstArm = null;
+        secondArm = null;
+        itemAttachment = null;
         itemAttachmentInstance = null;//itemAttachment.instance();
+        visuals++;
     }
 
     @Override
@@ -69,6 +72,7 @@ public class ArmVisual extends AbstractBlockEntityVisual<ArmEntity> implements T
     @Override
     protected void _delete() {
         instanceTree.delete();
+        visuals--;
     }
 
     @Override
@@ -96,18 +100,6 @@ public class ArmVisual extends AbstractBlockEntityVisual<ArmEntity> implements T
             firstArm.child(0).instance().posGoal.set(0, 1, 0);
             firstArm.child(0).instance().posFrom.set(0, 1, 0);
             instanceTree.cascadeWorldTransforms();
-            InstanceHandleImpl h = (InstanceHandleImpl) firstArm.child(0).instance().handle();
-            int index = h.index;
-
-            Instancer<InterpolatedInstance> inst = instancerProvider().instancer(InterpolatingInstancetype.INTERPOLATED, firstArm.child(0).instance().model);
-            int global;
-            if (inst instanceof IndirectInstancer<InterpolatedInstance> aa) {
-                global = aa.local2GlobalInstanceIndex(index);
-            }
-
-            else {}
-
-
         });
     }
 }
