@@ -48,6 +48,7 @@ public class InterpolatingInstanceTree {
             instance = provider.instancer(InterpolatingInstancetype.INTERPOLATED, model)
                     .createInstance();
             instance.partIdx = idx++;
+            instance.model = model;
         } else {
             instance = null;
         }

@@ -1,5 +1,6 @@
 package proto.mechanicalarmory.client.flywheel.instances.arm;
 
+import dev.engine_room.flywheel.api.model.Model;
 import org.joml.Quaternionf;
 import org.joml.Quaternionfc;
 import org.joml.Vector3f;
@@ -20,6 +21,7 @@ public class InterpolatedInstance extends ColoredLitOverlayInstance {
     public final Quaternionf rotGoal = new Quaternionf();
     public final Vector3f scaleGoal = new Vector3f(1.0f, 1.0f, 1.0f);
     public int partIdx;
+    public Model model;
 
     public InterpolatedInstance(InstanceType<? extends InterpolatedInstance> type, InstanceHandle handle) {
        super(type, handle);

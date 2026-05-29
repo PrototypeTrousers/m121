@@ -1,33 +1,25 @@
 package proto.mechanicalarmory.client.flywheel.instances.arm;
 
-import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.blaze3d.vertex.PoseStack;
 import dev.engine_room.flywheel.api.instance.Instance;
+import dev.engine_room.flywheel.api.instance.Instancer;
 import dev.engine_room.flywheel.api.task.Plan;
-import dev.engine_room.flywheel.api.visual.DynamicVisual;
 import dev.engine_room.flywheel.api.visual.LightUpdatedVisual;
 import dev.engine_room.flywheel.api.visual.TickableVisual;
 import dev.engine_room.flywheel.api.visualization.VisualizationContext;
-import dev.engine_room.flywheel.lib.instance.InstanceTypes;
+import dev.engine_room.flywheel.backend.engine.InstanceHandleImpl;
+import dev.engine_room.flywheel.backend.engine.indirect.IndirectInstancer;
 import dev.engine_room.flywheel.lib.instance.TransformedInstance;
-import dev.engine_room.flywheel.lib.model.part.InstanceTree;
 import dev.engine_room.flywheel.lib.model.part.ModelTree;
 import dev.engine_room.flywheel.lib.task.RunnablePlan;
 import dev.engine_room.flywheel.lib.visual.AbstractBlockEntityVisual;
 import it.unimi.dsi.fastutil.longs.LongSet;
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenCustomHashMap;
-import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.LevelRenderer;
-import net.minecraft.client.resources.model.BakedModel;
 import net.minecraft.core.SectionPos;
-import net.minecraft.util.Mth;
-import net.minecraft.world.item.ItemDisplayContext;
 import net.minecraft.world.item.ItemStack;
 import org.jetbrains.annotations.Nullable;
-import org.joml.*;
 import proto.mechanicalarmory.MechanicalArmoryClient;
 import proto.mechanicalarmory.client.flywheel.CapturedModel;
-import proto.mechanicalarmory.client.flywheel.instances.capturing.CapturingBufferSource;
 import proto.mechanicalarmory.common.entities.block.ArmEntity;
 
 import java.util.function.Consumer;
@@ -104,6 +96,18 @@ public class ArmVisual extends AbstractBlockEntityVisual<ArmEntity> implements T
             firstArm.child(0).instance().posGoal.set(0, 1, 0);
             firstArm.child(0).instance().posFrom.set(0, 1, 0);
             instanceTree.cascadeWorldTransforms();
+            InstanceHandleImpl h = (InstanceHandleImpl) firstArm.child(0).instance().handle();
+            int index = h.index;
+
+            Instancer<InterpolatedInstance> inst = instancerProvider().instancer(InterpolatingInstancetype.INTERPOLATED, firstArm.child(0).instance().model);
+            int global;
+            if (inst instanceof IndirectInstancer<InterpolatedInstance> aa) {
+                global = aa.local2GlobalInstanceIndex(index);
+            }
+
+            else {}
+
+
         });
     }
 }
