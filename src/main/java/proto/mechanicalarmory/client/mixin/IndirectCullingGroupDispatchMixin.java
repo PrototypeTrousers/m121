@@ -14,6 +14,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import proto.mechanicalarmory.MechanicalArmory;
 import proto.mechanicalarmory.client.flywheel.IMechanicalArmoryCullGroup;
 import proto.mechanicalarmory.client.flywheel.instances.arm.ArmVisual;
+import proto.mechanicalarmory.client.flywheel.instances.arm.PartTransformBuffer;
 
 @Mixin(value = IndirectCullingGroup.class, remap = false)
 public class IndirectCullingGroupDispatchMixin {
@@ -28,21 +29,28 @@ public class IndirectCullingGroupDispatchMixin {
 
         int targetSsboId = self.mechanicalArmory$getMatrixSsboId();
         if (targetSsboId == 0) return;
+        if (ArmVisual.visuals <= 0) return;
 
-        int armsCount = ArmVisual.visuals;
-        if (armsCount <= 0) return;
+        // Upload CPU-side transforms to GPU and bind TransformBuffer (binding 13).
+        // This is the render thread — safe for all GL operations.
+        PartTransformBuffer transformBuffer = PartTransformBuffer.get();
+        transformBuffer.uploadIfDirty();
+        transformBuffer.bindTo(13);
+
+        // Dispatch one thread per partIdx slot (gid == partIdx in the compute shader).
+        // highWaterMark is the max partIdx written — covers all nodes, mesh and non-mesh.
+        // This sidesteps Flywheel's page layout entirely: no _flw_unpackInstance needed.
+        int partCount = transformBuffer.highWaterMark() + 1;
+        if (partCount <= 0) return;
 
         GL43C.glUseProgram(MechanicalArmory.computeShaderId);
-        GL43C.glUniform1ui(50, armsCount);
+        GL43C.glUniform1ui(50, (int) partCount);
 
-        // bindForCull() binds slot 1 = instance buffer (_flw_unpackInstance reads here).
-        // Slot 0 (page descriptors) is no longer needed by the shader.
         buffers.bindForCull();
         GL43C.glBindBufferBase(GL43C.GL_SHADER_STORAGE_BUFFER, 12, targetSsboId);
 
-        // One workgroup per arm, 4 threads each (local_size_x = 4).
-        // shared mat4[4] lets all 4 threads chain within one workgroup.
-        GL43C.glDispatchCompute(armsCount, 1, 1);
+        int workgroups = Math.max(1, (partCount + 31) / 32);
+        GL43C.glDispatchCompute(workgroups, 1, 1);
 
         GL43C.glMemoryBarrier(GL43C.GL_SHADER_STORAGE_BARRIER_BIT);
         GL43C.glUseProgram(0);
@@ -78,5 +86,7 @@ public class IndirectCullingGroupDispatchMixin {
         if (ssboId != 0) {
             GL43C.glBindBufferBase(GL43C.GL_SHADER_STORAGE_BUFFER, 12, ssboId);
         }
+        // Also re-bind TransformBuffer (binding 13) for vertex shader access if needed.
+        PartTransformBuffer.get().bindTo(13);
     }
 }

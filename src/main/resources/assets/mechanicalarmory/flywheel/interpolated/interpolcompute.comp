@@ -1,12 +1,30 @@
-// Flywheel injects FlwInstance, _flw_unpackInstance, and all uniforms automatically.
+// Transforms are in TransformBuffer (binding 13), indexed by partIdx (globally unique).
+// One thread per partIdx — no Flywheel instance buffer access, no PAGE/batch/slot math.
+// Java wrote world-space from/goal keyframes for every tree node; GPU just interpolates.
 
-layout(local_size_x = 32) in; // one thread per arm
+layout(local_size_x = 32) in;
 
+// ── Output: interpolated world-space matrices, one slot per partIdx ──
 layout(std430, binding = 12) writeonly buffer OutputMatrices {
     mat4 finalPartMatrices[];
 };
 
-layout(location = 50) uniform uint armsCount;
+// ── Input: world-space from/goal keyframes, one entry per partIdx ──
+struct PartTransform {
+    vec3  posFrom;   float _p0;  // offset  0
+    vec4  rotFrom;               // offset 16
+    vec3  scaleFrom; float _p1;  // offset 32
+    vec3  posGoal;   float _p2;  // offset 48
+    vec4  rotGoal;               // offset 64
+    vec3  scaleGoal; float _p3;  // offset 80
+};                               // = 96 bytes
+
+layout(std430, binding = 13) readonly buffer TransformBuffer {
+    PartTransform transforms[];
+};
+
+// Total number of partIdx slots (highWaterMark + 1), set by Java dispatch mixin.
+layout(location = 50) uniform uint partCount;
 
 vec4 slerp(vec4 v0, vec4 v1, float t) {
     if (dot(v0, v0) < 0.0001) v0 = vec4(0.0, 0.0, 0.0, 1.0);
@@ -42,50 +60,17 @@ mat4 buildMatrix(vec3 pos, vec4 q, vec3 scale) {
     return m;
 }
 
-mat4 interpolate(uint globalIdx, float t) {
-    FlwInstance i = _flw_unpackInstance(globalIdx);
-    return buildMatrix(
-        mix(i.posFrom, i.posGoal, t),
-        slerp(i.rotFrom, i.rotGoal, t),
-        mix(i.scaleFrom, i.scaleGoal, t)
-    );
-}
-
 void main() {
-    uint armIdx = gl_GlobalInvocationID.x;
-    if (armIdx >= armsCount) return;
+    // gid IS partIdx — no instance buffer lookup needed.
+    uint gid = gl_GlobalInvocationID.x;
+    if (gid >= partCount) return;
 
     float t = flw_partialTick;
 
-    // Pages are allocated per-segment in batches of PAGE_SIZE=32 arms.
-    // Within a batch, all 4 segment groups are laid out consecutively,
-    // each occupying one full page of 32 slots:
-    //
-    //   batch 0 (arms  0-31): pages 0-3  → globalIdx   0-127
-    //   batch 1 (arms 32-63): pages 4-7  → globalIdx 128-255
-    //   batch B (arms B*32..): pages B*4  → globalIdx B*128
-    //
-    // globalIdx for segment S of arm A:
-    //   batch      = A / 32
-    //   slot       = A % 32
-    //   globalIdx  = batch * 128 + S * 32 + slot
-
-    uint batch       = armIdx / 32u;
-    uint slot        = armIdx & 31u;
-    uint batchOffset = batch * 128u; // 4 segments * PAGE_SIZE = 4 * 32 = 128
-
-    uint baseIdx   = batchOffset +  0u + slot;
-    uint firstIdx  = batchOffset + 32u + slot;
-    uint secondIdx = batchOffset + 64u + slot;
-    uint itemIdx   = batchOffset + 96u + slot;
-
-    mat4 base   = interpolate(baseIdx,   t); // world-space
-    mat4 first  = base   * interpolate(firstIdx,  t); // local → world
-    mat4 second = first  * interpolate(secondIdx, t);
-    mat4 item   = second * interpolate(itemIdx,   t);
-
-    finalPartMatrices[baseIdx]   = base;
-    finalPartMatrices[firstIdx]  = first;
-    finalPartMatrices[secondIdx] = second;
-    finalPartMatrices[itemIdx]   = item;
+    PartTransform p = transforms[gid];
+    finalPartMatrices[gid] = buildMatrix(
+        mix(p.posFrom,   p.posGoal,   t),
+        slerp(p.rotFrom, p.rotGoal,   t),
+        mix(p.scaleFrom, p.scaleGoal, t)
+    );
 }

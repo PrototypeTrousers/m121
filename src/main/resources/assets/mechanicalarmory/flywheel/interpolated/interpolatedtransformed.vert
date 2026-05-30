@@ -1,9 +1,5 @@
 #include "flywheel:internal/indirect/buffer_bindings.glsl"
 
-layout(std430, binding = _FLW_DRAW_INSTANCE_INDEX_BUFFER_BINDING) restrict readonly buffer TargetBuffer2 {
-    uint instanceIndices[];
-};
-
 layout(std430, binding = 12) readonly buffer OutputMatrices {
     mat4 finalPartMatrices[];
 };
@@ -17,11 +13,9 @@ layout(std430, binding = 12) readonly buffer OutputMatrices {
 #endif
 
 void flw_instanceVertex(in FlwInstance i) {
-    uint instanceIndex = instanceIndices[flw_baseInstance + gl_InstanceID];
-
-    // Compute shader already output world-space matrices — no chaining needed here.
-    // instanceIndex == globalIdx == the slot the compute shader wrote to.
-    mat4 result = finalPartMatrices[instanceIndex];
+    // Index directly by partIdx — compute shader wrote the final world-space
+    // matrix to finalPartMatrices[partIdx] for every part.
+    mat4 result = finalPartMatrices[i.partIdx];
 
     flw_vertexPos    = result * flw_vertexPos;
     flw_vertexNormal = normalize(mat3(result) * flw_vertexNormal);
