@@ -28,6 +28,8 @@ import org.joml.Matrix4fc;
 import org.joml.Vector4fc;
 import proto.mechanicalarmory.MechanicalArmoryClient;
 import proto.mechanicalarmory.client.flywheel.CapturedModel;
+import proto.mechanicalarmory.client.flywheel.gltf.MyInstanceTree;
+import proto.mechanicalarmory.client.flywheel.gltf.MyModelTree;
 import proto.mechanicalarmory.client.flywheel.instances.capturing.CapturingBufferSource;
 import proto.mechanicalarmory.common.entities.block.ArmEntity;
 
@@ -36,14 +38,14 @@ import java.util.function.Consumer;
 public class ArmVisual extends AbstractBlockEntityVisual<ArmEntity> implements DynamicVisual, LightUpdatedVisual {
 
     private static Object2ObjectOpenCustomHashMap<ItemStack, CapturedModel> modelCache = new Object2ObjectOpenCustomHashMap<>(new ItemStackHasher());
-    private final InstanceTree instanceTree;
-    private final @Nullable InstanceTree firstArm;
-    private final @Nullable InstanceTree secondArm;
-    private final @Nullable InstanceTree baseMotor;
-    private final @Nullable InstanceTree itemAttachment;
+    private final MyInstanceTree instanceTree;
+    private final @Nullable MyInstanceTree firstArm;
+    private final @Nullable MyInstanceTree secondArm;
+    private final @Nullable MyInstanceTree baseMotor;
+    private final @Nullable MyInstanceTree itemAttachment;
     private final @Nullable TransformedInstance itemAttachmentInstance;
     private final Matrix4fc initialPose;
-    ModelTree modelTree = MechanicalArmoryClient.fullArmModelTree;
+    MyModelTree modelTree = MechanicalArmoryClient.fullArmModelTree;
     int packedLight;
 
     public ArmVisual(VisualizationContext ctx, ArmEntity blockEntity, float partialTick) {
@@ -52,7 +54,7 @@ public class ArmVisual extends AbstractBlockEntityVisual<ArmEntity> implements D
 
         initialPose = new Matrix4f().translate(visualPos.getX() + 0.5f, visualPos.getY(), visualPos.getZ() + 0.5f);
 
-        instanceTree = InstanceTree.create(instancerProvider(), modelTree);
+        instanceTree = MyInstanceTree.create(instancerProvider(), modelTree);
         baseMotor = instanceTree.child("BaseMotor");
         firstArm = baseMotor.child("FirstArm");
         secondArm = firstArm.child("SecondArm");
@@ -86,7 +88,7 @@ public class ArmVisual extends AbstractBlockEntityVisual<ArmEntity> implements D
     }
 
     void updateItemTransforms(float scale, float offsetX, float offsetY, float offsetZ) {
-        itemAttachmentInstance.translate(0, secondArm.initialPose().y / 16f + 0.25f, 0);
+        itemAttachmentInstance.translate(0, secondArm.initialPose().y() + 0.25f, 0);
         itemAttachmentInstance.scale(scale);
         itemAttachmentInstance.translate(offsetX, offsetY, offsetZ);
         itemAttachmentInstance.setChanged();

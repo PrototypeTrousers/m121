@@ -29,6 +29,7 @@ import net.neoforged.neoforge.client.extensions.common.RegisterClientExtensionsE
 import net.neoforged.neoforge.client.gui.ConfigurationScreen;
 import net.neoforged.neoforge.client.gui.IConfigScreenFactory;
 import proto.mechanicalarmory.client.flywheel.gltf.GltfFlywheelModelTree;
+import proto.mechanicalarmory.client.flywheel.gltf.MyModelTree;
 import proto.mechanicalarmory.client.flywheel.instances.arm.ArmVisualiser;
 import proto.mechanicalarmory.client.flywheel.instances.crop.CropVisualiser;
 import proto.mechanicalarmory.client.flywheel.instances.generic.VanillaBlockVisualiser;
@@ -56,7 +57,7 @@ public class MechanicalArmoryClient {
     public static ModelResourceLocation octoarm = ModelResourceLocation.standalone(ResourceLocation.fromNamespaceAndPath(MODID, "models/octoarm.glb"));
     public static ModelResourceLocation armItemModel = ModelResourceLocation.standalone(ResourceLocation.fromNamespaceAndPath(MODID, "arm"));
     public static ModelResourceLocation chestplateItemModel = ModelResourceLocation.standalone(ResourceLocation.fromNamespaceAndPath(MODID, "my_chestplate"));
-    public static ModelTree fullArmModelTree;
+    public static MyModelTree fullArmModelTree;
     public static ModelTree octoArmModelTree;
     public static BandedPrimeLimiter limiter = new BandedPrimeLimiter();
 
@@ -103,7 +104,7 @@ public class MechanicalArmoryClient {
         event.register(arm);
         event.register(octoarm);
         fullArmModelTree = GltfFlywheelModelTree.create(loadglTFModel(arm));
-        octoArmModelTree = GltfFlywheelModelTree.create(loadglTFModel(octoarm));
+        //octoArmModelTree = GltfFlywheelModelTree.create(loadglTFModel(octoarm));
         event.register(armItemModel);
     }
 

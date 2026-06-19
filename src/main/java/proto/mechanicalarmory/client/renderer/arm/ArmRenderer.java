@@ -6,7 +6,6 @@ import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.mojang.blaze3d.vertex.VertexFormat;
 import dev.engine_room.flywheel.api.model.Model;
 import dev.engine_room.flywheel.api.vertex.VertexList;
-import dev.engine_room.flywheel.lib.model.part.ModelTree;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.blockentity.BlockEntityRenderer;
@@ -15,6 +14,7 @@ import net.minecraft.util.Mth;
 import net.minecraft.world.phys.Vec3;
 import proto.mechanicalarmory.MechanicalArmoryClient;
 import proto.mechanicalarmory.client.flywheel.gltf.GltfMesh;
+import proto.mechanicalarmory.client.flywheel.gltf.MyModelTree;
 import proto.mechanicalarmory.client.flywheel.gltf.TriIndexSequence;
 import proto.mechanicalarmory.client.renderer.util.VertexConsumerMutableWrapper;
 import proto.mechanicalarmory.common.entities.block.ArmEntity;
@@ -25,11 +25,11 @@ import static net.minecraft.client.renderer.RenderStateShard.*;
 
 public class ArmRenderer implements BlockEntityRenderer<ArmEntity> {
 
-    ModelTree modelTree = MechanicalArmoryClient.fullArmModelTree;
-    MyModelTree armTree = MyModelTree.create(modelTree);
-    MyModelTree baseMotor = armTree.child("BaseMotor");
-    MyModelTree firstArmTree = baseMotor.child("FirstArm");
-    MyModelTree secondArmTree = firstArmTree.child("SecondArm");
+    MyModelTree modelTree = MechanicalArmoryClient.fullArmModelTree;
+    MyModelTreeForVanilla armTree = MyModelTreeForVanilla.create(modelTree);
+    MyModelTreeForVanilla baseMotor = armTree.child("BaseMotor");
+    MyModelTreeForVanilla firstArmTree = baseMotor.child("FirstArm");
+    MyModelTreeForVanilla secondArmTree = firstArmTree.child("SecondArm");
 
     VertexConsumerMutableWrapper wrapper = new VertexConsumerMutableWrapper();
 
@@ -54,8 +54,8 @@ public class ArmRenderer implements BlockEntityRenderer<ArmEntity> {
 
     }
 
-    public void renderModelRecursive(MyModelTree modelTree, ArmEntity blockEntity, PoseStack poseStack, MultiBufferSource bufferSource, int packedLight, int packedOverlay) {
-        ModelTree mt = modelTree.getSource();
+    public void renderModelRecursive(MyModelTreeForVanilla modelTree, ArmEntity blockEntity, PoseStack poseStack, MultiBufferSource bufferSource, int packedLight, int packedOverlay) {
+        MyModelTree mt = modelTree.getSource();
         Model model = mt.model();
         poseStack.pushPose();
         modelTree.translateAndRotate(poseStack.last().pose());

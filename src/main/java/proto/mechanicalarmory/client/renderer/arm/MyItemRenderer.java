@@ -5,15 +5,18 @@ import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.mojang.blaze3d.vertex.VertexFormat;
 import dev.engine_room.flywheel.api.vertex.VertexList;
-import dev.engine_room.flywheel.lib.model.part.ModelTree;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.renderer.*;
+import net.minecraft.client.renderer.BlockEntityWithoutLevelRenderer;
+import net.minecraft.client.renderer.MultiBufferSource;
+import net.minecraft.client.renderer.RenderStateShard;
+import net.minecraft.client.renderer.RenderType;
 import net.minecraft.world.item.ItemDisplayContext;
 import net.minecraft.world.item.ItemStack;
 import org.joml.Quaternionf;
 import proto.mechanicalarmory.MechanicalArmoryClient;
 import proto.mechanicalarmory.client.flywheel.gltf.GltfFlywheelModel;
 import proto.mechanicalarmory.client.flywheel.gltf.GltfMesh;
+import proto.mechanicalarmory.client.flywheel.gltf.MyModelTree;
 import proto.mechanicalarmory.client.flywheel.gltf.TriIndexSequence;
 import proto.mechanicalarmory.client.renderer.util.VertexConsumerMutableWrapper;
 
@@ -25,14 +28,13 @@ import static net.minecraft.client.renderer.RenderStateShard.RENDERTYPE_ENTITY_C
 public class MyItemRenderer extends BlockEntityWithoutLevelRenderer {
 
     public static final MyItemRenderer INSTANCE = new MyItemRenderer();
-    ModelTree modelTree = MechanicalArmoryClient.fullArmModelTree;
+    MyModelTree modelTree = MechanicalArmoryClient.fullArmModelTree;
     public static RenderType r;
-
 
 
     public MyItemRenderer() {
         super(Minecraft.getInstance().getBlockEntityRenderDispatcher(),
-              Minecraft.getInstance().getEntityModels());
+                Minecraft.getInstance().getEntityModels());
     }
 
     @Override
@@ -41,14 +43,14 @@ public class MyItemRenderer extends BlockEntityWithoutLevelRenderer {
 
     }
 
-    public void renderModelRecursive(ModelTree node, PoseStack poseStack, MultiBufferSource bufferSource, int packedLight, int packedOverlay) {
+    public void renderModelRecursive(MyModelTree node, PoseStack poseStack, MultiBufferSource bufferSource, int packedLight, int packedOverlay) {
         poseStack.pushPose();
 
 
         // 1. Apply local transformations
         // Assuming mt.initialPose() provides the local offset/rotation for this node
         var pose = node.initialPose();
-        poseStack.translate(pose.x/16f, pose.y/16f, pose.z/16f);
+        poseStack.translate(pose.x(), pose.y(), pose.z());
 
         // If your initialPose includes rotation, apply it here:
         // poseStack.mulPose(pose.rotation());

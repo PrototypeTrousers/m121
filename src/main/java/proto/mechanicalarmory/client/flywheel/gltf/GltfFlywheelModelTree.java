@@ -1,9 +1,7 @@
 package proto.mechanicalarmory.client.flywheel.gltf;
 
 import de.javagl.jgltf.model.*;
-import dev.engine_room.flywheel.lib.model.part.ModelTree;
 import it.unimi.dsi.fastutil.objects.Object2ObjectArrayMap;
-import net.minecraft.client.model.geom.PartPose;
 
 import java.util.Collections;
 import java.util.Map;
@@ -11,51 +9,51 @@ import java.util.Map;
 public class GltfFlywheelModelTree {
     static private int childidx;
 
-    public static ModelTree create(GltfModel gltfModel) {
+    public static MyModelTree create(GltfModel gltfModel) {
         childidx = 0;
-        Map<String, ModelTree> children = new Object2ObjectArrayMap<>();
+        Map<String, MyModelTree> children = new Object2ObjectArrayMap<>();
         for (SceneModel sm : gltfModel.getSceneModels()) {
             for (NodeModel nm : sm.getNodeModels()) {
-                Map<String, ModelTree> newChildren = new Object2ObjectArrayMap<>();
+                Map<String, MyModelTree> newChildren = new Object2ObjectArrayMap<>();
                 float[] translation;
                 translation = nm.getTranslation();
-                PartPose pp;
+                MyPartPose pp;
                 if (translation != null) {
-                    pp = PartPose.offset(translation[0] * 16, translation[1] * 16, translation[2] * 16);
+                    pp = MyPartPose.offset(translation[0], translation[1], translation[2]);
                 } else {
-                    pp = PartPose.ZERO;
+                    pp = MyPartPose.ZERO;
                 }
                 addNodeChildren(nm, newChildren);
-                ModelTree modelTree = new ModelTree(null, pp, newChildren);
+                MyModelTree MyModelTree = new MyModelTree(null, pp, newChildren);
 
                 String nmName = nm.getName();
-                children.put(nmName != null ? nmName : String.valueOf(childidx++), modelTree);
+                children.put(nmName != null ? nmName : String.valueOf(childidx++), MyModelTree);
             }
         }
-        return new ModelTree(null, PartPose.ZERO, children);
+        return new MyModelTree(null, MyPartPose.ZERO, children);
     }
 
-    static void addNodeChildren(NodeModel nm, Map<String, ModelTree> children) {
+    static void addNodeChildren(NodeModel nm, Map<String, MyModelTree> children) {
         for (MeshModel mm : nm.getMeshModels()) {
             for (MeshPrimitiveModel pm : mm.getMeshPrimitiveModels()) {
-                ModelTree modelTree = new ModelTree(new GltfFlywheelModel(nm, pm), PartPose.ZERO, Collections.EMPTY_MAP);
+                MyModelTree MyModelTree = new MyModelTree(new GltfFlywheelModel(nm, pm), MyPartPose.ZERO, Collections.EMPTY_MAP);
                 String mmName = mm.getName();
-                children.put(mmName != null ? mmName : String.valueOf(childidx++), modelTree);
+                children.put(mmName != null ? mmName : String.valueOf(childidx++), MyModelTree);
             }
         }
 
         for (NodeModel mm : nm.getChildren()) {
-            Map<String, ModelTree> newChildren = new Object2ObjectArrayMap<>();
-            PartPose pp = PartPose.offset(mm.getTranslation()[0] * 16, mm.getTranslation()[1] * 16, mm.getTranslation()[2] * 16);
+            Map<String, MyModelTree> newChildren = new Object2ObjectArrayMap<>();
+            MyPartPose pp = MyPartPose.offset(mm.getTranslation()[0], mm.getTranslation()[1], mm.getTranslation()[2]);
             addNodeChildren(mm, newChildren);
-            ModelTree modelTree;
+            MyModelTree MyModelTree;
             if (mm.getName().equals("ItemAttach")) {
-                modelTree = new ModelTree(new GltfFlywheelModel(nm, null), pp, newChildren);
+                MyModelTree = new MyModelTree(new GltfFlywheelModel(nm, null), pp, newChildren);
             } else {
-                modelTree = new ModelTree(null, pp, newChildren);
+                MyModelTree = new MyModelTree(null, pp, newChildren);
             }
             String mmName = mm.getName();
-            children.put(mmName != null ? mmName : String.valueOf(childidx++), modelTree);
+            children.put(mmName != null ? mmName : String.valueOf(childidx++), MyModelTree);
         }
     }
 }

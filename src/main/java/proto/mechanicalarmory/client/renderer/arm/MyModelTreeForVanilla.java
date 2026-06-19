@@ -1,28 +1,20 @@
 package proto.mechanicalarmory.client.renderer.arm;
 
-import java.util.NoSuchElementException;
-import java.util.function.Consumer;
-import java.util.function.ObjIntConsumer;
-
-import dev.engine_room.flywheel.lib.model.part.ModelTree;
-import org.jetbrains.annotations.ApiStatus;
-import org.jetbrains.annotations.Nullable;
-import org.joml.*;
-
 import com.mojang.blaze3d.vertex.PoseStack;
-
-import dev.engine_room.flywheel.api.instance.InstancerProvider;
-import dev.engine_room.flywheel.api.model.Model;
-import dev.engine_room.flywheel.lib.instance.InstanceTypes;
-import dev.engine_room.flywheel.lib.instance.TransformedInstance;
 import dev.engine_room.flywheel.lib.transform.Affine;
 import dev.engine_room.flywheel.lib.transform.TransformStack;
 import net.minecraft.client.model.geom.ModelPart;
-import net.minecraft.client.model.geom.PartPose;
+import org.jetbrains.annotations.ApiStatus;
+import org.jetbrains.annotations.Nullable;
+import org.joml.*;
+import proto.mechanicalarmory.client.flywheel.gltf.MyModelTree;
+import proto.mechanicalarmory.client.flywheel.gltf.MyPartPose;
 
-public final class MyModelTree {
-    private final ModelTree source;
-    private final MyModelTree[] children;
+import java.util.NoSuchElementException;
+
+public final class MyModelTreeForVanilla {
+    private final MyModelTree source;
+    private final MyModelTreeForVanilla[] children;
 
     private final Matrix4f poseMatrix;
 
@@ -40,7 +32,7 @@ public final class MyModelTree {
 
     private boolean changed;
 
-    private MyModelTree(ModelTree source, MyModelTree[] children) {
+    private MyModelTreeForVanilla(MyModelTree source, MyModelTreeForVanilla[] children) {
         this.source = source;
         this.children = children;
 
@@ -49,16 +41,16 @@ public final class MyModelTree {
         resetPose();
     }
 
-    public static MyModelTree create(ModelTree meshTree) {
-        MyModelTree[] children = new MyModelTree[meshTree.childCount()];
+    public static MyModelTreeForVanilla create(MyModelTree meshTree) {
+        MyModelTreeForVanilla[] children = new MyModelTreeForVanilla[meshTree.childCount()];
         for (int i = 0; i < meshTree.childCount(); i++) {
             children[i] = create(meshTree.child(i));
         }
 
-        return new MyModelTree(meshTree, children);
+        return new MyModelTreeForVanilla(meshTree, children);
     }
 
-    public ModelTree getSource() {
+    public MyModelTree getSource() {
         return source;
     }
 
@@ -66,7 +58,7 @@ public final class MyModelTree {
         return poseMatrix;
     }
 
-    public PartPose initialPose() {
+    public MyPartPose initialPose() {
         return source.initialPose();
     }
 
@@ -74,7 +66,7 @@ public final class MyModelTree {
         return children.length;
     }
 
-    public MyModelTree child(int index) {
+    public MyModelTreeForVanilla child(int index) {
         return children[index];
     }
 
@@ -91,7 +83,7 @@ public final class MyModelTree {
     }
 
     @Nullable
-    public MyModelTree child(String name) {
+    public MyModelTreeForVanilla child(String name) {
         int index = childIndex(name);
 
         if (index < 0) {
@@ -101,8 +93,8 @@ public final class MyModelTree {
         return child(index);
     }
 
-    public MyModelTree childOrThrow(String name) {
-        MyModelTree child = child(name);
+    public MyModelTreeForVanilla childOrThrow(String name) {
+        MyModelTreeForVanilla child = child(name);
 
         if (child == null) {
             throw new NoSuchElementException("Can't find part " + name);
@@ -112,7 +104,7 @@ public final class MyModelTree {
     }
 
     public void translateAndRotate(Affine<?> affine, Quaternionf tempQuaternion) {
-        affine.translate(x / 16.0F, y / 16.0F, z / 16.0F);
+        affine.translate(x, y, z);
 
         if (xRot != 0.0F || yRot != 0.0F || zRot != 0.0F) {
             affine.rotate(tempQuaternion.rotationZYX(zRot, yRot, xRot));
@@ -128,7 +120,7 @@ public final class MyModelTree {
     }
 
     public void translateAndRotate(Matrix4f pose) {
-        pose.translate(x / 16.0F, y / 16.0F, z / 16.0F);
+        pose.translate(x, y, z);
 
         if (xRot != 0.0F || yRot != 0.0F || zRot != 0.0F) {
             pose.rotateZYX(zRot, yRot, xRot);
@@ -188,7 +180,7 @@ public final class MyModelTree {
             force = true;
         }
 
-        for (MyModelTree child : children) {
+        for (MyModelTreeForVanilla child : children) {
             child.propagateAnimation(poseMatrix, force);
         }
 
@@ -392,17 +384,17 @@ public final class MyModelTree {
         offsetScale(offset.x(), offset.y(), offset.z());
     }
 
-    public PartPose storePose() {
-        return PartPose.offsetAndRotation(x, y, z, xRot, yRot, zRot);
+    public MyPartPose storePose() {
+        return MyPartPose.offsetAndRotation(x, y, z, xRot, yRot, zRot);
     }
 
-    public void loadPose(PartPose pose) {
-        x = pose.x;
-        y = pose.y;
-        z = pose.z;
-        xRot = pose.xRot;
-        yRot = pose.yRot;
-        zRot = pose.zRot;
+    public void loadPose(MyPartPose pose) {
+        x = pose.x();
+        y = pose.y();
+        z = pose.z();
+        xRot = pose.xRot();
+        yRot = pose.yRot();
+        zRot = pose.zRot();
         xScale = ModelPart.DEFAULT_SCALE;
         yScale = ModelPart.DEFAULT_SCALE;
         zScale = ModelPart.DEFAULT_SCALE;
@@ -413,7 +405,7 @@ public final class MyModelTree {
         loadPose(source.initialPose());
     }
 
-    public void copyTransform(MyModelTree tree) {
+    public void copyTransform(MyModelTreeForVanilla tree) {
         x = tree.x;
         y = tree.y;
         z = tree.z;
