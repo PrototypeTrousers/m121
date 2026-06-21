@@ -10,6 +10,7 @@ import net.neoforged.neoforge.registries.DeferredRegister;
 import proto.mechanicalarmory.common.blocks.BushBlockEntity;
 import proto.mechanicalarmory.common.blocks.MABlocks;
 import proto.mechanicalarmory.common.entities.block.ArmEntity;
+import proto.mechanicalarmory.common.entities.block.ShredderEntity;
 
 import java.util.function.Supplier;
 
@@ -29,6 +30,20 @@ public class MAEntities {
                             // A vararg of blocks that can have this block entity.
                             // This assumes the existence of the referenced blocks as DeferredBlock<Block>s.
                             MABlocks.ARM.get()
+                    )
+                    // Build using null; vanilla does some datafixer shenanigans with the parameter that we don't need.
+                    .build(null)
+    );
+
+    public static final Supplier<BlockEntityType<ShredderEntity>> SHREDDER_ENTITY = BLOCK_ENTITY_TYPES.register(
+            "shredderentity",
+            // The block entity type, created using a builder.
+            () -> BlockEntityType.Builder.of(
+                            // The supplier to use for constructing the block entity instances.
+                            ShredderEntity::new,
+                            // A vararg of blocks that can have this block entity.
+                            // This assumes the existence of the referenced blocks as DeferredBlock<Block>s.
+                            MABlocks.SHREDDER.get()
                     )
                     // Build using null; vanilla does some datafixer shenanigans with the parameter that we don't need.
                     .build(null)

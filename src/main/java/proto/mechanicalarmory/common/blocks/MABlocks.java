@@ -13,4 +13,5 @@ public class MABlocks {
     // Creates a new Block with the id "mechanicalarmory:example_block", combining the namespace and path
     public static final DeferredBlock<Block> EXAMPLE_BLOCK = BLOCKS.registerSimpleBlock("example_block", BlockBehaviour.Properties.of().mapColor(MapColor.STONE));
     public static final DeferredBlock<BlockArm> ARM = BLOCKS.registerBlock("arm", BlockArm::new, BlockBehaviour.Properties.of());
+    public static final DeferredBlock<BlockShredder> SHREDDER = BLOCKS.registerBlock("shredder", BlockShredder::new, BlockBehaviour.Properties.of());
 }

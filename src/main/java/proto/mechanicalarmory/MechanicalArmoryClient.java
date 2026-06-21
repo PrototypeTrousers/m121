@@ -34,9 +34,11 @@ import proto.mechanicalarmory.client.flywheel.instances.arm.ArmVisualiser;
 import proto.mechanicalarmory.client.flywheel.instances.crop.CropVisualiser;
 import proto.mechanicalarmory.client.flywheel.instances.generic.VanillaBlockVisualiser;
 import proto.mechanicalarmory.client.flywheel.instances.generic.VanillaEntityVisualiser;
+import proto.mechanicalarmory.client.flywheel.instances.shredder.ShredderVisualiser;
 import proto.mechanicalarmory.client.renderer.arm.ArmRenderer;
 import proto.mechanicalarmory.client.renderer.arm.MyCustomItemBakedModel;
 import proto.mechanicalarmory.client.renderer.arm.MyItemRenderer;
+import proto.mechanicalarmory.client.renderer.shredder.ShredderRenderer;
 import proto.mechanicalarmory.client.screens.ArmScreen;
 import proto.mechanicalarmory.common.entities.MAEntities;
 import proto.mechanicalarmory.common.items.MAItems;
@@ -54,10 +56,12 @@ import static proto.mechanicalarmory.common.menu.MenuTypes.ARM_ENTITY_MENU;
 @EventBusSubscriber(modid = MODID, value = Dist.CLIENT)
 public class MechanicalArmoryClient {
     public static ModelResourceLocation arm = ModelResourceLocation.standalone(ResourceLocation.fromNamespaceAndPath(MODID, "models/fullarm.glb"));
+    public static ModelResourceLocation shredder = ModelResourceLocation.standalone(ResourceLocation.fromNamespaceAndPath(MODID, "models/shredder.glb"));
     public static ModelResourceLocation octoarm = ModelResourceLocation.standalone(ResourceLocation.fromNamespaceAndPath(MODID, "models/octoarm.glb"));
     public static ModelResourceLocation armItemModel = ModelResourceLocation.standalone(ResourceLocation.fromNamespaceAndPath(MODID, "arm"));
     public static ModelResourceLocation chestplateItemModel = ModelResourceLocation.standalone(ResourceLocation.fromNamespaceAndPath(MODID, "my_chestplate"));
     public static MyModelTree fullArmModelTree;
+    public static MyModelTree shredderModelTree;
     public static ModelTree octoArmModelTree;
     public static BandedPrimeLimiter limiter = new BandedPrimeLimiter();
 
@@ -72,6 +76,9 @@ public class MechanicalArmoryClient {
     @SubscribeEvent(priority = EventPriority.LOWEST)
     static void onClientSetup(FMLClientSetupEvent event) {
         VisualizerRegistry.setVisualizer(MAEntities.ARM_ENTITY.get(), ArmVisualiser.ARM_VISUAL);
+        VisualizerRegistry.setVisualizer(MAEntities.SHREDDER_ENTITY.get(), ShredderVisualiser.SHREDDER_VISUAL);
+
+
         VisualizerRegistry.setVisualizer(MAEntities.BUSH_BLOCK_ENTITY.get(), CropVisualiser.CROP_VISUAL);
         BuiltInRegistries.BLOCK_ENTITY_TYPE.forEach(c -> {
             if (VisualizerRegistry.getVisualizer(c) == null) {
@@ -97,13 +104,19 @@ public class MechanicalArmoryClient {
                 // Pass the context to an empty (default) constructor call
                 ArmRenderer::new
         );
+        event.registerBlockEntityRenderer(MAEntities.SHREDDER_ENTITY.get(),
+                // Pass the context to an empty (default) constructor call
+                ShredderRenderer::new
+        );
     }
 
     @SubscribeEvent // on the mod event bus only on the physical client
     public static void registerAdditional(ModelEvent.RegisterAdditional event) {
         event.register(arm);
+        event.register(shredder);
         event.register(octoarm);
         fullArmModelTree = GltfFlywheelModelTree.create(loadglTFModel(arm));
+        shredderModelTree = GltfFlywheelModelTree.create(loadglTFModel(shredder));
         //octoArmModelTree = GltfFlywheelModelTree.create(loadglTFModel(octoarm));
         event.register(armItemModel);
     }

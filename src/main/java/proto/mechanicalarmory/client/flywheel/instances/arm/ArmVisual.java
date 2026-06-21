@@ -9,8 +9,6 @@ import dev.engine_room.flywheel.api.visual.LightUpdatedVisual;
 import dev.engine_room.flywheel.api.visualization.VisualizationContext;
 import dev.engine_room.flywheel.lib.instance.InstanceTypes;
 import dev.engine_room.flywheel.lib.instance.TransformedInstance;
-import dev.engine_room.flywheel.lib.model.part.InstanceTree;
-import dev.engine_room.flywheel.lib.model.part.ModelTree;
 import dev.engine_room.flywheel.lib.task.RunnablePlan;
 import dev.engine_room.flywheel.lib.visual.AbstractBlockEntityVisual;
 import it.unimi.dsi.fastutil.longs.LongSet;
