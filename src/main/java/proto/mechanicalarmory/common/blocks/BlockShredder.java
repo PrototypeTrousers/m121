@@ -2,10 +2,11 @@ package proto.mechanicalarmory.common.blocks;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
-import net.minecraft.world.item.context.BlockPlaceContext;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.RenderShape;
 import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.level.block.entity.BlockEntityTicker;
+import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.state.BlockState;
 import net.nikdo53.tinymultiblocklib.block.AbstractMultiBlock;
 import net.nikdo53.tinymultiblocklib.block.IMultiBlock;
@@ -13,7 +14,6 @@ import net.nikdo53.tinymultiblocklib.block.IPreviewableMultiblock;
 import org.jetbrains.annotations.Nullable;
 import proto.mechanicalarmory.common.entities.block.ShredderEntity;
 
-import java.util.ArrayList;
 import java.util.List;
 
 public class BlockShredder extends AbstractMultiBlock implements IPreviewableMultiblock {
@@ -32,7 +32,19 @@ public class BlockShredder extends AbstractMultiBlock implements IPreviewableMul
         return IMultiBlock.posStreamToList(BlockPos.betweenClosedStream(center, center.north().west()));
     }
 
-
+    @Override
+    public @Nullable <T extends BlockEntity> BlockEntityTicker<T> getTicker(Level level, BlockState state, BlockEntityType<T> blockEntityType) {
+        if (level.isClientSide) {
+            return null;
+        }
+        if (IMultiBlock.isCenter(state)) {
+            return (world1, pos, state1, blockEntity) -> {
+                if (blockEntity instanceof BlockEntityTicker ticker)
+                    ticker.tick(world1, pos, state1, blockEntity);
+            };
+        }
+        return null;
+    }
 
     @Override
     public boolean hasCustomBE() {

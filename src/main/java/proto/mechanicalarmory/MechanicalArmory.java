@@ -25,6 +25,7 @@ import proto.mechanicalarmory.common.items.MAItems;
 import proto.mechanicalarmory.common.items.armor.ArmorMaterials;
 import proto.mechanicalarmory.common.items.armor.MyAttachments;
 import proto.mechanicalarmory.common.menu.MenuTypes;
+import proto.mechanicalarmory.common.recipes.shredder.ShredderRecipes;
 
 // The value here should match an entry in the META-INF/neoforge.mods.toml file
 @Mod(MechanicalArmory.MODID)
@@ -57,6 +58,7 @@ public class MechanicalArmory {
         MyAttachments.ATTACHMENT_TYPES.register(modEventBus);
         MAEntities.BLOCK_ENTITY_TYPES.register(modEventBus);
         MenuTypes.register(modEventBus);
+        ShredderRecipes.init();
         // Register the Deferred Register to the mod event bus so tabs get registered
         CREATIVE_MODE_TABS.register(modEventBus);
 
