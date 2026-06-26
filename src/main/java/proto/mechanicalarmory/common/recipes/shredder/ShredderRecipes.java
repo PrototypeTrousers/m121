@@ -9,7 +9,7 @@ public class ShredderRecipes {
     static final Recipe COBBLESTONE = new Recipe(new ItemStack(Items.COBBLESTONE), new  ItemStack(Items.STONE));
 
     public static void init() {
-        var l = RecipeRegistry.INSTANCE.register("shredding");
+        var l = RecipeRegistry.INSTANCE.register("shredder");
         l.add(COBBLESTONE);
     }
 }
