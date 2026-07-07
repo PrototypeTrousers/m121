@@ -1,13 +1,17 @@
 package proto.mechanicalarmory.common.blocks;
 
+import brachy.modularui.factory.UIFactories;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.RenderShape;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.entity.BlockEntityTicker;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.phys.BlockHitResult;
 import net.nikdo53.tinymultiblocklib.block.AbstractMultiBlock;
 import net.nikdo53.tinymultiblocklib.block.IMultiBlock;
 import net.nikdo53.tinymultiblocklib.block.IPreviewableMultiblock;
@@ -54,5 +58,13 @@ public class BlockShredder extends AbstractMultiBlock implements IPreviewableMul
     @Override
     public @Nullable BlockEntity newBlockEntity(BlockPos pos, BlockState state) {
         return new ShredderEntity(pos, state);
+    }
+
+    @Override
+    protected InteractionResult useWithoutItem(BlockState state, Level level, BlockPos pos, Player player, BlockHitResult hitResult) {
+        if (!level.isClientSide) {
+            UIFactories.blockEntity().open(player, pos);
+        }
+        return InteractionResult.SUCCESS;
     }
 }

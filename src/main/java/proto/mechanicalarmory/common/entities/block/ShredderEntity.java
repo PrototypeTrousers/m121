@@ -1,5 +1,13 @@
 package proto.mechanicalarmory.common.entities.block;
 
+import brachy.modularui.api.IUIHolder;
+import brachy.modularui.drawable.schema.BoxSchema;
+import brachy.modularui.factory.PosGuiData;
+import brachy.modularui.screen.ModularPanel;
+import brachy.modularui.screen.ModularScreen;
+import brachy.modularui.screen.UISettings;
+import brachy.modularui.value.sync.PanelSyncManager;
+import brachy.modularui.widgets.SchemaWidget;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.MenuProvider;
@@ -15,13 +23,14 @@ import net.minecraft.world.phys.AABB;
 import net.nikdo53.tinymultiblocklib.blockentities.AbstractMultiBlockEntity;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import proto.mechanicalarmory.MechanicalArmory;
 import proto.mechanicalarmory.common.entities.MAEntities;
 import proto.mechanicalarmory.common.recipes.Recipe;
 import proto.mechanicalarmory.common.recipes.RecipeRegistry;
 
 import java.util.List;
 
-public class ShredderEntity extends AbstractMultiBlockEntity implements BlockEntityTicker<ShredderEntity>, MenuProvider {
+public class ShredderEntity extends AbstractMultiBlockEntity implements BlockEntityTicker<ShredderEntity>, MenuProvider, IUIHolder<PosGuiData> {
     private static final List<Recipe> recipes = RecipeRegistry.getInstance().getRecipes("shredder");
 
     public ShredderEntity(BlockPos pos, BlockState blockState) {
@@ -57,5 +66,23 @@ public class ShredderEntity extends AbstractMultiBlockEntity implements BlockEnt
         });
     }
 
+    @Override
+    public ModularScreen createScreen(PosGuiData data, ModularPanel<?> mainPanel) {
+        return new ModularScreen(MechanicalArmory.MODID, mainPanel);
+    }
 
+    @Override
+    public ModularPanel<?> buildUI(PosGuiData data, PanelSyncManager syncManager, UISettings settings) {
+        ModularPanel<?> panel = new ModularPanel<>("shredder");
+
+        var schema  =BoxSchema.of(this.level, this.getCenter(), 5  );
+        int i = 0;
+        if (level.isClientSide) {
+            var renderer = schema.createRenderer();
+
+
+            panel.child(new SchemaWidget(renderer).full().enableDragTranslation(false));
+        }
+        return panel;
+    }
 }
