@@ -1,13 +1,19 @@
 package proto.mechanicalarmory.common.entities.block;
 
 import brachy.modularui.api.IUIHolder;
+import brachy.modularui.drawable.SchemaRenderer;
+import brachy.modularui.drawable.schema.BaseSchemaRenderer;
+import brachy.modularui.drawable.schema.BlockHighlight;
 import brachy.modularui.drawable.schema.BoxSchema;
+import brachy.modularui.drawable.schema.ISchema;
 import brachy.modularui.factory.PosGuiData;
 import brachy.modularui.screen.ModularPanel;
 import brachy.modularui.screen.ModularScreen;
 import brachy.modularui.screen.UISettings;
+import brachy.modularui.utils.Color;
 import brachy.modularui.value.sync.PanelSyncManager;
 import brachy.modularui.widgets.SchemaWidget;
+import brachy.modularui.widgets.SlotGroupWidget;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.MenuProvider;
@@ -20,6 +26,7 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntityTicker;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.HitResult;
 import net.nikdo53.tinymultiblocklib.blockentities.AbstractMultiBlockEntity;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -79,10 +86,32 @@ public class ShredderEntity extends AbstractMultiBlockEntity implements BlockEnt
         int i = 0;
         if (level.isClientSide) {
             var renderer = schema.createRenderer();
+            renderer.highlightRenderer(new BlockHighlight(Color.withAlpha(Color.RED.main, 0.5f))
+                    .allSides(false)
+                    .thickness(0.1f));
 
-
-            panel.child(new SchemaWidget(renderer).full().enableDragTranslation(false));
+            panel.child(
+                    new ConfigSchemaWidget(renderer, panel)
+                            .full()
+                            .enableDragTranslation(false));
         }
         return panel;
+    }
+
+    static class ConfigSchemaWidget extends SchemaWidget {
+        ModularPanel<?> panel;
+        public ConfigSchemaWidget(SchemaRenderer renderer, ModularPanel<?> panel) {
+            super(renderer);
+            this.panel = panel;
+        }
+
+        @Override
+        public @NotNull Result onMousePressed(int button) {
+            if (getSchemaRenderer().lastRayTrace().getType() == HitResult.Type.BLOCK) {
+                this.panel.child(SlotGroupWidget.playerInventory(true));
+                return Result.SUCCESS;
+            }
+            return super.onMousePressed(button);
+        }
     }
 }
