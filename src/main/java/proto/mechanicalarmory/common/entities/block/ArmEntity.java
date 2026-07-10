@@ -297,7 +297,6 @@ public class ArmEntity extends BlockEntity implements BlockEntityTicker<ArmEntit
 
         if (level.isClientSide) {
             var renderer = schema.createRenderer();
-            renderer.scale(0);
             renderer.highlightRenderer(new BlockHighlight(Color.withAlpha(Color.RED.main, 0.5f))
                     .allSides(false)
                     .thickness(0.1f));

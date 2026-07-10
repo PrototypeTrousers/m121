@@ -30,6 +30,7 @@
     "defaultRequire": 1
   },
   "mixins": [
+    "BaseSchemaRendererMixin",
     "BushBlockMixin",
     "GeoRenderMixin",
     "ItemModelsMixin",
