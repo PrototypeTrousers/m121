@@ -163,13 +163,7 @@ dependencies {
 
     implementation("brachy.modularui:modularui-mc1.21.1:${mui_version}")
 
-
     implementation "rearth.oritech:oritech-neoforge-${minecraft_version}:0.19.7"
-
-    compileOnlyApi "io.wispforest:owo-lib-neoforge:$owo_neo_version"
-    annotationProcessor "io.wispforest:owo-lib-neoforge:$owo_neo_version"
-    //accessTransformers "io.wispforest:owo-lib-neoforge:$owo_neo_version"
-    //interfaceInjectionData "io.wispforest:owo-lib-neoforge:$owo_neo_version"
 
     compileOnly("maven.modrinth:immediatelyfast:1.6.9+1.21.1-neoforge") // Get latest version from modrinth
     compileOnly("maven.modrinth:iris:1.8.12+1.21.1-neoforge") // Get latest version from modrinth

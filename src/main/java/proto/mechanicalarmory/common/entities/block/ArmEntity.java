@@ -1,5 +1,22 @@
 package proto.mechanicalarmory.common.entities.block;
 
+import brachy.modularui.api.IPanelHandler;
+import brachy.modularui.api.IUIHolder;
+import brachy.modularui.api.drawable.Text;
+import brachy.modularui.drawable.SchemaRenderer;
+import brachy.modularui.drawable.schema.BlockHighlight;
+import brachy.modularui.drawable.schema.BoxSchema;
+import brachy.modularui.factory.PosGuiData;
+import brachy.modularui.screen.ModularPanel;
+import brachy.modularui.screen.ModularScreen;
+import brachy.modularui.screen.UISettings;
+import brachy.modularui.utils.Color;
+import brachy.modularui.value.sync.IntSyncValue;
+import brachy.modularui.value.sync.PanelSyncManager;
+import brachy.modularui.widgets.Dialog;
+import brachy.modularui.widgets.ItemDisplayWidget;
+import brachy.modularui.widgets.SchemaWidget;
+import brachy.modularui.widgets.SlotGroupWidget;
 import it.unimi.dsi.fastutil.Pair;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -9,30 +26,24 @@ import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.NbtUtils;
 import net.minecraft.nbt.Tag;
 import net.minecraft.network.Connection;
-import net.minecraft.network.chat.Component;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.game.ClientGamePacketListener;
 import net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket;
-import net.minecraft.world.MenuProvider;
-import net.minecraft.world.entity.player.Inventory;
-import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.entity.BlockEntityTicker;
 import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.saveddata.SavedData;
+import net.minecraft.world.phys.HitResult;
 import net.neoforged.neoforge.capabilities.Capabilities;
 import net.neoforged.neoforge.items.IItemHandler;
 import net.neoforged.neoforge.items.ItemStackHandler;
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 import org.joml.Vector3d;
+import proto.mechanicalarmory.MechanicalArmory;
 import proto.mechanicalarmory.common.entities.MAEntities;
 import proto.mechanicalarmory.common.logic.*;
 import proto.mechanicalarmory.common.logic.filter.ItemContextFilter;
-import proto.mechanicalarmory.common.menu.ArmScreenHandler;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -40,7 +51,7 @@ import java.util.List;
 import static proto.mechanicalarmory.common.logic.Action.DELIVER;
 import static proto.mechanicalarmory.common.logic.Action.RETRIEVE;
 
-public class ArmEntity extends BlockEntity implements BlockEntityTicker<ArmEntity>, MenuProvider {
+public class ArmEntity extends BlockEntity implements BlockEntityTicker<ArmEntity>, IUIHolder<PosGuiData> {
     private final Targeting targeting = new Targeting();
     private final MotorCortex motorCortex;
     private final WorkStatus workStatus = new WorkStatus();
@@ -262,16 +273,6 @@ public class ArmEntity extends BlockEntity implements BlockEntityTicker<ArmEntit
         return targeting.hasOutput();
     }
 
-    @Override
-    public @NotNull Component getDisplayName() {
-        return Component.nullToEmpty("");
-    }
-
-    @Override
-    public @Nullable AbstractContainerMenu createMenu(int containerId, @NotNull Inventory playerInventory, @NotNull Player player) {
-        return new ArmScreenHandler(containerId, playerInventory, this);
-    }
-
     public Targeting getTargeting() {
         return targeting;
     }
@@ -282,6 +283,74 @@ public class ArmEntity extends BlockEntity implements BlockEntityTicker<ArmEntit
 
     public List<Pair<BlockPos, Direction>> getLogicList() {
         return logicSources;
+    }
+
+    @Override
+    public ModularScreen createScreen(PosGuiData data, ModularPanel<?> mainPanel) {
+        return new ModularScreen(MechanicalArmory.MODID, mainPanel);
+    }
+
+    @Override
+    public ModularPanel<?> buildUI(PosGuiData data, PanelSyncManager syncManager, UISettings settings) {
+        ModularPanel<?> panel = new ModularPanel<>("arm");
+        var schema = BoxSchema.of(this.level, this.getBlockPos(), 5);
+
+        if (level.isClientSide) {
+            var renderer = schema.createRenderer();
+            renderer.scale(0);
+            renderer.highlightRenderer(new BlockHighlight(Color.withAlpha(Color.RED.main, 0.5f))
+                    .allSides(false)
+                    .thickness(0.1f));
+
+            panel.child(
+                    new ConfigSchemaWidget(renderer, panel, syncManager)
+                            .full()
+                            .enableDragTranslation(false));
+        }
+
+
+        IntSyncValue slot = new IntSyncValue(() -> level.isClientSide ? 0 : 1);
+        syncManager.syncValue("slot", slot);
+
+        syncManager.syncedPanel("clicked", true, (mainPanel, player) ->
+                new Dialog<>("slot_panel")
+                        .child(Text.lang(slot.getStringValue()).asWidget())
+                        .child(SlotGroupWidget.builder()
+                                .matrix("I")
+                                .key('I', new ItemDisplayWidget().item(getItemStack()))
+                                .build()
+                                .coverChildren())
+                        .draggable(true)
+                        .disablePanelsBelow(true)
+                        .relative(panel)
+                        .top(0)
+                        .rightRel(1f)
+                        .size(32)
+                        .closeOnOutOfBoundsClick(true));
+
+        return panel;
+    }
+
+    static class ConfigSchemaWidget extends SchemaWidget {
+        ModularPanel<?> panel;
+        PanelSyncManager syncManager;
+        public ConfigSchemaWidget(SchemaRenderer renderer, ModularPanel<?> panel, PanelSyncManager syncManager) {
+            super(renderer);
+            this.panel = panel;
+            this.syncManager = syncManager;
+        }
+
+        @Override
+        public @NotNull Result onMousePressed(int button) {
+            if (getSchemaRenderer().lastRayTrace().getType() == HitResult.Type.BLOCK) {
+
+                IPanelHandler colorPicker1 = syncManager.findPanelHandler("clicked");
+                colorPicker1.openPanel();
+
+                return Result.SUCCESS;
+            }
+            return super.onMousePressed(button);
+        }
     }
 
     public class ArmItemHandler extends ItemStackHandler {

@@ -1,9 +1,9 @@
 package proto.mechanicalarmory.common.blocks;
 
+import brachy.modularui.factory.UIFactories;
 import com.mojang.serialization.MapCodec;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.InteractionResult;
-import net.minecraft.world.MenuProvider;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.level.Level;
@@ -74,13 +74,10 @@ public class BlockArm extends Block implements EntityBlock {
     }
 
     @Override
-    public @NotNull InteractionResult useWithoutItem(@NotNull BlockState state, Level world, @NotNull BlockPos pos, @NotNull Player player, @NotNull BlockHitResult hit) {
-
-        if (!world.isClientSide) {
-            var handler = (MenuProvider) world.getBlockEntity(pos);
-            player.openMenu(handler, pos);
+    protected @NotNull InteractionResult useWithoutItem(@NotNull BlockState state, Level level, @NotNull BlockPos pos, @NotNull Player player, @NotNull BlockHitResult hitResult) {
+        if (!level.isClientSide) {
+            UIFactories.blockEntity().open(player, pos);
         }
-
         return InteractionResult.SUCCESS;
     }
 }
