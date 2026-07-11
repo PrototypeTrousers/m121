@@ -34,6 +34,7 @@
     "BushBlockMixin",
     "GeoRenderMixin",
     "ItemModelsMixin",
+    "RenderCompileTaskMixin",
     "SegmentedBufferBuilderAccessor",
     "StorageMixinAccessor"
   ]
