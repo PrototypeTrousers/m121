@@ -13,10 +13,8 @@ import brachy.modularui.screen.UISettings;
 import brachy.modularui.utils.Color;
 import brachy.modularui.value.sync.IntSyncValue;
 import brachy.modularui.value.sync.PanelSyncManager;
-import brachy.modularui.widgets.Dialog;
-import brachy.modularui.widgets.ItemDisplayWidget;
-import brachy.modularui.widgets.SchemaWidget;
-import brachy.modularui.widgets.SlotGroupWidget;
+import brachy.modularui.widgets.*;
+import brachy.modularui.widgets.menu.DropdownWidget;
 import it.unimi.dsi.fastutil.Pair;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -26,6 +24,7 @@ import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.NbtUtils;
 import net.minecraft.nbt.Tag;
 import net.minecraft.network.Connection;
+import net.minecraft.network.chat.Component;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.game.ClientGamePacketListener;
 import net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket;
@@ -307,24 +306,21 @@ public class ArmEntity extends BlockEntity implements BlockEntityTicker<ArmEntit
                             .enableDragTranslation(false));
         }
 
-
         IntSyncValue slot = new IntSyncValue(() -> level.isClientSide ? 0 : 1);
         syncManager.syncValue("slot", slot);
 
         syncManager.syncedPanel("clicked", true, (mainPanel, player) ->
                 new Dialog<>("slot_panel")
-                        .child(Text.lang(slot.getStringValue()).asWidget())
-                        .child(SlotGroupWidget.builder()
-                                .matrix("I")
-                                .key('I', new ItemDisplayWidget().item(getItemStack()))
-                                .build()
-                                .coverChildren())
+                        .child(
+                                new ListWidget<>()
+                                        .child(Text.str("hah").asWidget())
+                        )
                         .draggable(true)
                         .disablePanelsBelow(true)
                         .relative(panel)
                         .top(0)
                         .rightRel(1f)
-                        .size(32)
+                        .coverChildren()
                         .closeOnOutOfBoundsClick(true));
 
         return panel;
