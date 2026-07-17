@@ -5,7 +5,7 @@ import brachy.modularui.api.IUIHolder;
 import brachy.modularui.api.drawable.Text;
 import brachy.modularui.drawable.SchemaRenderer;
 import brachy.modularui.drawable.schema.BlockHighlight;
-import brachy.modularui.drawable.schema.BoxSchema;
+import brachy.modularui.drawable.schema.SchemaLevel;
 import brachy.modularui.factory.PosGuiData;
 import brachy.modularui.screen.ModularPanel;
 import brachy.modularui.screen.ModularScreen;
@@ -13,8 +13,9 @@ import brachy.modularui.screen.UISettings;
 import brachy.modularui.utils.Color;
 import brachy.modularui.value.sync.IntSyncValue;
 import brachy.modularui.value.sync.PanelSyncManager;
-import brachy.modularui.widgets.*;
-import brachy.modularui.widgets.menu.DropdownWidget;
+import brachy.modularui.widgets.ButtonWidget;
+import brachy.modularui.widgets.ListWidget;
+import brachy.modularui.widgets.SchemaWidget;
 import it.unimi.dsi.fastutil.Pair;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -24,29 +25,34 @@ import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.NbtUtils;
 import net.minecraft.nbt.Tag;
 import net.minecraft.network.Connection;
-import net.minecraft.network.chat.Component;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.game.ClientGamePacketListener;
 import net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.entity.BlockEntityTicker;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.HitResult;
 import net.neoforged.neoforge.capabilities.Capabilities;
 import net.neoforged.neoforge.items.IItemHandler;
 import net.neoforged.neoforge.items.ItemStackHandler;
+import net.neoforged.neoforge.network.PacketDistributor;
 import org.jetbrains.annotations.NotNull;
 import org.joml.Vector3d;
 import proto.mechanicalarmory.MechanicalArmory;
+import proto.mechanicalarmory.client.modularui.schemas.BoxSchema2;
 import proto.mechanicalarmory.common.entities.MAEntities;
 import proto.mechanicalarmory.common.logic.*;
 import proto.mechanicalarmory.common.logic.filter.ItemContextFilter;
+import proto.mechanicalarmory.common.network.ArmClickPayload;
 
 import java.util.ArrayList;
 import java.util.List;
 
+import static proto.mechanicalarmory.client.modularui.Utils.getAllInside;
 import static proto.mechanicalarmory.common.logic.Action.DELIVER;
 import static proto.mechanicalarmory.common.logic.Action.RETRIEVE;
 
@@ -165,7 +171,7 @@ public class ArmEntity extends BlockEntity implements BlockEntityTicker<ArmEntit
         if (te != null) {
             IItemHandler itemHandler = level.getCapability(Capabilities.ItemHandler.BLOCK, blkFace.key().offset((this.worldPosition)), blkFace.value());
             if (itemHandler != null) {
-                if (action == Action.RETRIEVE) {
+                if (action == RETRIEVE) {
                     if (this.itemHandler.getStackInSlot(0).isEmpty()) {
                         for (int i = 0; i < itemHandler.getSlots(); i++) {
                             if (!itemHandler.extractItem(i, 1, true).isEmpty()) {
@@ -178,7 +184,7 @@ public class ArmEntity extends BlockEntity implements BlockEntityTicker<ArmEntit
                             }
                         }
                     }
-                } else if (action == Action.DELIVER) {
+                } else if (action == DELIVER) {
                     ItemStack itemStack = this.itemHandler.extractItem(0, 1, true);
                     if (!itemStack.isEmpty()) {
                         for (int i = 0; i < itemHandler.getSlots(); i++) {
@@ -292,18 +298,46 @@ public class ArmEntity extends BlockEntity implements BlockEntityTicker<ArmEntit
     @Override
     public ModularPanel<?> buildUI(PosGuiData data, PanelSyncManager syncManager, UISettings settings) {
         ModularPanel<?> panel = new ModularPanel<>("arm");
-        var schema = BoxSchema.of(this.level, this.getBlockPos(), 5);
+
+
+        SchemaLevel sl = new SchemaLevel();
+
+        panel.onCloseAction(() -> {
+            if (sl.hasFilledBlocks()) {
+                sl.getFilledBlocks().forEach(b -> {
+                            sl.setBlock(b, Blocks.AIR.defaultBlockState(), 0);
+                        }
+                );
+            }
+        });
+
+        int r = 5;
+        var blocks = getAllInside(getBlockPos().offset(-r, -r, -r), getBlockPos().offset(r, r, r), false);
+        for (BlockPos blockPos : blocks) {
+            sl.setBlock(blockPos.subtract(this.getBlockPos()), level.getBlockState(blockPos), 0);
+        }
+
+        var schema = BoxSchema2.of(sl, BlockPos.ZERO, 5);
+
+        SchemaRenderer renderer;
+        ConfigSchemaWidget configSchemaWidget;
 
         if (level.isClientSide) {
-            var renderer = schema.createRenderer();
+            renderer = schema.createRenderer();
             renderer.highlightRenderer(new BlockHighlight(Color.withAlpha(Color.RED.main, 0.5f))
                     .allSides(false)
                     .thickness(0.1f));
 
-            panel.child(
-                    new ConfigSchemaWidget(renderer, panel, syncManager)
-                            .full()
-                            .enableDragTranslation(false));
+            configSchemaWidget = new ConfigSchemaWidget(renderer, panel, syncManager);
+            configSchemaWidget
+                    .full()
+                    .enableDragTranslation(false);
+
+            panel.child(configSchemaWidget);
+
+
+        } else {
+            configSchemaWidget = null;
         }
 
         IntSyncValue slot = new IntSyncValue(() -> level.isClientSide ? 0 : 1);
@@ -312,9 +346,50 @@ public class ArmEntity extends BlockEntity implements BlockEntityTicker<ArmEntit
         syncManager.syncedPanel("clicked", true, (mainPanel, player) ->
                 new ModularPanel<>("clicked2")
                         .child(new ListWidget<>()
-                                .child(Text.str("hah").asWidget().size(128,16))
-                                .child(Text.str("hah2").asWidget().size(128,16))
+                                .child(new ButtonWidget<>()
+                                        .overlay(Text.str("IN"))
+                                        .onMousePressed((context, button) -> {
+                                                    if (level.isClientSide) {
+                                                        int x = 999;
+                                                        if (button == 0 || button == 1) {
+                                                            PacketDistributor.sendToServer(
+                                                                    new ArmClickPayload(
+                                                                            this.getBlockPos(),
+                                                                            configSchemaWidget.blockHitResult.getBlockPos().offset(this.getBlockPos()),
+                                                                            configSchemaWidget.blockHitResult.getDirection(),
+                                                                            ArmClickPayload.Configuration.SOURCE
+                                                                    ));
+                                                            return true;
+                                                        }
+                                                        return false;
+                                                    }
+                                                    return true;
+                                                }
+                                        )
+                                        .size(3 * 16, 16))
+                                .child(new ButtonWidget<>()
+                                        .overlay(Text.str("OUT"))
+                                        .onMousePressed((context, button) -> {
+                                                    if (level.isClientSide) {
+                                                        int x = 999;
+                                                        if (button == 0 || button == 1) {
+                                                            PacketDistributor.sendToServer(
+                                                                    new ArmClickPayload(
+                                                                            this.getBlockPos(),
+                                                                            configSchemaWidget.blockHitResult.getBlockPos().offset(this.getBlockPos()),
+                                                                            configSchemaWidget.blockHitResult.getDirection(),
+                                                                            ArmClickPayload.Configuration.TARGET
+                                                                    ));
+                                                            return true;
+                                                        }
+                                                        return false;
+                                                    }
+                                                    return true;
+                                                }
+                                        )
+                                        .size(3 * 16, 16))
                                 .coverChildren())
+                        .child(ButtonWidget.panelCloseButton())
                         .draggable(true)
                         .disablePanelsBelow(true)
                         .relative(panel)
@@ -322,29 +397,37 @@ public class ArmEntity extends BlockEntity implements BlockEntityTicker<ArmEntit
                         .rightRel(1f)
                         .coverChildren()
                         .closeOnOutOfBoundsClick(true));
-
+        panel.child(ButtonWidget.panelCloseButton());
         return panel;
     }
+
+
 
     static class ConfigSchemaWidget extends SchemaWidget {
         ModularPanel<?> panel;
         PanelSyncManager syncManager;
+        BlockHitResult blockHitResult;
         public ConfigSchemaWidget(SchemaRenderer renderer, ModularPanel<?> panel, PanelSyncManager syncManager) {
             super(renderer);
             this.panel = panel;
             this.syncManager = syncManager;
+            this.blockHitResult = null;
         }
 
         @Override
         public @NotNull Result onMousePressed(int button) {
             if (getSchemaRenderer().lastRayTrace().getType() == HitResult.Type.BLOCK) {
-
+                blockHitResult = getSchemaRenderer().lastRayTrace();
                 IPanelHandler colorPicker1 = syncManager.findPanelHandler("clicked");
                 colorPicker1.openPanel();
 
                 return Result.SUCCESS;
             }
             return super.onMousePressed(button);
+        }
+
+        public BlockHitResult getBlockHitResult() {
+            return blockHitResult;
         }
     }
 
@@ -359,6 +442,4 @@ public class ArmEntity extends BlockEntity implements BlockEntityTicker<ArmEntit
             level.markAndNotifyBlock(worldPosition, level.getChunkAt(worldPosition), getBlockState(), getBlockState(), 3, 3);
         }
     }
-
-    
 }
