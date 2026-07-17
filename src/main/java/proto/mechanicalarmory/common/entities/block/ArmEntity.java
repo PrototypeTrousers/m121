@@ -310,11 +310,11 @@ public class ArmEntity extends BlockEntity implements BlockEntityTicker<ArmEntit
         syncManager.syncValue("slot", slot);
 
         syncManager.syncedPanel("clicked", true, (mainPanel, player) ->
-                new Dialog<>("slot_panel")
-                        .child(
-                                new ListWidget<>()
-                                        .child(Text.str("hah").asWidget())
-                        )
+                new ModularPanel<>("clicked2")
+                        .child(new ListWidget<>()
+                                .child(Text.str("hah").asWidget().size(128,16))
+                                .child(Text.str("hah2").asWidget().size(128,16))
+                                .coverChildren())
                         .draggable(true)
                         .disablePanelsBelow(true)
                         .relative(panel)
