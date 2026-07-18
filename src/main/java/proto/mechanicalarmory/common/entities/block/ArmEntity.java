@@ -346,45 +346,22 @@ public class ArmEntity extends BlockEntity implements BlockEntityTicker<ArmEntit
         syncManager.syncedPanel("clicked", true, (mainPanel, player) ->
                 new ModularPanel<>("clicked2")
                         .child(new ListWidget<>()
-                                .child(new ButtonWidget<>()
-                                        .overlay(Text.str("IN"))
+                                .children(buttons, b -> new ButtonWidget<>()
+                                        .overlay(Text.str(b.key))
                                         .onMousePressed((context, button) -> {
                                                     if (level.isClientSide) {
-                                                        int x = 999;
                                                         if (button == 0 || button == 1) {
                                                             PacketDistributor.sendToServer(
                                                                     new ArmClickPayload(
                                                                             this.getBlockPos(),
                                                                             configSchemaWidget.blockHitResult.getBlockPos().offset(this.getBlockPos()),
                                                                             configSchemaWidget.blockHitResult.getDirection(),
-                                                                            ArmClickPayload.Configuration.SOURCE
+                                                                            b.configuration
                                                                     ));
                                                             return true;
                                                         }
-                                                        return false;
                                                     }
-                                                    return true;
-                                                }
-                                        )
-                                        .size(3 * 16, 16))
-                                .child(new ButtonWidget<>()
-                                        .overlay(Text.str("OUT"))
-                                        .onMousePressed((context, button) -> {
-                                                    if (level.isClientSide) {
-                                                        int x = 999;
-                                                        if (button == 0 || button == 1) {
-                                                            PacketDistributor.sendToServer(
-                                                                    new ArmClickPayload(
-                                                                            this.getBlockPos(),
-                                                                            configSchemaWidget.blockHitResult.getBlockPos().offset(this.getBlockPos()),
-                                                                            configSchemaWidget.blockHitResult.getDirection(),
-                                                                            ArmClickPayload.Configuration.TARGET
-                                                                    ));
-                                                            return true;
-                                                        }
-                                                        return false;
-                                                    }
-                                                    return true;
+                                                    return false;
                                                 }
                                         )
                                         .size(3 * 16, 16))
@@ -401,7 +378,12 @@ public class ArmEntity extends BlockEntity implements BlockEntityTicker<ArmEntit
         return panel;
     }
 
+    static Button IN_BUTTON = new Button("IN", ArmClickPayload.Configuration.SOURCE);
+    static Button OUT_BUTTON = new Button("OUT", ArmClickPayload.Configuration.TARGET);
 
+    static List<Button> buttons = List.of(IN_BUTTON, OUT_BUTTON);
+
+    record Button(String key, ArmClickPayload.Configuration configuration){}
 
     static class ConfigSchemaWidget extends SchemaWidget {
         ModularPanel<?> panel;
