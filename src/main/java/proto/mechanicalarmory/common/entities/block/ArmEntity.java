@@ -5,6 +5,7 @@ import brachy.modularui.api.IUIHolder;
 import brachy.modularui.api.drawable.Text;
 import brachy.modularui.drawable.SchemaRenderer;
 import brachy.modularui.drawable.schema.BlockHighlight;
+import brachy.modularui.drawable.schema.RenderFilter;
 import brachy.modularui.drawable.schema.SchemaLevel;
 import brachy.modularui.factory.PosGuiData;
 import brachy.modularui.screen.ModularPanel;
@@ -209,7 +210,11 @@ public class ArmEntity extends BlockEntity implements BlockEntityTicker<ArmEntit
         }
         if (workStatus.getType() == ActionTypes.IDLING) {
             if (hasInput() && hasOutput()) {
-                updateWorkStatus(ActionTypes.MOVEMENT, RETRIEVE);
+                if (this.itemHandler.getStackInSlot(0).isEmpty()) {
+                    updateWorkStatus(ActionTypes.MOVEMENT, RETRIEVE);
+                } else {
+                    updateWorkStatus(ActionTypes.MOVEMENT, DELIVER);
+                }
             }
         } else if (workStatus.getType() == ActionTypes.MOVEMENT) {
             if (workStatus.getAction() == RETRIEVE) {
@@ -299,31 +304,22 @@ public class ArmEntity extends BlockEntity implements BlockEntityTicker<ArmEntit
     public ModularPanel<?> buildUI(PosGuiData data, PanelSyncManager syncManager, UISettings settings) {
         ModularPanel<?> panel = new ModularPanel<>("arm");
 
-
-        SchemaLevel sl = new SchemaLevel();
-
-        panel.onCloseAction(() -> {
-            if (sl.hasFilledBlocks()) {
-                sl.getFilledBlocks().forEach(b -> {
-                            sl.setBlock(b, Blocks.AIR.defaultBlockState(), 0);
-                        }
-                );
-            }
-        });
-
-        int r = 5;
-        var blocks = getAllInside(getBlockPos().offset(-r, -r, -r), getBlockPos().offset(r, r, r), false);
-        for (BlockPos blockPos : blocks) {
-            sl.setBlock(blockPos.subtract(this.getBlockPos()), level.getBlockState(blockPos), 0);
-        }
-
-        var schema = BoxSchema2.of(sl, BlockPos.ZERO, 5);
+        var schema = BoxSchema2.of(this.level, this.getBlockPos(), 5);
 
         SchemaRenderer renderer;
         ConfigSchemaWidget configSchemaWidget;
 
         if (level.isClientSide) {
             renderer = schema.createRenderer();
+            renderer.updateRenderFilter(new RenderFilter() {
+                @Override
+                public boolean shouldRender(BlockPos checkPos, BlockState state) {
+                    return
+                            checkPos.getX() >= schema.getMin().getX() && checkPos.getX() <= schema.getMax().getX() &&
+                                    checkPos.getY() >= schema.getMin().getY() && checkPos.getY() <= schema.getMax().getY() &&
+                                    checkPos.getZ() >= schema.getMin().getZ() && checkPos.getZ() <= schema.getMax().getZ();
+                }
+            });
             renderer.highlightRenderer(new BlockHighlight(Color.withAlpha(Color.RED.main, 0.5f))
                     .allSides(false)
                     .thickness(0.1f));
@@ -354,7 +350,7 @@ public class ArmEntity extends BlockEntity implements BlockEntityTicker<ArmEntit
                                                             PacketDistributor.sendToServer(
                                                                     new ArmClickPayload(
                                                                             this.getBlockPos(),
-                                                                            configSchemaWidget.blockHitResult.getBlockPos().offset(this.getBlockPos()),
+                                                                            configSchemaWidget.blockHitResult.getBlockPos(),
                                                                             configSchemaWidget.blockHitResult.getDirection(),
                                                                             b.configuration
                                                                     ));
