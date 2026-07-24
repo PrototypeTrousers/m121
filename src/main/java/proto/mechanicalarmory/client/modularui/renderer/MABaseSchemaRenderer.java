@@ -17,7 +17,6 @@ import com.mojang.blaze3d.platform.Window;
 import com.mojang.blaze3d.shaders.FogShape;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.*;
-import it.unimi.dsi.fastutil.objects.Reference2ObjectArrayMap;
 import it.unimi.dsi.fastutil.objects.Reference2ObjectLinkedOpenHashMap;
 import lombok.Getter;
 import lombok.Setter;
@@ -27,19 +26,20 @@ import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.renderer.*;
 import net.minecraft.client.renderer.block.ModelBlockRenderer;
 import net.minecraft.client.renderer.texture.OverlayTexture;
-import net.minecraft.client.renderer.texture.TextureAtlas;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.client.resources.model.BakedModel;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.SectionPos;
 import net.minecraft.util.Mth;
 import net.minecraft.util.RandomSource;
+import net.minecraft.world.entity.Entity;
 import net.minecraft.world.level.ClipContext;
 import net.minecraft.world.level.block.RenderShape;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.lighting.LevelLightEngine;
 import net.minecraft.world.level.material.FluidState;
+import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
@@ -52,6 +52,7 @@ import org.joml.Matrix4f;
 import org.joml.Matrix4fStack;
 import org.joml.Vector3f;
 import org.lwjgl.opengl.GL11;
+import proto.mechanicalarmory.client.mixin.BufferSourceAccessor;
 import proto.mechanicalarmory.client.modularui.widgets.MASchemaWidget;
 
 import java.util.*;
@@ -74,8 +75,8 @@ import java.util.*;
 public class MABaseSchemaRenderer implements IDrawable {
 
     // Shared across all renderers — no per-instance allocation needed
-    private static final brachy.modularui.drawable.schema.DummyLightTexture LIGHT_TEXTURE =
-            new brachy.modularui.drawable.schema.DummyLightTexture();
+    private static final DummyLightTexture LIGHT_TEXTURE =
+            new DummyLightTexture();
 
     // -----------------------------------------------------------------------
     // State
@@ -87,6 +88,7 @@ public class MABaseSchemaRenderer implements IDrawable {
     @Getter private final Camera camera = new Camera();
     @Getter private BlockHitResult lastRayTrace = null;
     @Getter private RenderFilter renderFilter = RenderFilter.ALL;
+    private RenderBuffers rb = new RenderBuffers(Runtime.getRuntime().availableProcessors());
 
     /** Set to {@code true} to force a synchronous recompile on the next rendered frame. */
     private volatile boolean dirty = true;
@@ -95,6 +97,7 @@ public class MABaseSchemaRenderer implements IDrawable {
     // Compiled GPU buffers — keyed only for render types that actually have geometry.
     private final Map<RenderType, VertexBuffer> vertexBuffers = new Reference2ObjectLinkedOpenHashMap<>();
     private final List<BlockEntity> compiledBlockEntities = new ArrayList<>();
+    private final List<Entity> entities = new ArrayList<>();
     private final Set<TextureAtlasSprite> activeFluidSprites = new HashSet<>();
 
     // Reused across recompile calls to avoid repeated large allocations.
@@ -192,12 +195,12 @@ public class MABaseSchemaRenderer implements IDrawable {
     private void recompileNow() {
         clearVertexBuffers();
         compiledBlockEntities.clear();
+        entities.clear();
         activeFluidSprites.clear();
 
         var dispatcher = Minecraft.getInstance().getBlockRenderer();
         var random = RandomSource.create();
         var poseStack = new PoseStack();
-        Map<RenderType, BufferBuilder> builders = new Reference2ObjectArrayMap<>(RenderType.chunkBufferLayers().size());
 
         ModelBlockRenderer.enableCaching();
         for (var entry : this.schema) {
@@ -217,8 +220,7 @@ public class MABaseSchemaRenderer implements IDrawable {
             // ---- fluids ----
             if (!fluid.isEmpty()) {
                 RenderType rt = ItemBlockRenderTypes.getRenderLayer(fluid);
-                BufferBuilder builder = getOrBeginLayer(builders, rt);
-                dispatcher.renderLiquid(pos, this.renderLevel, new LiquidVertexConsumer(builder, SectionPos.of(pos)), state, fluid);
+                dispatcher.renderLiquid(pos, this.renderLevel, new LiquidVertexConsumer(rb.bufferSource().getBuffer(rt), SectionPos.of(pos)), state, fluid);
                 // track sprites for Sodium compat
                 var props = IClientFluidTypeExtensions.of(fluid);
                 activeFluidSprites.add(FluidTextureType.STILL.map(props));
@@ -236,16 +238,28 @@ public class MABaseSchemaRenderer implements IDrawable {
                 for (RenderType rt : model.getRenderTypes(state, random, modelData)) {
                     poseStack.pushPose();
                     poseStack.translate(pos.getX(), pos.getY(), pos.getZ());
-                    dispatcher.renderBatched(state, pos, this.renderLevel, poseStack, getOrBeginLayer(builders, rt), true, random, modelData, rt);
+                    dispatcher.renderBatched(state, pos, this.renderLevel, poseStack, rb.bufferSource().getBuffer(rt), true, random, modelData, rt);
                     poseStack.popPose();
                 }
             }
         }
+
+        Vector3f min = new Vector3f();
+        Vector3f max = new Vector3f();
+
+        for (var e : this.schema) {
+            BlockPos pos = e.getKey();
+            min.min(Vec3.atLowerCornerOf(pos).toVector3f());
+            max.max(Vec3.atLowerCornerOf(pos).toVector3f());
+        }
+
+        entities.addAll(schema.getLevel().getEntities((Entity) null, new AABB(min.x, min.y, min.z, max.x, max.y, max.z), Entity::isAlive));
+
         ModelBlockRenderer.clearCache();
 
         // Build MeshData and upload to VertexBuffer — all on the render thread, so no
         // RenderSystem.recordRenderCall indirection is needed.
-        builders.forEach((rt, builder) -> {
+        ((BufferSourceAccessor) rb.bufferSource()).getStartedBuilders().forEach((rt, builder) -> {
             MeshData mesh = builder.build();
             if (mesh == null) return;
             if (rt == RenderType.translucent()) {
@@ -261,11 +275,6 @@ public class MABaseSchemaRenderer implements IDrawable {
 
         sectionBufferBuilders.clearAll(); // reset byte buffers for next recompile
         onRendered();
-    }
-
-    private BufferBuilder getOrBeginLayer(Map<RenderType, BufferBuilder> builders, RenderType rt) {
-        return builders.computeIfAbsent(rt, type ->
-                new BufferBuilder(sectionBufferBuilders.buffer(type), VertexFormat.Mode.QUADS, DefaultVertexFormat.BLOCK));
     }
 
     private void clearVertexBuffers() {
@@ -303,37 +312,46 @@ public class MABaseSchemaRenderer implements IDrawable {
         RenderSystem.clear(GL11.GL_DEPTH_BUFFER_BIT, Minecraft.ON_OSX);
 
         RenderSystem.runAsFancy(() -> {
-            renderLayer(RenderType.solid());
-            Minecraft.getInstance().getModelManager().getAtlas(TextureAtlas.LOCATION_BLOCKS)
-                    .setBlurMipmap(false, Minecraft.getInstance().options.mipmapLevels().get() > 0);
-            renderLayer(RenderType.cutoutMipped());
-            Minecraft.getInstance().getModelManager().getAtlas(TextureAtlas.LOCATION_BLOCKS).restoreLastBlurMipmap();
-            renderLayer(RenderType.cutout());
 
-            bufferSource.endBatch(RenderType.entitySolid(TextureAtlas.LOCATION_BLOCKS));
-            bufferSource.endBatch(RenderType.entityCutout(TextureAtlas.LOCATION_BLOCKS));
-            bufferSource.endBatch(RenderType.entityCutoutNoCull(TextureAtlas.LOCATION_BLOCKS));
-            bufferSource.endBatch(RenderType.entitySmoothCutout(TextureAtlas.LOCATION_BLOCKS));
+            vertexBuffers.forEach((renderType, vertexBuffer) -> {
+                renderLayer(renderType);
+            });
+
+            var entityDispatcher = Minecraft.getInstance().getEntityRenderDispatcher();
+            PoseStack poseStack = new PoseStack();
+
+            for (Entity entity : entities) {
+                poseStack.pushPose();
+                double d0 = Mth.lerp(partialTick, entity.xOld, entity.getX());
+                double d1 = Mth.lerp(partialTick, entity.yOld, entity.getY());
+                double d2 = Mth.lerp(partialTick, entity.zOld, entity.getZ());
+                float f = Mth.lerp(partialTick, entity.yRotO, entity.getYRot());
+
+                entityDispatcher
+                        .render(
+                                entity,
+                                d0,
+                                d1,
+                                d2,
+                                f,
+                                partialTick,
+                                poseStack,
+                                Minecraft.getInstance().renderBuffers().bufferSource(),
+                                entityDispatcher.getPackedLightCoords(entity, partialTick)
+                        );
+                poseStack.popPose();
+            }
 
             if (isBEREnabled()) renderBlockEntities(bufferSource, partialTick);
 
-            bufferSource.endBatch(RenderType.solid());
-            bufferSource.endBatch(RenderType.endPortal());
-            bufferSource.endBatch(RenderType.endGateway());
-            bufferSource.endBatch(Sheets.solidBlockSheet());
-            bufferSource.endBatch(Sheets.cutoutBlockSheet());
-            bufferSource.endBatch(Sheets.bedSheet());
-            bufferSource.endBatch(Sheets.shulkerBoxSheet());
-            bufferSource.endBatch(Sheets.signSheet());
-            bufferSource.endBatch(Sheets.hangingSignSheet());
-            bufferSource.endBatch(Sheets.chestSheet());
-            bufferSource.endBatch(Sheets.translucentCullBlockSheet());
-            bufferSource.endBatch(Sheets.bannerSheet());
-            bufferSource.endBatch(Sheets.shieldSheet());
-            bufferSource.endLastBatch();
-
             renderLayer(RenderType.translucent());
             renderLayer(RenderType.tripwire());
+
+            List<RenderType> rts = new ArrayList<>(((BufferSourceAccessor)bufferSource).getStartedBuilders().keySet());
+            for (RenderType rt : rts) {
+                bufferSource.endBatch(rt);
+            }
+            bufferSource.endLastBatch();
 
             if (this.captureDebugInfo) drawBlockOutlines(bufferSource);
         });
@@ -491,8 +509,7 @@ public class MABaseSchemaRenderer implements IDrawable {
     }
 
     public PoseStack createWorldRenderPose() {
-        var ps = new PoseStack();
-        return ps;
+        return new PoseStack();
     }
 
     public Vector3f screenToOpenGLPos(int x, int y, int width, int height, Vector3f dest) {
