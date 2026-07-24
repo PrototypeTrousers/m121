@@ -327,6 +327,9 @@ public class MABaseSchemaRenderer implements IDrawable {
             bufferSource.endBatch(Sheets.signSheet());
             bufferSource.endBatch(Sheets.hangingSignSheet());
             bufferSource.endBatch(Sheets.chestSheet());
+            bufferSource.endBatch(Sheets.translucentCullBlockSheet());
+            bufferSource.endBatch(Sheets.bannerSheet());
+            bufferSource.endBatch(Sheets.shieldSheet());
             bufferSource.endLastBatch();
 
             renderLayer(RenderType.translucent());
