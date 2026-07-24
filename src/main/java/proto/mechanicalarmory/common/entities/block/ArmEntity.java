@@ -3,7 +3,6 @@ package proto.mechanicalarmory.common.entities.block;
 import brachy.modularui.api.IPanelHandler;
 import brachy.modularui.api.IUIHolder;
 import brachy.modularui.api.drawable.Text;
-import brachy.modularui.drawable.SchemaRenderer;
 import brachy.modularui.drawable.schema.BlockHighlight;
 import brachy.modularui.drawable.schema.RenderFilter;
 import brachy.modularui.factory.PosGuiData;
@@ -16,8 +15,9 @@ import brachy.modularui.value.sync.PanelSyncHandler;
 import brachy.modularui.value.sync.PanelSyncManager;
 import brachy.modularui.widgets.ButtonWidget;
 import brachy.modularui.widgets.ListWidget;
-import brachy.modularui.widgets.SchemaWidget;
 import it.unimi.dsi.fastutil.Pair;
+import proto.mechanicalarmory.client.modularui.renderer.MASchemaRenderer;
+import proto.mechanicalarmory.client.modularui.widgets.MASchemaWidget;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.HolderLookup;
@@ -304,11 +304,11 @@ public class ArmEntity extends BlockEntity implements BlockEntityTicker<ArmEntit
 
         var schema = BoxSchema2.of(this.level, this.getBlockPos(), 5);
 
-        SchemaRenderer renderer;
+        MASchemaRenderer renderer;
         ConfigSchemaWidget configSchemaWidget;
 
         if (level.isClientSide) {
-            renderer = schema.createRenderer();
+            renderer = schema.createMARenderer();
             renderer.updateRenderFilter((checkPos, state) -> checkPos.getX() >= schema.getMin().getX() && checkPos.getX() <= schema.getMax().getX() &&
                     checkPos.getY() >= schema.getMin().getY() && checkPos.getY() <= schema.getMax().getY() &&
                     checkPos.getZ() >= schema.getMin().getZ() && checkPos.getZ() <= schema.getMax().getZ());
@@ -375,11 +375,11 @@ public class ArmEntity extends BlockEntity implements BlockEntityTicker<ArmEntit
 
     record Button(String key, ArmClickPayload.Configuration configuration){}
 
-    static class ConfigSchemaWidget extends SchemaWidget {
+    static class ConfigSchemaWidget extends MASchemaWidget {
         ModularPanel<?> panel;
         PanelSyncManager syncManager;
         BlockHitResult blockHitResult;
-        public ConfigSchemaWidget(SchemaRenderer renderer, ModularPanel<?> panel, PanelSyncManager syncManager) {
+        public ConfigSchemaWidget(MASchemaRenderer renderer, ModularPanel<?> panel, PanelSyncManager syncManager) {
             super(renderer);
             this.panel = panel;
             this.syncManager = syncManager;

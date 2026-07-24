@@ -8,6 +8,7 @@ import net.minecraft.world.level.Level;
 import org.joml.Vector3f;
 import org.joml.Vector3fc;
 import proto.mechanicalarmory.client.modularui.Utils;
+import proto.mechanicalarmory.client.modularui.renderer.MASchemaRenderer;
 
 public class BoxSchema2 extends PosListSchema {
         public static BoxSchema2 of(Level level, BlockPos center, int r) {
@@ -36,6 +37,16 @@ public class BoxSchema2 extends PosListSchema {
     @Override
     public BlockPos getOrigin() {
         return min;
+    }
+
+    /**
+     * Creates a Mechanical Armory renderer for this schema.
+     * Use this instead of {@link #createRenderer()} anywhere in MA code so that
+     * the returned renderer is typed as {@link MASchemaRenderer} and gives access
+     * to the full MA fluent API without any casting.
+     */
+    public MASchemaRenderer createMARenderer() {
+        return new MASchemaRenderer(this);
     }
 
     @Override
