@@ -75,6 +75,8 @@ public class BytecodeDualSlicer {
     }
 
     public static SliceResult slice(String owner, MethodNode method) throws AnalyzerException {
+        // Ensure maxStack is sufficiently large for ASM Analyzer after inlining and transformations
+        method.maxStack = Math.max(method.maxStack, 128);
         DependencyGraphInterpreter interpreter = new DependencyGraphInterpreter();
         Analyzer<SourceValue> analyzer = new Analyzer<>(interpreter);
         Frame<SourceValue>[] frames = analyzer.analyze(owner, method);

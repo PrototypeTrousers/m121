@@ -26,6 +26,17 @@ public class RuntimeVisualGenerator {
         
         String generatedName = originalClassName.replace('/', '_') + "_FlywheelVisual";
         
+        String beInternalName = "net/minecraft/world/level/block/entity/BlockEntity";
+        for (MethodNode mn : originalClassNode.methods) {
+            if (mn.name.equals("render") && (mn.desc.contains("MultiBufferSource") || mn.desc.contains("PoseStack"))) {
+                org.objectweb.asm.Type[] args = org.objectweb.asm.Type.getArgumentTypes(mn.desc);
+                if (args.length > 0 && args[0].getSort() == org.objectweb.asm.Type.OBJECT) {
+                    beInternalName = args[0].getInternalName();
+                    break;
+                }
+            }
+        }
+        
         // public class GeneratedVisual extends AbstractBlockEntityVisual implements SimpleTickableVisual, SimpleDynamicVisual
         cw.visit(Opcodes.V17, Opcodes.ACC_PUBLIC, generatedName, null, "dev/engine_room/flywheel/lib/visual/AbstractBlockEntityVisual", new String[]{"dev/engine_room/flywheel/lib/visual/SimpleTickableVisual", "dev/engine_room/flywheel/lib/visual/SimpleDynamicVisual"});
 
@@ -44,11 +55,13 @@ public class RuntimeVisualGenerator {
         // 1.5. Find all ModelPart GETFIELDs in the animation slice
         Set<String> dummyParts = new HashSet<>();
         for (AbstractInsnNode insn : slices.animationSlice) {
-            if (insn.getOpcode() == Opcodes.GETFIELD) {
-                FieldInsnNode fin = (FieldInsnNode) insn;
-                if (fin.desc.equals("Lnet/minecraft/client/model/geom/ModelPart;")) {
-                    dummyParts.add(fin.name);
-                }
+            if (insn instanceof FieldInsnNode fin && fin.desc.equals("Lnet/minecraft/client/model/geom/ModelPart;")) {
+                dummyParts.add(fin.name);
+            } else if (insn instanceof MethodInsnNode min && min.desc.endsWith("Lnet/minecraft/client/model/geom/ModelPart;")) {
+                String partName = min.name.startsWith("get") && min.name.length() > 3 
+                    ? Character.toLowerCase(min.name.charAt(3)) + min.name.substring(4) 
+                    : min.name;
+                dummyParts.add(partName);
             }
         }
         
@@ -138,8 +151,8 @@ public class RuntimeVisualGenerator {
             mvInit.visitVarInsn(Opcodes.ALOAD, 0);
             mvInit.visitFieldInsn(Opcodes.GETFIELD, "dev/engine_room/flywheel/lib/visual/AbstractBlockEntityVisual", "blockEntity", "Lnet/minecraft/world/level/block/entity/BlockEntity;");
             
-            // MaterialHelper.createModelTree(ModelLayerLocation, BlockEntity)
-            mvInit.visitMethodInsn(Opcodes.INVOKESTATIC, "proto/mechanicalarmory/client/flywheel/slicer/MaterialHelper", "createModelTree", "(Lnet/minecraft/client/model/geom/ModelLayerLocation;Lnet/minecraft/world/level/block/entity/BlockEntity;)Ldev/engine_room/flywheel/lib/model/part/ModelTree;", false);
+            // generatedName.createModelTree(ModelLayerLocation, BlockEntity)
+            mvInit.visitMethodInsn(Opcodes.INVOKESTATIC, generatedName, "createModelTree", "(Lnet/minecraft/client/model/geom/ModelLayerLocation;Lnet/minecraft/world/level/block/entity/BlockEntity;)Ldev/engine_room/flywheel/lib/model/part/ModelTree;", false);
             
             // InstanceTree.create(instancerProvider, modelTree)
             mvInit.visitVarInsn(Opcodes.ALOAD, 0); 
@@ -171,7 +184,9 @@ public class RuntimeVisualGenerator {
             mvInit.visitFieldInsn(Opcodes.PUTFIELD, generatedName, "dummy_" + partName, "Lproto/mechanicalarmory/client/flywheel/slicer/DummyModelPart;");
             
             String childName = fieldToChildName.get(partName);
+            if (childName == null) childName = partName;
             String layerField = fieldToLayerField.get(partName);
+            if (layerField == null && !uniqueLayerFields.isEmpty()) layerField = uniqueLayerFields.iterator().next();
             if (childName != null && layerField != null) {
                 mvInit.visitVarInsn(Opcodes.ALOAD, 0); // this
                 
@@ -206,6 +221,9 @@ public class RuntimeVisualGenerator {
                 if (vin.var == 1 && vin.getOpcode() == Opcodes.ALOAD) {
                     mvTick.visitVarInsn(Opcodes.ALOAD, 0); // this
                     mvTick.visitFieldInsn(Opcodes.GETFIELD, "dev/engine_room/flywheel/lib/visual/AbstractBlockEntityVisual", "blockEntity", "Lnet/minecraft/world/level/block/entity/BlockEntity;");
+                    if (!"net/minecraft/world/level/block/entity/BlockEntity".equals(beInternalName)) {
+                        mvTick.visitTypeInsn(Opcodes.CHECKCAST, beInternalName);
+                    }
                     continue; // Skip the original ALOAD 1
                 }
                 if (vin.var == 2 && vin.getOpcode() == Opcodes.FLOAD) {
@@ -275,8 +293,17 @@ public class RuntimeVisualGenerator {
                 } else if (fin.owner.equals("net/minecraft/client/model/geom/ModelPart")) {
                     mvUpdate.visitFieldInsn(Opcodes.GETFIELD, "proto/mechanicalarmory/client/flywheel/slicer/DummyModelPart", fin.name, fin.desc);
                 } else {
-                    insn.accept(mvUpdate);
+                    mvUpdate.visitInsn(Opcodes.POP);
+                    mvUpdate.visitInsn(Opcodes.ACONST_NULL);
                 }
+            } else if (insn instanceof MethodInsnNode min && min.desc.endsWith("Lnet/minecraft/client/model/geom/ModelPart;")) {
+                String partName = min.name.startsWith("get") && min.name.length() > 3 
+                    ? Character.toLowerCase(min.name.charAt(3)) + min.name.substring(4) 
+                    : min.name;
+                mvUpdate.visitVarInsn(Opcodes.ALOAD, 0);
+                mvUpdate.visitFieldInsn(Opcodes.GETFIELD, generatedName, "dummy_" + partName, "Lproto/mechanicalarmory/client/flywheel/slicer/DummyModelPart;");
+                mvUpdate.visitInsn(Opcodes.SWAP);
+                mvUpdate.visitInsn(Opcodes.POP);
             } else if (insn.getOpcode() == Opcodes.PUTFIELD) {
                 FieldInsnNode fin = (FieldInsnNode) insn;
                 if (fin.owner.equals("net/minecraft/client/model/geom/ModelPart")) {
@@ -289,6 +316,9 @@ public class RuntimeVisualGenerator {
                     if (vin.var == 1 && vin.getOpcode() == Opcodes.ALOAD) {
                         mvUpdate.visitVarInsn(Opcodes.ALOAD, 0);
                         mvUpdate.visitFieldInsn(Opcodes.GETFIELD, "dev/engine_room/flywheel/lib/visual/AbstractBlockEntityVisual", "blockEntity", "Lnet/minecraft/world/level/block/entity/BlockEntity;");
+                        if (!"net/minecraft/world/level/block/entity/BlockEntity".equals(beInternalName)) {
+                            mvUpdate.visitTypeInsn(Opcodes.CHECKCAST, beInternalName);
+                        }
                         continue;
                     }
                     if (vin.var == 2 && vin.getOpcode() == Opcodes.FLOAD) {
@@ -415,6 +445,9 @@ public class RuntimeVisualGenerator {
         mvDelete.visitMaxs(0, 0);
         mvDelete.visitEnd();
 
+        // 7. Generate createModelTree helper method via ASM
+        generateMaterialResolverMethod(cw, detectMaterialStrategy(originalClassNode));
+
         cw.visitEnd();
         byte[] bytes = cw.toByteArray();
         
@@ -425,5 +458,171 @@ public class RuntimeVisualGenerator {
         }
         
         return bytes;
+    }
+
+    private enum MaterialStrategy {
+        CHEST, BED, SHULKER, FALLBACK
+    }
+
+    private static MaterialStrategy detectMaterialStrategy(org.objectweb.asm.tree.ClassNode rendererClassNode) {
+        for (org.objectweb.asm.tree.MethodNode mn : rendererClassNode.methods) {
+            for (AbstractInsnNode insn : mn.instructions) {
+                if (insn.getOpcode() == Opcodes.INVOKESTATIC || insn.getOpcode() == Opcodes.INVOKEVIRTUAL) {
+                    MethodInsnNode min = (MethodInsnNode) insn;
+                    if ("chooseMaterial".equals(min.name) && min.owner.contains("Sheets")) return MaterialStrategy.CHEST;
+                } else if (insn.getOpcode() == Opcodes.GETSTATIC) {
+                    FieldInsnNode fin = (FieldInsnNode) insn;
+                    if ("BED_TEXTURES".equals(fin.name)) return MaterialStrategy.BED;
+                    if ("SHULKER_TEXTURE_LOCATION".equals(fin.name) || "DEFAULT_SHULKER_TEXTURE_LOCATION".equals(fin.name)) return MaterialStrategy.SHULKER;
+                }
+            }
+        }
+        String name = rendererClassNode.name.toLowerCase();
+        if (name.contains("chest")) return MaterialStrategy.CHEST;
+        if (name.contains("bed")) return MaterialStrategy.BED;
+        if (name.contains("shulker")) return MaterialStrategy.SHULKER;
+        return MaterialStrategy.FALLBACK;
+    }
+
+    private static void generateMaterialResolverMethod(ClassWriter cw, MaterialStrategy strategy) {
+        MethodVisitor mv = cw.visitMethod(Opcodes.ACC_PRIVATE | Opcodes.ACC_STATIC, "createModelTree", "(Lnet/minecraft/client/model/geom/ModelLayerLocation;Lnet/minecraft/world/level/block/entity/BlockEntity;)Ldev/engine_room/flywheel/lib/model/part/ModelTree;", null, null);
+        mv.visitCode();
+        switch (strategy) {
+            case CHEST -> generateChestMaterialResolver(mv);
+            case BED -> generateBedMaterialResolver(mv);
+            case SHULKER -> generateShulkerMaterialResolver(mv);
+            case FALLBACK -> generateFallbackMaterialResolver(mv);
+        }
+        mv.visitMaxs(0, 0);
+        mv.visitEnd();
+    }
+
+    private static void generateChestMaterialResolver(MethodVisitor mv) {
+        mv.visitFieldInsn(Opcodes.GETSTATIC, "net/minecraft/world/level/block/state/properties/ChestType", "SINGLE", "Lnet/minecraft/world/level/block/state/properties/ChestType;");
+        mv.visitVarInsn(Opcodes.ASTORE, 2);
+        mv.visitVarInsn(Opcodes.ALOAD, 0);
+        mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "net/minecraft/client/model/geom/ModelLayerLocation", "getModel", "()Lnet/minecraft/resources/ResourceLocation;", false);
+        mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "net/minecraft/resources/ResourceLocation", "getPath", "()Ljava/lang/String;", false);
+        mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/lang/String", "toLowerCase", "()Ljava/lang/String;", false);
+        mv.visitVarInsn(Opcodes.ASTORE, 3);
+        org.objectweb.asm.Label l3 = new org.objectweb.asm.Label();
+        mv.visitVarInsn(Opcodes.ALOAD, 3);
+        mv.visitLdcInsn("left");
+        mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/lang/String", "contains", "(Ljava/lang/CharSequence;)Z", false);
+        mv.visitJumpInsn(Opcodes.IFEQ, l3);
+        mv.visitFieldInsn(Opcodes.GETSTATIC, "net/minecraft/world/level/block/state/properties/ChestType", "LEFT", "Lnet/minecraft/world/level/block/state/properties/ChestType;");
+        mv.visitVarInsn(Opcodes.ASTORE, 2);
+        org.objectweb.asm.Label l5 = new org.objectweb.asm.Label();
+        mv.visitJumpInsn(Opcodes.GOTO, l5);
+        mv.visitLabel(l3);
+        mv.visitVarInsn(Opcodes.ALOAD, 3);
+        mv.visitLdcInsn("right");
+        mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/lang/String", "contains", "(Ljava/lang/CharSequence;)Z", false);
+        mv.visitJumpInsn(Opcodes.IFEQ, l5);
+        mv.visitFieldInsn(Opcodes.GETSTATIC, "net/minecraft/world/level/block/state/properties/ChestType", "RIGHT", "Lnet/minecraft/world/level/block/state/properties/ChestType;");
+        mv.visitVarInsn(Opcodes.ASTORE, 2);
+        mv.visitLabel(l5);
+        mv.visitVarInsn(Opcodes.ALOAD, 1);
+        mv.visitVarInsn(Opcodes.ALOAD, 2);
+        mv.visitInsn(Opcodes.ICONST_0);
+        mv.visitMethodInsn(Opcodes.INVOKESTATIC, "net/minecraft/client/renderer/Sheets", "chooseMaterial", "(Lnet/minecraft/world/level/block/entity/BlockEntity;Lnet/minecraft/world/level/block/state/properties/ChestType;Z)Lnet/minecraft/client/resources/model/Material;", false);
+        mv.visitVarInsn(Opcodes.ASTORE, 4);
+        mv.visitMethodInsn(Opcodes.INVOKESTATIC, "dev/engine_room/flywheel/lib/material/SimpleMaterial", "builder", "()Ldev/engine_room/flywheel/lib/material/SimpleMaterial$Builder;", false);
+        mv.visitFieldInsn(Opcodes.GETSTATIC, "dev/engine_room/flywheel/api/material/CardinalLightingMode", "ENTITY", "Ldev/engine_room/flywheel/api/material/CardinalLightingMode;");
+        mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "dev/engine_room/flywheel/lib/material/SimpleMaterial$Builder", "cardinalLightingMode", "(Ldev/engine_room/flywheel/api/material/CardinalLightingMode;)Ldev/engine_room/flywheel/lib/material/SimpleMaterial$Builder;", false);
+        mv.visitVarInsn(Opcodes.ALOAD, 4);
+        mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "net/minecraft/client/resources/model/Material", "atlasLocation", "()Lnet/minecraft/resources/ResourceLocation;", false);
+        mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "dev/engine_room/flywheel/lib/material/SimpleMaterial$Builder", "texture", "(Lnet/minecraft/resources/ResourceLocation;)Ldev/engine_room/flywheel/lib/material/SimpleMaterial$Builder;", false);
+        mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "dev/engine_room/flywheel/lib/material/SimpleMaterial$Builder", "build", "()Ldev/engine_room/flywheel/lib/material/SimpleMaterial;", false);
+        mv.visitVarInsn(Opcodes.ASTORE, 5);
+        mv.visitVarInsn(Opcodes.ALOAD, 0);
+        mv.visitVarInsn(Opcodes.ALOAD, 4);
+        mv.visitVarInsn(Opcodes.ALOAD, 5);
+        mv.visitMethodInsn(Opcodes.INVOKESTATIC, "dev/engine_room/flywheel/lib/model/part/ModelTrees", "of", "(Lnet/minecraft/client/model/geom/ModelLayerLocation;Lnet/minecraft/client/resources/model/Material;Ldev/engine_room/flywheel/api/material/Material;)Ldev/engine_room/flywheel/lib/model/part/ModelTree;", false);
+        mv.visitInsn(Opcodes.ARETURN);
+    }
+
+    private static void generateBedMaterialResolver(MethodVisitor mv) {
+        mv.visitFieldInsn(Opcodes.GETSTATIC, "net/minecraft/client/renderer/Sheets", "BED_TEXTURES", "[Lnet/minecraft/client/resources/model/Material;");
+        mv.visitVarInsn(Opcodes.ALOAD, 1);
+        mv.visitTypeInsn(Opcodes.CHECKCAST, "net/minecraft/world/level/block/entity/BedBlockEntity");
+        mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "net/minecraft/world/level/block/entity/BedBlockEntity", "getColor", "()Lnet/minecraft/world/item/DyeColor;", false);
+        mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "net/minecraft/world/item/DyeColor", "getId", "()I", false);
+        mv.visitInsn(Opcodes.AALOAD);
+        mv.visitVarInsn(Opcodes.ASTORE, 2);
+        mv.visitMethodInsn(Opcodes.INVOKESTATIC, "dev/engine_room/flywheel/lib/material/SimpleMaterial", "builder", "()Ldev/engine_room/flywheel/lib/material/SimpleMaterial$Builder;", false);
+        mv.visitFieldInsn(Opcodes.GETSTATIC, "dev/engine_room/flywheel/api/material/CardinalLightingMode", "ENTITY", "Ldev/engine_room/flywheel/api/material/CardinalLightingMode;");
+        mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "dev/engine_room/flywheel/lib/material/SimpleMaterial$Builder", "cardinalLightingMode", "(Ldev/engine_room/flywheel/api/material/CardinalLightingMode;)Ldev/engine_room/flywheel/lib/material/SimpleMaterial$Builder;", false);
+        mv.visitVarInsn(Opcodes.ALOAD, 2);
+        mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "net/minecraft/client/resources/model/Material", "atlasLocation", "()Lnet/minecraft/resources/ResourceLocation;", false);
+        mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "dev/engine_room/flywheel/lib/material/SimpleMaterial$Builder", "texture", "(Lnet/minecraft/resources/ResourceLocation;)Ldev/engine_room/flywheel/lib/material/SimpleMaterial$Builder;", false);
+        mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "dev/engine_room/flywheel/lib/material/SimpleMaterial$Builder", "build", "()Ldev/engine_room/flywheel/lib/material/SimpleMaterial;", false);
+        mv.visitVarInsn(Opcodes.ASTORE, 3);
+        mv.visitVarInsn(Opcodes.ALOAD, 0);
+        mv.visitVarInsn(Opcodes.ALOAD, 2);
+        mv.visitVarInsn(Opcodes.ALOAD, 3);
+        mv.visitMethodInsn(Opcodes.INVOKESTATIC, "dev/engine_room/flywheel/lib/model/part/ModelTrees", "of", "(Lnet/minecraft/client/model/geom/ModelLayerLocation;Lnet/minecraft/client/resources/model/Material;Ldev/engine_room/flywheel/api/material/Material;)Ldev/engine_room/flywheel/lib/model/part/ModelTree;", false);
+        mv.visitInsn(Opcodes.ARETURN);
+    }
+
+    private static void generateShulkerMaterialResolver(MethodVisitor mv) {
+        mv.visitVarInsn(Opcodes.ALOAD, 1);
+        mv.visitTypeInsn(Opcodes.CHECKCAST, "net/minecraft/world/level/block/entity/ShulkerBoxBlockEntity");
+        mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "net/minecraft/world/level/block/entity/ShulkerBoxBlockEntity", "getColor", "()Lnet/minecraft/world/item/DyeColor;", false);
+        mv.visitVarInsn(Opcodes.ASTORE, 2);
+        org.objectweb.asm.Label l2 = new org.objectweb.asm.Label();
+        org.objectweb.asm.Label l5 = new org.objectweb.asm.Label();
+        mv.visitVarInsn(Opcodes.ALOAD, 2);
+        mv.visitJumpInsn(Opcodes.IFNONNULL, l2);
+        mv.visitFieldInsn(Opcodes.GETSTATIC, "net/minecraft/client/renderer/Sheets", "DEFAULT_SHULKER_TEXTURE_LOCATION", "Lnet/minecraft/client/resources/model/Material;");
+        mv.visitVarInsn(Opcodes.ASTORE, 3);
+        mv.visitJumpInsn(Opcodes.GOTO, l5);
+        mv.visitLabel(l2);
+        mv.visitFieldInsn(Opcodes.GETSTATIC, "net/minecraft/client/renderer/Sheets", "SHULKER_TEXTURE_LOCATION", "Ljava/util/List;");
+        mv.visitVarInsn(Opcodes.ALOAD, 2);
+        mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "net/minecraft/world/item/DyeColor", "getId", "()I", false);
+        mv.visitMethodInsn(Opcodes.INVOKEINTERFACE, "java/util/List", "get", "(I)Ljava/lang/Object;", true);
+        mv.visitTypeInsn(Opcodes.CHECKCAST, "net/minecraft/client/resources/model/Material");
+        mv.visitVarInsn(Opcodes.ASTORE, 3);
+        mv.visitLabel(l5);
+        mv.visitMethodInsn(Opcodes.INVOKESTATIC, "dev/engine_room/flywheel/lib/material/SimpleMaterial", "builder", "()Ldev/engine_room/flywheel/lib/material/SimpleMaterial$Builder;", false);
+        mv.visitFieldInsn(Opcodes.GETSTATIC, "dev/engine_room/flywheel/api/material/CardinalLightingMode", "ENTITY", "Ldev/engine_room/flywheel/api/material/CardinalLightingMode;");
+        mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "dev/engine_room/flywheel/lib/material/SimpleMaterial$Builder", "cardinalLightingMode", "(Ldev/engine_room/flywheel/api/material/CardinalLightingMode;)Ldev/engine_room/flywheel/lib/material/SimpleMaterial$Builder;", false);
+        mv.visitVarInsn(Opcodes.ALOAD, 3);
+        mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "net/minecraft/client/resources/model/Material", "atlasLocation", "()Lnet/minecraft/resources/ResourceLocation;", false);
+        mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "dev/engine_room/flywheel/lib/material/SimpleMaterial$Builder", "texture", "(Lnet/minecraft/resources/ResourceLocation;)Ldev/engine_room/flywheel/lib/material/SimpleMaterial$Builder;", false);
+        mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "dev/engine_room/flywheel/lib/material/SimpleMaterial$Builder", "build", "()Ldev/engine_room/flywheel/lib/material/SimpleMaterial;", false);
+        mv.visitVarInsn(Opcodes.ASTORE, 4);
+        mv.visitVarInsn(Opcodes.ALOAD, 0);
+        mv.visitVarInsn(Opcodes.ALOAD, 3);
+        mv.visitVarInsn(Opcodes.ALOAD, 4);
+        mv.visitMethodInsn(Opcodes.INVOKESTATIC, "dev/engine_room/flywheel/lib/model/part/ModelTrees", "of", "(Lnet/minecraft/client/model/geom/ModelLayerLocation;Lnet/minecraft/client/resources/model/Material;Ldev/engine_room/flywheel/api/material/Material;)Ldev/engine_room/flywheel/lib/model/part/ModelTree;", false);
+        mv.visitInsn(Opcodes.ARETURN);
+    }
+
+    private static void generateFallbackMaterialResolver(MethodVisitor mv) {
+        mv.visitMethodInsn(Opcodes.INVOKESTATIC, "dev/engine_room/flywheel/lib/material/SimpleMaterial", "builder", "()Ldev/engine_room/flywheel/lib/material/SimpleMaterial$Builder;", false);
+        mv.visitFieldInsn(Opcodes.GETSTATIC, "dev/engine_room/flywheel/api/material/CardinalLightingMode", "ENTITY", "Ldev/engine_room/flywheel/api/material/CardinalLightingMode;");
+        mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "dev/engine_room/flywheel/lib/material/SimpleMaterial$Builder", "cardinalLightingMode", "(Ldev/engine_room/flywheel/api/material/CardinalLightingMode;)Ldev/engine_room/flywheel/lib/material/SimpleMaterial$Builder;", false);
+        mv.visitLdcInsn("minecraft");
+        mv.visitTypeInsn(Opcodes.NEW, "java/lang/StringBuilder");
+        mv.visitInsn(Opcodes.DUP);
+        mv.visitLdcInsn("textures/entity/");
+        mv.visitMethodInsn(Opcodes.INVOKESPECIAL, "java/lang/StringBuilder", "<init>", "(Ljava/lang/String;)V", false);
+        mv.visitVarInsn(Opcodes.ALOAD, 0);
+        mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "net/minecraft/client/model/geom/ModelLayerLocation", "getModel", "()Lnet/minecraft/resources/ResourceLocation;", false);
+        mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "net/minecraft/resources/ResourceLocation", "getPath", "()Ljava/lang/String;", false);
+        mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/lang/StringBuilder", "append", "(Ljava/lang/String;)Ljava/lang/StringBuilder;", false);
+        mv.visitLdcInsn(".png");
+        mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/lang/StringBuilder", "append", "(Ljava/lang/String;)Ljava/lang/StringBuilder;", false);
+        mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/lang/StringBuilder", "toString", "()Ljava/lang/String;", false);
+        mv.visitMethodInsn(Opcodes.INVOKESTATIC, "net/minecraft/resources/ResourceLocation", "fromNamespaceAndPath", "(Ljava/lang/String;Ljava/lang/String;)Lnet/minecraft/resources/ResourceLocation;", false);
+        mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "dev/engine_room/flywheel/lib/material/SimpleMaterial$Builder", "texture", "(Lnet/minecraft/resources/ResourceLocation;)Ldev/engine_room/flywheel/lib/material/SimpleMaterial$Builder;", false);
+        mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "dev/engine_room/flywheel/lib/material/SimpleMaterial$Builder", "build", "()Ldev/engine_room/flywheel/lib/material/SimpleMaterial;", false);
+        mv.visitVarInsn(Opcodes.ASTORE, 2);
+        mv.visitVarInsn(Opcodes.ALOAD, 0);
+        mv.visitVarInsn(Opcodes.ALOAD, 2);
+        mv.visitMethodInsn(Opcodes.INVOKESTATIC, "dev/engine_room/flywheel/lib/model/part/ModelTrees", "of", "(Lnet/minecraft/client/model/geom/ModelLayerLocation;Ldev/engine_room/flywheel/api/material/Material;)Ldev/engine_room/flywheel/lib/model/part/ModelTree;", false);
+        mv.visitInsn(Opcodes.ARETURN);
     }
 }

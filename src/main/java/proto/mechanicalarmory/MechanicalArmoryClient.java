@@ -8,6 +8,7 @@ import dev.engine_room.flywheel.impl.visual.BandedPrimeLimiter;
 import dev.engine_room.flywheel.lib.model.part.ModelTree;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.BlockEntityWithoutLevelRenderer;
+import net.minecraft.client.renderer.blockentity.BedRenderer;
 import net.minecraft.client.resources.model.ModelResourceLocation;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
@@ -85,7 +86,8 @@ public class MechanicalArmoryClient {
         // -- Flywheel Slicer Automated Runtime Registry --
         // Register the ChestRenderer for automated slicing and generation
         AutomatedVisualRegistry.generateAndMap(BlockEntityType.CHEST, ChestRenderer.class, "render", "(Lnet/minecraft/world/level/block/entity/BlockEntity;FLcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/MultiBufferSource;II)V");
-        
+        AutomatedVisualRegistry.generateAndMap(BlockEntityType.BED, BedRenderer.class, "render", "(Lnet/minecraft/world/level/block/entity/BlockEntity;FLcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/MultiBufferSource;II)V");
+
         // You can add a loop here over BuiltInRegistries.BLOCK_ENTITY_TYPE or target specific ones like EnchantTableRenderer!
         
         // Finalize automated registration

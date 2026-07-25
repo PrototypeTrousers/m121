@@ -88,8 +88,9 @@ public class MethodInliner {
         hostMethod.instructions.insertBefore(methodCall, inlineBlock);
         hostMethod.instructions.remove(methodCall);
         
-        // Update max locals
+        // Update max locals and max stack
         hostMethod.maxLocals += methodToInline.maxLocals;
+        hostMethod.maxStack += methodToInline.maxStack;
     }
     
     private static int getBaseLocalIndex(Type[] argTypes, int index) {
