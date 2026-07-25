@@ -12,21 +12,54 @@ import java.util.Map;
 
 public class PoseHelper {
 
+    private static final Map<net.minecraft.world.level.block.entity.BlockEntityType<?>, PartPoseConfig> POSE_CONFIGS = new java.util.HashMap<>();
+
+    public static void registerPoseConfig(net.minecraft.world.level.block.entity.BlockEntityType<?> type, PartPoseConfig config) {
+        if (type != null && config != null) {
+            POSE_CONFIGS.put(type, config);
+        }
+    }
+
     public static Matrix4f createInitialPose(BlockPos visualPos, BlockState blockState) {
+        return createInitialPose(visualPos, blockState, null);
+    }
+
+    public static Matrix4f createInitialPose(BlockPos visualPos, BlockState blockState, net.minecraft.world.level.block.entity.BlockEntity blockEntity) {
         Matrix4f matrix = new Matrix4f().translate(visualPos.getX(), visualPos.getY(), visualPos.getZ());
 
         if (blockState != null) {
+            Direction facing = null;
+
             for (Property<?> prop : blockState.getProperties()) {
-                if (prop.getName().equals("facing") || prop.getValueClass() == Direction.class) {
+                String name = prop.getName();
+                if (name.equals("facing") || prop.getValueClass() == Direction.class) {
                     Object val = blockState.getValue(prop);
                     if (val instanceof Direction dir && dir.getAxis().isHorizontal()) {
-                        float horizontalAngle = dir.toYRot();
-                        matrix.translate(0.5F, 0.5F, 0.5F)
-                              .rotateY(-horizontalAngle * Mth.DEG_TO_RAD)
-                              .translate(-0.5F, -0.5F, -0.5F);
-                        break;
+                        facing = dir;
                     }
                 }
+            }
+
+            PartPoseConfig config = (blockEntity != null) ? POSE_CONFIGS.get(blockEntity.getType()) : null;
+
+            if (config != null && config.customPose && facing != null) {
+                matrix.translate(0.0F, config.yOffset, 0.0F);
+                if (config.xRot != 0.0F) {
+                    matrix.rotateX(config.xRot * Mth.DEG_TO_RAD);
+                }
+                matrix.translate(0.5F, 0.5F, 0.5F);
+                if (config.zRotOffset != 0.0F) {
+                    matrix.rotateZ((config.zRotOffset + facing.toYRot()) * Mth.DEG_TO_RAD);
+                } else {
+                    matrix.rotateY(-facing.toYRot() * Mth.DEG_TO_RAD);
+                }
+                matrix.translate(-0.5F, -0.5F, -0.5F);
+                return matrix;
+            } else if (facing != null) {
+                float horizontalAngle = facing.toYRot();
+                matrix.translate(0.5F, 0.5F, 0.5F)
+                      .rotateY(-horizontalAngle * Mth.DEG_TO_RAD)
+                      .translate(-0.5F, -0.5F, -0.5F);
             }
         }
         return matrix;

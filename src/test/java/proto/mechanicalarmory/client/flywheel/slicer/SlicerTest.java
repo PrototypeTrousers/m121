@@ -44,7 +44,10 @@ public class SlicerTest {
                 System.out.println("Found target method: " + targetMethod.name + " " + targetMethod.desc);
                 
                 MethodInliner.inlineLocalMethods(cn, targetMethod);
-                
+
+                PartPoseConfig poseConfig = PartPoseExtractor.extract(cn);
+                System.out.println("Extracted Pose Config: " + poseConfig);
+
                 BytecodeDualSlicer.SliceResult result = BytecodeDualSlicer.slice(cn.name, targetMethod);
                 
                 System.out.println("Capture slice size: " + result.captureSlice.size() + " instructions");

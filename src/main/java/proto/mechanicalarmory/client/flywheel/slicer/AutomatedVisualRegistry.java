@@ -32,6 +32,10 @@ public class AutomatedVisualRegistry {
             // Inline all private helper methods so the slicer sees the full graph
             MethodInliner.inlineLocalMethods(classNode, renderMethod);
 
+            PartPoseConfig poseConfig = PartPoseExtractor.extract(classNode);
+            PoseHelper.registerPoseConfig(type, poseConfig);
+            System.out.println("[Flywheel Slicer] Extracted pose config for " + rendererClass.getSimpleName() + ": " + poseConfig);
+
             BytecodeDualSlicer.SliceResult slices = BytecodeDualSlicer.slice(classNode.name, renderMethod);
 
             String generatedName = classNode.name.replace('/', '_') + "_FlywheelVisual";
