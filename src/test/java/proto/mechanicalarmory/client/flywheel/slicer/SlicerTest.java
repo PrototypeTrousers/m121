@@ -17,7 +17,25 @@ public class SlicerTest {
             Class<?>[] testClasses = new Class<?>[] {
                 net.minecraft.client.renderer.blockentity.ChestRenderer.class,
                 net.minecraft.client.renderer.blockentity.BedRenderer.class,
-                net.minecraft.client.renderer.blockentity.ShulkerBoxRenderer.class
+                net.minecraft.client.renderer.blockentity.ShulkerBoxRenderer.class,
+                net.minecraft.client.renderer.blockentity.SignRenderer.class,
+                net.minecraft.client.renderer.blockentity.HangingSignRenderer.class,
+                net.minecraft.client.renderer.blockentity.BannerRenderer.class,
+                net.minecraft.client.renderer.blockentity.SkullBlockRenderer.class,
+                net.minecraft.client.renderer.blockentity.ConduitRenderer.class,
+                net.minecraft.client.renderer.blockentity.BeaconRenderer.class,
+                net.minecraft.client.renderer.blockentity.EnchantTableRenderer.class,
+                net.minecraft.client.renderer.blockentity.LecternRenderer.class,
+                net.minecraft.client.renderer.blockentity.BellRenderer.class,
+                net.minecraft.client.renderer.blockentity.CampfireRenderer.class,
+                net.minecraft.client.renderer.blockentity.PistonHeadRenderer.class,
+                net.minecraft.client.renderer.blockentity.StructureBlockRenderer.class,
+                net.minecraft.client.renderer.blockentity.TheEndPortalRenderer.class,
+                net.minecraft.client.renderer.blockentity.TheEndGatewayRenderer.class,
+                net.minecraft.client.renderer.blockentity.DecoratedPotRenderer.class,
+                net.minecraft.client.renderer.blockentity.BrushableBlockRenderer.class,
+                net.minecraft.client.renderer.blockentity.TrialSpawnerRenderer.class,
+                net.minecraft.client.renderer.blockentity.VaultRenderer.class
             };
             
             for (Class<?> rendererClass : testClasses) {
@@ -40,9 +58,6 @@ public class SlicerTest {
                     System.out.println("Could not find the public render method in " + rendererClass.getSimpleName());
                     continue;
                 }
-                
-                System.out.println("Found target method: " + targetMethod.name + " " + targetMethod.desc);
-                
                 MethodInliner.inlineLocalMethods(cn, targetMethod);
 
                 PartPoseConfig poseConfig = PartPoseExtractor.extract(cn);

@@ -27,4 +27,12 @@ public class RendererAnalyzer {
                 .filter(m -> m.name.equals(methodName) && m.desc.equals(methodDesc))
                 .findFirst();
     }
+
+    public static Optional<MethodNode> findRenderMethod(ClassNode cn) {
+        return cn.methods.stream()
+                .filter(m -> "render".equals(m.name)
+                        && (m.access & (org.objectweb.asm.Opcodes.ACC_BRIDGE | org.objectweb.asm.Opcodes.ACC_SYNTHETIC)) == 0
+                        && m.desc.endsWith(";FLcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/MultiBufferSource;II)V"))
+                .findFirst();
+    }
 }

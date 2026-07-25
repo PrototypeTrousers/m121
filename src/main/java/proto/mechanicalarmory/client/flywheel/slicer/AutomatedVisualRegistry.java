@@ -3,11 +3,17 @@ package proto.mechanicalarmory.client.flywheel.slicer;
 import dev.engine_room.flywheel.api.visual.BlockEntityVisual;
 import dev.engine_room.flywheel.api.visualization.VisualizationContext;
 import dev.engine_room.flywheel.api.visualization.VisualizerRegistry;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.renderer.blockentity.BlockEntityRenderDispatcher;
 import net.minecraft.client.renderer.blockentity.BlockEntityRenderer;
+import net.minecraft.client.renderer.blockentity.BlockEntityRendererProvider;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import org.objectweb.asm.tree.ClassNode;
 import org.objectweb.asm.tree.MethodNode;
+import proto.mechanicalarmory.client.mixin.BlockEntityRenderDispatcherAccessor;
+import proto.mechanicalarmory.client.mixin.BlockEntityRenderersAccessor;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -15,7 +21,71 @@ import java.util.Map;
 public class AutomatedVisualRegistry {
 
     public static final Map<BlockEntityType<?>, Class<?>> GENERATED_VISUALS = new HashMap<>();
+    private static final Map<Class<?>, Class<?>> RENDERER_CLASS_TO_VISUAL = new HashMap<>();
     private static VisualLoader loader;
+
+    public static Class<?> getRendererClass(BlockEntityType<?> type) {
+        try {
+            BlockEntityRenderDispatcher dispatcher = Minecraft.getInstance().getBlockEntityRenderDispatcher();
+            if (dispatcher != null) {
+                Map<BlockEntityType<?>, BlockEntityRenderer<?>> renderers = ((BlockEntityRenderDispatcherAccessor) dispatcher).getRenderers();
+                if (renderers != null && renderers.containsKey(type)) {
+                    BlockEntityRenderer<?> r = renderers.get(type);
+                    if (r != null) return r.getClass();
+                }
+            }
+        } catch (Exception ignored) {}
+
+        try {
+            Map<BlockEntityType<?>, BlockEntityRendererProvider<?>> providers = BlockEntityRenderersAccessor.getProviders();
+            if (providers != null && providers.containsKey(type)) {
+                BlockEntityRendererProvider<?> provider = providers.get(type);
+                if (provider == null) return null;
+
+                BlockEntityRenderDispatcher dispatcher = Minecraft.getInstance().getBlockEntityRenderDispatcher();
+                if (dispatcher == null) return null;
+                BlockEntityRenderDispatcherAccessor acc = (BlockEntityRenderDispatcherAccessor) dispatcher;
+
+                BlockEntityRendererProvider.Context context = new BlockEntityRendererProvider.Context(
+                        dispatcher,
+                        acc.getBlockRenderDispatcher().get(),
+                        acc.getItemRenderer().get(),
+                        acc.getEntityRenderer().get(),
+                        acc.getEntityModelSet(),
+                        acc.getFont()
+                );
+                BlockEntityRenderer<?> r = provider.create(context);
+                if (r != null) return r.getClass();
+            }
+        } catch (Exception ignored) {}
+
+        return null;
+    }
+
+    public static void generateAndMapAll() {
+        BuiltInRegistries.BLOCK_ENTITY_TYPE.forEach(AutomatedVisualRegistry::generateAndMap);
+    }
+
+    public static void generateAndMap(BlockEntityType<?> type) {
+        Class<?> rendererClass = getRendererClass(type);
+        if (rendererClass != null) {
+            generateAndMap(type, rendererClass);
+        } else {
+            System.out.println("[Flywheel Slicer] Skipping " + BuiltInRegistries.BLOCK_ENTITY_TYPE.getKey(type) + " (no custom 3D renderer registered)");
+        }
+    }
+
+    public static void generateAndMap(BlockEntityType<?> type, Class<?> rendererClass) {
+        try {
+            ClassNode classNode = RendererAnalyzer.loadClassNode(rendererClass);
+            MethodNode renderMethod = RendererAnalyzer.findRenderMethod(classNode)
+                    .orElseThrow(() -> new NoSuchMethodException("Could not find non-synthetic render method in " + rendererClass.getName()));
+            generateAndMap(type, rendererClass, renderMethod.name, renderMethod.desc);
+        } catch (Exception e) {
+            System.err.println("[Flywheel Slicer] Failed to generate visual for " + rendererClass.getSimpleName());
+            e.printStackTrace();
+        }
+    }
 
     /**
      * Call this during client setup to generate and map a vanilla renderer to Flywheel.
@@ -24,6 +94,14 @@ public class AutomatedVisualRegistry {
         try {
             if (loader == null) {
                 loader = new VisualLoader(Thread.currentThread().getContextClassLoader());
+            }
+
+            // If we have already generated and loaded a Flywheel visual for this exact renderer class, reuse it immediately!
+            if (RENDERER_CLASS_TO_VISUAL.containsKey(rendererClass)) {
+                Class<?> existingClass = RENDERER_CLASS_TO_VISUAL.get(rendererClass);
+                GENERATED_VISUALS.put(type, existingClass);
+                System.out.println("[Flywheel Slicer] Reusing already generated visual for " + rendererClass.getSimpleName() + " on " + BuiltInRegistries.BLOCK_ENTITY_TYPE.getKey(type));
+                return;
             }
 
             ClassNode classNode = RendererAnalyzer.loadClassNode(rendererClass);
@@ -52,6 +130,7 @@ public class AutomatedVisualRegistry {
             }
 
             Class<?> generatedClass = loader.loadGeneratedClass(generatedName, classBytes);
+            RENDERER_CLASS_TO_VISUAL.put(rendererClass, generatedClass);
             GENERATED_VISUALS.put(type, generatedClass);
             
             System.out.println("[Flywheel Slicer] Successfully mapped " + rendererClass.getSimpleName() + " for Flywheel integration.");

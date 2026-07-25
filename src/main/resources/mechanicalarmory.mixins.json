@@ -6,6 +6,7 @@
   "refmap": "mechanicalarmory.refmap.json",
   "client": [
     "BatchableBufferSourceAccessor",
+    "BlockEntityRenderDispatcherAccessor",
     "BlockEntityRenderDispatcherMixin",
     "BlockEntityRenderersAccessor",
     "BufferBuilderAccessor",

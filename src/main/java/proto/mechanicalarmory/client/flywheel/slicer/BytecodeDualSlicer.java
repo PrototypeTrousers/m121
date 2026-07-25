@@ -182,6 +182,12 @@ public class BytecodeDualSlicer {
             if (min.owner.contains("Level") || min.owner.contains("BlockEntity") || min.owner.contains("BlockState")) {
                 return true;
             }
+        } else if (insn.getOpcode() == Opcodes.GETFIELD) {
+            FieldInsnNode fin = (FieldInsnNode) insn;
+            // Any field read from BlockEntity, BlockState, Level is a capture boundary!
+            if (fin.owner.contains("Level") || fin.owner.contains("BlockEntity") || fin.owner.contains("BlockState")) {
+                return true;
+            }
         }
         return false;
     }

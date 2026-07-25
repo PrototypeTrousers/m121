@@ -48,6 +48,8 @@ public class RuntimeVisualGenerator {
             String desc = "F";
             if (insn instanceof MethodInsnNode min) {
                 desc = org.objectweb.asm.Type.getReturnType(min.desc).getDescriptor();
+            } else if (insn instanceof FieldInsnNode fin) {
+                desc = fin.desc;
             }
             cw.visitField(Opcodes.ACC_PRIVATE, fieldName, desc, null, null).visitEnd();
         }
@@ -239,6 +241,8 @@ public class RuntimeVisualGenerator {
                 String desc = "F";
                 if (insn instanceof MethodInsnNode min) {
                     desc = org.objectweb.asm.Type.getReturnType(min.desc).getDescriptor();
+                } else if (insn instanceof FieldInsnNode fin) {
+                    desc = fin.desc;
                 }
                 
                 boolean consumedInCaptureSlice = false;
@@ -250,12 +254,19 @@ public class RuntimeVisualGenerator {
                     }
                 }
                 
+                boolean isCat2 = desc.equals("J") || desc.equals("D");
+                
                 if (consumedInCaptureSlice) {
-                    mvTick.visitInsn(Opcodes.DUP);
+                    mvTick.visitInsn(isCat2 ? Opcodes.DUP2 : Opcodes.DUP);
                 }
                 
                 mvTick.visitVarInsn(Opcodes.ALOAD, 0); // this
-                mvTick.visitInsn(Opcodes.SWAP); // swap the value and 'this'
+                if (isCat2) {
+                    mvTick.visitInsn(Opcodes.DUP_X2);
+                    mvTick.visitInsn(Opcodes.POP);
+                } else {
+                    mvTick.visitInsn(Opcodes.SWAP);
+                }
                 mvTick.visitFieldInsn(Opcodes.PUTFIELD, generatedName, fieldName, desc);
             }
         }
@@ -280,6 +291,8 @@ public class RuntimeVisualGenerator {
                 String desc = "F";
                 if (insn instanceof MethodInsnNode min) {
                     desc = org.objectweb.asm.Type.getReturnType(min.desc).getDescriptor();
+                } else if (insn instanceof FieldInsnNode fin) {
+                    desc = fin.desc;
                 }
                 mvUpdate.visitVarInsn(Opcodes.ALOAD, 0); // this
                 mvUpdate.visitFieldInsn(Opcodes.GETFIELD, generatedName, fieldName, desc);

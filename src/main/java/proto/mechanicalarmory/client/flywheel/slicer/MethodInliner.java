@@ -12,28 +12,54 @@ import java.util.Map;
 public class MethodInliner {
 
     public static void inlineLocalMethods(ClassNode classNode, MethodNode targetMethod) {
-        boolean modified = true;
-        
-        while (modified) {
-            modified = false;
-            
-            for (AbstractInsnNode insn : targetMethod.instructions) {
-                if (insn instanceof MethodInsnNode min) {
-                    // Only inline private/helper methods from the same class.
-                    // Make sure we don't infinitely recurse by skipping the exact same method (name + desc),
-                    // but allow overloaded methods with the same name!
-                    if (min.owner.equals(classNode.name) && !(min.name.equals(targetMethod.name) && min.desc.equals(targetMethod.desc))) {
-                        MethodNode methodToInline = RendererAnalyzer.findMethod(classNode, min.name, min.desc).orElse(null);
-                        
-                        if (methodToInline != null) {
-                            inlineMethodCall(targetMethod, min, methodToInline);
-                            modified = true;
-                            break; // Restart loop after modification because the instruction list changed
+        java.util.Set<String> callStack = new java.util.HashSet<>();
+        callStack.add(targetMethod.name + targetMethod.desc);
+        inlineRecursive(classNode, targetMethod, callStack, 0);
+    }
+
+    private static void inlineRecursive(ClassNode classNode, MethodNode hostMethod, java.util.Set<String> callStack, int depth) {
+        if (depth > 5) {
+            return; // Prevent runaway inlining depth in deep or cyclic helper chains
+        }
+
+        // Collect all target MethodInsnNodes in a single pass before modifying the instruction list.
+        // This guarantees we never re-scan instructions that were just inlined from helper methods,
+        // which completely prevents infinite loops on recursive helpers!
+        java.util.List<MethodInsnNode> toInline = new java.util.ArrayList<>();
+        for (AbstractInsnNode insn : hostMethod.instructions) {
+            if (insn instanceof MethodInsnNode min) {
+                if (min.owner.equals(classNode.name)) {
+                    if (!min.name.equals("<init>") && !min.name.equals("<clinit>")) {
+                        String sig = min.name + min.desc;
+                        if (!callStack.contains(sig)) {
+                            toInline.add(min);
                         }
                     }
                 }
             }
         }
+
+        for (MethodInsnNode min : toInline) {
+            MethodNode methodToInline = RendererAnalyzer.findMethod(classNode, min.name, min.desc).orElse(null);
+            if (methodToInline != null) {
+                // Clone the method so we don't mutate the original class definition's method node
+                MethodNode copy = cloneMethod(methodToInline);
+                
+                // Recursively inline helper methods into the copy first!
+                java.util.Set<String> nextStack = new java.util.HashSet<>(callStack);
+                nextStack.add(min.name + min.desc);
+                inlineRecursive(classNode, copy, nextStack, depth + 1);
+                
+                // Now inline the fully-inlined copy into hostMethod
+                inlineMethodCall(hostMethod, min, copy);
+            }
+        }
+    }
+
+    private static MethodNode cloneMethod(MethodNode source) {
+        MethodNode copy = new MethodNode(source.access, source.name, source.desc, source.signature, source.exceptions != null ? source.exceptions.toArray(new String[0]) : null);
+        source.accept(copy);
+        return copy;
     }
 
     private static void inlineMethodCall(MethodNode hostMethod, MethodInsnNode methodCall, MethodNode methodToInline) {
