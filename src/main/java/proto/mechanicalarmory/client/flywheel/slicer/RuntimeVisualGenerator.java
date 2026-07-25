@@ -134,20 +134,12 @@ public class RuntimeVisualGenerator {
             // Get ModelLayerLocation
             mvInit.visitFieldInsn(Opcodes.GETSTATIC, owner, layerField, "Lnet/minecraft/client/model/geom/ModelLayerLocation;");
             
-            // Build a simple material
-            mvInit.visitMethodInsn(Opcodes.INVOKESTATIC, "dev/engine_room/flywheel/lib/material/SimpleMaterial", "builder", "()Ldev/engine_room/flywheel/lib/material/SimpleMaterial$Builder;", false);
-            mvInit.visitFieldInsn(Opcodes.GETSTATIC, "dev/engine_room/flywheel/api/material/CardinalLightingMode", "ENTITY", "Ldev/engine_room/flywheel/api/material/CardinalLightingMode;");
-            mvInit.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "dev/engine_room/flywheel/lib/material/SimpleMaterial$Builder", "cardinalLightingMode", "(Ldev/engine_room/flywheel/api/material/CardinalLightingMode;)Ldev/engine_room/flywheel/lib/material/SimpleMaterial$Builder;", false);
+            // Get blockEntity
+            mvInit.visitVarInsn(Opcodes.ALOAD, 0);
+            mvInit.visitFieldInsn(Opcodes.GETFIELD, "dev/engine_room/flywheel/lib/visual/AbstractBlockEntityVisual", "blockEntity", "Lnet/minecraft/world/level/block/entity/BlockEntity;");
             
-            // Set the chest texture directly for this proof of concept
-            mvInit.visitLdcInsn("minecraft");
-            mvInit.visitLdcInsn("textures/entity/chest/normal.png");
-            mvInit.visitMethodInsn(Opcodes.INVOKESTATIC, "net/minecraft/resources/ResourceLocation", "fromNamespaceAndPath", "(Ljava/lang/String;Ljava/lang/String;)Lnet/minecraft/resources/ResourceLocation;", false);
-            mvInit.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "dev/engine_room/flywheel/lib/material/SimpleMaterial$Builder", "texture", "(Lnet/minecraft/resources/ResourceLocation;)Ldev/engine_room/flywheel/lib/material/SimpleMaterial$Builder;", false);
-            mvInit.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "dev/engine_room/flywheel/lib/material/SimpleMaterial$Builder", "build", "()Ldev/engine_room/flywheel/lib/material/SimpleMaterial;", false);
-            
-            // ModelTrees.of(ModelLayerLocation, Material)
-            mvInit.visitMethodInsn(Opcodes.INVOKESTATIC, "dev/engine_room/flywheel/lib/model/part/ModelTrees", "of", "(Lnet/minecraft/client/model/geom/ModelLayerLocation;Ldev/engine_room/flywheel/api/material/Material;)Ldev/engine_room/flywheel/lib/model/part/ModelTree;", false);
+            // MaterialHelper.createModelTree(ModelLayerLocation, BlockEntity)
+            mvInit.visitMethodInsn(Opcodes.INVOKESTATIC, "proto/mechanicalarmory/client/flywheel/slicer/MaterialHelper", "createModelTree", "(Lnet/minecraft/client/model/geom/ModelLayerLocation;Lnet/minecraft/world/level/block/entity/BlockEntity;)Ldev/engine_room/flywheel/lib/model/part/ModelTree;", false);
             
             // InstanceTree.create(instancerProvider, modelTree)
             mvInit.visitVarInsn(Opcodes.ALOAD, 0); 
