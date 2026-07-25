@@ -35,6 +35,9 @@ import proto.mechanicalarmory.client.flywheel.instances.crop.CropVisualiser;
 import proto.mechanicalarmory.client.flywheel.instances.generic.VanillaBlockVisualiser;
 import proto.mechanicalarmory.client.flywheel.instances.generic.VanillaEntityVisualiser;
 import proto.mechanicalarmory.client.flywheel.instances.shredder.ShredderVisualiser;
+import proto.mechanicalarmory.client.flywheel.slicer.AutomatedVisualRegistry;
+import net.minecraft.world.level.block.entity.BlockEntityType;
+import net.minecraft.client.renderer.blockentity.ChestRenderer;
 import proto.mechanicalarmory.client.renderer.arm.ArmRenderer;
 import proto.mechanicalarmory.client.renderer.arm.MyCustomItemBakedModel;
 import proto.mechanicalarmory.client.renderer.arm.MyItemRenderer;
@@ -78,11 +81,22 @@ public class MechanicalArmoryClient {
 
 
         VisualizerRegistry.setVisualizer(MAEntities.BUSH_BLOCK_ENTITY.get(), CropVisualiser.CROP_VISUAL);
-        BuiltInRegistries.BLOCK_ENTITY_TYPE.forEach(c -> {
-            if (VisualizerRegistry.getVisualizer(c) == null) {
-                VisualizerRegistry.setVisualizer(c, VanillaBlockVisualiser.VANILLA_BLOCK_VISUALISER);
-            }
-        });
+
+        // -- Flywheel Slicer Automated Runtime Registry --
+        // Register the ChestRenderer for automated slicing and generation
+        AutomatedVisualRegistry.generateAndMap(BlockEntityType.CHEST, ChestRenderer.class, "render", "(Lnet/minecraft/world/level/block/entity/BlockEntity;FLcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/MultiBufferSource;II)V");
+        
+        // You can add a loop here over BuiltInRegistries.BLOCK_ENTITY_TYPE or target specific ones like EnchantTableRenderer!
+        
+        // Finalize automated registration
+        AutomatedVisualRegistry.registerAllToFlywheel();
+        // ------------------------------------------------
+
+//        BuiltInRegistries.BLOCK_ENTITY_TYPE.forEach(c -> {
+//            if (VisualizerRegistry.getVisualizer(c) == null) {
+//                VisualizerRegistry.setVisualizer(c, VanillaBlockVisualiser.VANILLA_BLOCK_VISUALISER);
+//            }
+//        });
 
         BuiltInRegistries.ENTITY_TYPE.forEach(c -> {
             if (c == EntityType.PLAYER) return;

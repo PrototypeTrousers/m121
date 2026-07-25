@@ -25,11 +25,11 @@ import static net.minecraft.client.renderer.RenderStateShard.*;
 
 public class ArmRenderer implements BlockEntityRenderer<ArmEntity> {
 
-    MyModelTree modelTree = MechanicalArmoryClient.fullArmModelTree;
-    MyModelTreeForVanilla armTree = MyModelTreeForVanilla.create(modelTree);
-    MyModelTreeForVanilla baseMotor = armTree.child("BaseMotor");
-    MyModelTreeForVanilla firstArmTree = baseMotor.child("FirstArm");
-    MyModelTreeForVanilla secondArmTree = firstArmTree.child("SecondArm");
+    MyModelTree modelTree;
+    MyModelTreeForVanilla armTree;
+    MyModelTreeForVanilla baseMotor;
+    MyModelTreeForVanilla firstArmTree;
+    MyModelTreeForVanilla secondArmTree;
 
     VertexConsumerMutableWrapper wrapper = new VertexConsumerMutableWrapper();
 
@@ -40,6 +40,14 @@ public class ArmRenderer implements BlockEntityRenderer<ArmEntity> {
 
     @Override
     public void render(ArmEntity blockEntity, float partialTick, PoseStack poseStack, MultiBufferSource bufferSource, int packedLight, int packedOverlay) {
+        if (armTree == null) {
+            modelTree = MechanicalArmoryClient.fullArmModelTree;
+            armTree = MyModelTreeForVanilla.create(modelTree);
+            baseMotor = armTree.child("BaseMotor");
+            firstArmTree = baseMotor.child("FirstArm");
+            secondArmTree = firstArmTree.child("SecondArm");
+        }
+        
         packedLight = 15728880;
         firstArmTree.resetPose();
         firstArmTree.xRot(Mth.lerp(partialTick, blockEntity.getAnimationRotation(0)[0], blockEntity.getRotation(0)[0]));

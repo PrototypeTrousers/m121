@@ -324,3 +324,4 @@ idea {
         downloadJavadoc = true
     }
 }
+task runSlicerTest(type: JavaExec) { mainClass = 'proto.mechanicalarmory.client.flywheel.slicer.SlicerTest'; classpath = sourceSets.test.runtimeClasspath }
