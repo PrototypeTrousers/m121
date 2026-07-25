@@ -61,18 +61,24 @@ public class RuntimeVisualGenerator {
             }
         }
         
-        String modelLayerLocationField = null;
-        String modelLayerLocationOwner = null;
         Map<String, String> fieldToChildName = new java.util.HashMap<>();
+        Map<String, String> fieldToLayerField = new java.util.HashMap<>();
+        Map<String, String> fieldToLayerOwner = new java.util.HashMap<>();
+        Set<String> uniqueLayerFields = new java.util.LinkedHashSet<>();
+        Map<String, String> layerFieldToOwner = new java.util.HashMap<>();
 
         if (constructor != null) {
             String lastString = null;
+            String currentLayerOwner = null;
+            String currentLayerField = null;
             for (AbstractInsnNode insn : constructor.instructions) {
                 if (insn.getOpcode() == Opcodes.GETSTATIC) {
                     FieldInsnNode fin = (FieldInsnNode) insn;
                     if (fin.desc.equals("Lnet/minecraft/client/model/geom/ModelLayerLocation;")) {
-                        modelLayerLocationOwner = fin.owner;
-                        modelLayerLocationField = fin.name;
+                        currentLayerOwner = fin.owner;
+                        currentLayerField = fin.name;
+                        uniqueLayerFields.add(currentLayerField);
+                        layerFieldToOwner.put(currentLayerField, currentLayerOwner);
                     }
                 } else if (insn.getOpcode() == Opcodes.LDC) {
                     org.objectweb.asm.tree.LdcInsnNode ldc = (org.objectweb.asm.tree.LdcInsnNode) insn;
@@ -82,8 +88,10 @@ public class RuntimeVisualGenerator {
                 } else if (insn.getOpcode() == Opcodes.PUTFIELD) {
                     FieldInsnNode fin = (FieldInsnNode) insn;
                     if (fin.desc.equals("Lnet/minecraft/client/model/geom/ModelPart;")) {
-                        if (lastString != null) {
+                        if (lastString != null && currentLayerField != null) {
                             fieldToChildName.put(fin.name, lastString);
+                            fieldToLayerField.put(fin.name, currentLayerField);
+                            fieldToLayerOwner.put(fin.name, currentLayerOwner);
                             lastString = null;
                         }
                     }
@@ -97,6 +105,12 @@ public class RuntimeVisualGenerator {
             cw.visitField(Opcodes.ACC_PRIVATE, "tree_" + partName, "Ldev/engine_room/flywheel/lib/model/part/InstanceTree;", null, null).visitEnd();
         }
 
+        // Generate rootTree fields and map
+        for (String layerField : uniqueLayerFields) {
+            cw.visitField(Opcodes.ACC_PRIVATE, "rootTree_" + layerField, "Ldev/engine_room/flywheel/lib/model/part/InstanceTree;", null, null).visitEnd();
+        }
+        cw.visitField(Opcodes.ACC_PRIVATE, "rootTreesMap", "Ljava/util/Map;", null, null).visitEnd();
+
         // Generate the Constructor
         // public GeneratedVisual(VisualizationContext ctx, BlockEntity blockEntity, float partialTick)
         MethodVisitor mvInit = cw.visitMethod(Opcodes.ACC_PUBLIC, "<init>", "(Ldev/engine_room/flywheel/api/visualization/VisualizationContext;Lnet/minecraft/world/level/block/entity/BlockEntity;F)V", null, null);
@@ -107,14 +121,21 @@ public class RuntimeVisualGenerator {
         mvInit.visitVarInsn(Opcodes.FLOAD, 3); // partialTick
         mvInit.visitMethodInsn(Opcodes.INVOKESPECIAL, "dev/engine_room/flywheel/lib/visual/AbstractBlockEntityVisual", "<init>", "(Ldev/engine_room/flywheel/api/visualization/VisualizationContext;Lnet/minecraft/world/level/block/entity/BlockEntity;F)V", false);
         
-        // Bake the ModelTree locally using ModelTrees.of(ModelLayerLocation, Material)
-        if (modelLayerLocationOwner != null && modelLayerLocationField != null) {
-            // Get the ModelLayerLocation
-            mvInit.visitFieldInsn(Opcodes.GETSTATIC, modelLayerLocationOwner, modelLayerLocationField, "Lnet/minecraft/client/model/geom/ModelLayerLocation;");
+        // Initialize rootTreesMap = new HashMap()
+        mvInit.visitVarInsn(Opcodes.ALOAD, 0);
+        mvInit.visitTypeInsn(Opcodes.NEW, "java/util/HashMap");
+        mvInit.visitInsn(Opcodes.DUP);
+        mvInit.visitMethodInsn(Opcodes.INVOKESPECIAL, "java/util/HashMap", "<init>", "()V", false);
+        mvInit.visitFieldInsn(Opcodes.PUTFIELD, generatedName, "rootTreesMap", "Ljava/util/Map;");
+
+        for (String layerField : uniqueLayerFields) {
+            String owner = layerFieldToOwner.get(layerField);
+            
+            // Get ModelLayerLocation
+            mvInit.visitFieldInsn(Opcodes.GETSTATIC, owner, layerField, "Lnet/minecraft/client/model/geom/ModelLayerLocation;");
             
             // Build a simple material
             mvInit.visitMethodInsn(Opcodes.INVOKESTATIC, "dev/engine_room/flywheel/lib/material/SimpleMaterial", "builder", "()Ldev/engine_room/flywheel/lib/material/SimpleMaterial$Builder;", false);
-            // Try to set some basic entity lighting so it's not totally dark
             mvInit.visitFieldInsn(Opcodes.GETSTATIC, "dev/engine_room/flywheel/api/material/CardinalLightingMode", "ENTITY", "Ldev/engine_room/flywheel/api/material/CardinalLightingMode;");
             mvInit.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "dev/engine_room/flywheel/lib/material/SimpleMaterial$Builder", "cardinalLightingMode", "(Ldev/engine_room/flywheel/api/material/CardinalLightingMode;)Ldev/engine_room/flywheel/lib/material/SimpleMaterial$Builder;", false);
             
@@ -123,7 +144,6 @@ public class RuntimeVisualGenerator {
             mvInit.visitLdcInsn("textures/entity/chest/normal.png");
             mvInit.visitMethodInsn(Opcodes.INVOKESTATIC, "net/minecraft/resources/ResourceLocation", "fromNamespaceAndPath", "(Ljava/lang/String;Ljava/lang/String;)Lnet/minecraft/resources/ResourceLocation;", false);
             mvInit.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "dev/engine_room/flywheel/lib/material/SimpleMaterial$Builder", "texture", "(Lnet/minecraft/resources/ResourceLocation;)Ldev/engine_room/flywheel/lib/material/SimpleMaterial$Builder;", false);
-            
             mvInit.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "dev/engine_room/flywheel/lib/material/SimpleMaterial$Builder", "build", "()Ldev/engine_room/flywheel/lib/material/SimpleMaterial;", false);
             
             // ModelTrees.of(ModelLayerLocation, Material)
@@ -135,11 +155,19 @@ public class RuntimeVisualGenerator {
             mvInit.visitInsn(Opcodes.SWAP);
             mvInit.visitMethodInsn(Opcodes.INVOKESTATIC, "dev/engine_room/flywheel/lib/model/part/InstanceTree", "create", "(Ldev/engine_room/flywheel/api/instance/InstancerProvider;Ldev/engine_room/flywheel/lib/model/part/ModelTree;)Ldev/engine_room/flywheel/lib/model/part/InstanceTree;", false);
             
-            mvInit.visitVarInsn(Opcodes.ASTORE, 4); // Local 4 = root InstanceTree
-        } else {
-            // Fallback if parsing failed
-            mvInit.visitInsn(Opcodes.ACONST_NULL);
-            mvInit.visitVarInsn(Opcodes.ASTORE, 4);
+            // PUTFIELD rootTree_<layerField>
+            mvInit.visitVarInsn(Opcodes.ALOAD, 0);
+            mvInit.visitInsn(Opcodes.SWAP);
+            mvInit.visitFieldInsn(Opcodes.PUTFIELD, generatedName, "rootTree_" + layerField, "Ldev/engine_room/flywheel/lib/model/part/InstanceTree;");
+
+            // rootTreesMap.put(layerField, rootTree_<layerField>)
+            mvInit.visitVarInsn(Opcodes.ALOAD, 0);
+            mvInit.visitFieldInsn(Opcodes.GETFIELD, generatedName, "rootTreesMap", "Ljava/util/Map;");
+            mvInit.visitLdcInsn(layerField);
+            mvInit.visitVarInsn(Opcodes.ALOAD, 0);
+            mvInit.visitFieldInsn(Opcodes.GETFIELD, generatedName, "rootTree_" + layerField, "Ldev/engine_room/flywheel/lib/model/part/InstanceTree;");
+            mvInit.visitMethodInsn(Opcodes.INVOKEINTERFACE, "java/util/Map", "put", "(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;", true);
+            mvInit.visitInsn(Opcodes.POP);
         }
 
         // For each ModelPart field found, initialize a DummyModelPart and an InstanceTree
@@ -151,20 +179,29 @@ public class RuntimeVisualGenerator {
             mvInit.visitFieldInsn(Opcodes.PUTFIELD, generatedName, "dummy_" + partName, "Lproto/mechanicalarmory/client/flywheel/slicer/DummyModelPart;");
             
             String childName = fieldToChildName.get(partName);
-            if (childName != null && modelLayerLocationOwner != null) {
+            String layerField = fieldToLayerField.get(partName);
+            if (childName != null && layerField != null) {
                 mvInit.visitVarInsn(Opcodes.ALOAD, 0); // this
                 
-                // rootInstanceTree.child(childName)
-                mvInit.visitVarInsn(Opcodes.ALOAD, 4);
+                // rootTree_<layerField>.child(childName)
+                mvInit.visitVarInsn(Opcodes.ALOAD, 0);
+                mvInit.visitFieldInsn(Opcodes.GETFIELD, generatedName, "rootTree_" + layerField, "Ldev/engine_room/flywheel/lib/model/part/InstanceTree;");
                 mvInit.visitLdcInsn(childName);
                 mvInit.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "dev/engine_room/flywheel/lib/model/part/InstanceTree", "child", "(Ljava/lang/String;)Ldev/engine_room/flywheel/lib/model/part/InstanceTree;", false);
                 
                 mvInit.visitFieldInsn(Opcodes.PUTFIELD, generatedName, "tree_" + partName, "Ldev/engine_room/flywheel/lib/model/part/InstanceTree;");
+
+                // Copy initial pose from tree_part into dummy_part!
+                mvInit.visitVarInsn(Opcodes.ALOAD, 0);
+                mvInit.visitFieldInsn(Opcodes.GETFIELD, generatedName, "dummy_" + partName, "Lproto/mechanicalarmory/client/flywheel/slicer/DummyModelPart;");
+                mvInit.visitVarInsn(Opcodes.ALOAD, 0);
+                mvInit.visitFieldInsn(Opcodes.GETFIELD, generatedName, "tree_" + partName, "Ldev/engine_room/flywheel/lib/model/part/InstanceTree;");
+                mvInit.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "proto/mechanicalarmory/client/flywheel/slicer/DummyModelPart", "copyFrom", "(Ldev/engine_room/flywheel/lib/model/part/InstanceTree;)V", false);
             }
         }
         
         mvInit.visitInsn(Opcodes.RETURN);
-        mvInit.visitMaxs(4, 4);
+        mvInit.visitMaxs(0, 0);
         mvInit.visitEnd();
         
         // 2. Generate tick() method (The Capture Slice)
@@ -220,6 +257,13 @@ public class RuntimeVisualGenerator {
         MethodVisitor mvUpdate = cw.visitMethod(Opcodes.ACC_PUBLIC, "beginFrame", "(Ldev/engine_room/flywheel/api/visual/DynamicVisual$Context;)V", null, null);
         mvUpdate.visitCode();
         
+        // Update visibility of root trees based on blockState (e.g. single vs double chest)
+        mvUpdate.visitVarInsn(Opcodes.ALOAD, 0);
+        mvUpdate.visitFieldInsn(Opcodes.GETFIELD, "dev/engine_room/flywheel/lib/visual/AbstractBlockEntityVisual", "blockState", "Lnet/minecraft/world/level/block/state/BlockState;");
+        mvUpdate.visitVarInsn(Opcodes.ALOAD, 0);
+        mvUpdate.visitFieldInsn(Opcodes.GETFIELD, generatedName, "rootTreesMap", "Ljava/util/Map;");
+        mvUpdate.visitMethodInsn(Opcodes.INVOKESTATIC, "proto/mechanicalarmory/client/flywheel/slicer/PoseHelper", "updateVisibility", "(Lnet/minecraft/world/level/block/state/BlockState;Ljava/util/Map;)V", false);
+
         for (AbstractInsnNode insn : slices.animationSlice) {
             if (slices.captureStateMap.containsKey(insn)) {
                 String fieldName = slices.captureStateMap.get(insn);
@@ -293,7 +337,7 @@ public class RuntimeVisualGenerator {
                 mvUpdate.visitFieldInsn(Opcodes.GETFIELD, "proto/mechanicalarmory/client/flywheel/slicer/DummyModelPart", "zRot", "F");
                 mvUpdate.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "dev/engine_room/flywheel/lib/model/part/InstanceTree", "zRot", "(F)V", false);
 
-                // x, y, z translation (scaling is handled similarly if needed, but x,y,z are standard)
+                // x, y, z translation
                 mvUpdate.visitVarInsn(Opcodes.ALOAD, 0);
                 mvUpdate.visitFieldInsn(Opcodes.GETFIELD, generatedName, "tree_" + partName, "Ldev/engine_room/flywheel/lib/model/part/InstanceTree;");
                 mvUpdate.visitVarInsn(Opcodes.ALOAD, 0);
@@ -314,47 +358,22 @@ public class RuntimeVisualGenerator {
                 mvUpdate.visitFieldInsn(Opcodes.GETFIELD, generatedName, "dummy_" + partName, "Lproto/mechanicalarmory/client/flywheel/slicer/DummyModelPart;");
                 mvUpdate.visitFieldInsn(Opcodes.GETFIELD, "proto/mechanicalarmory/client/flywheel/slicer/DummyModelPart", "z", "F");
                 mvUpdate.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "dev/engine_room/flywheel/lib/model/part/InstanceTree", "zPos", "(F)V", false);
-                
-                // tree_part.propagateAnimation(matrix, false)
-                mvUpdate.visitVarInsn(Opcodes.ALOAD, 0);
-                mvUpdate.visitFieldInsn(Opcodes.GETFIELD, generatedName, "tree_" + partName, "Ldev/engine_room/flywheel/lib/model/part/InstanceTree;");
-                
-                mvUpdate.visitTypeInsn(Opcodes.NEW, "org/joml/Matrix4f");
-                mvUpdate.visitInsn(Opcodes.DUP);
-                mvUpdate.visitMethodInsn(Opcodes.INVOKESPECIAL, "org/joml/Matrix4f", "<init>", "()V", false);
-                
-                mvUpdate.visitVarInsn(Opcodes.ALOAD, 0);
-                mvUpdate.visitMethodInsn(Opcodes.INVOKEVIRTUAL, generatedName, "getVisualPosition", "()Lnet/minecraft/core/BlockPos;", false);
-                mvUpdate.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "net/minecraft/core/Vec3i", "getX", "()I", false);
-                mvUpdate.visitInsn(Opcodes.I2F);
-                mvUpdate.visitLdcInsn(0.5f);
-                mvUpdate.visitInsn(Opcodes.FADD);
-                
-                mvUpdate.visitVarInsn(Opcodes.ALOAD, 0);
-                mvUpdate.visitMethodInsn(Opcodes.INVOKEVIRTUAL, generatedName, "getVisualPosition", "()Lnet/minecraft/core/BlockPos;", false);
-                mvUpdate.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "net/minecraft/core/Vec3i", "getY", "()I", false);
-                mvUpdate.visitInsn(Opcodes.I2F);
-                mvUpdate.visitLdcInsn(0.5f);
-                mvUpdate.visitInsn(Opcodes.FADD);
-                
-                mvUpdate.visitVarInsn(Opcodes.ALOAD, 0);
-                mvUpdate.visitMethodInsn(Opcodes.INVOKEVIRTUAL, generatedName, "getVisualPosition", "()Lnet/minecraft/core/BlockPos;", false);
-                mvUpdate.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "net/minecraft/core/Vec3i", "getZ", "()I", false);
-                mvUpdate.visitInsn(Opcodes.I2F);
-                mvUpdate.visitLdcInsn(0.5f);
-                mvUpdate.visitInsn(Opcodes.FADD);
-                
-                mvUpdate.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "org/joml/Matrix4f", "translate", "(FFF)Lorg/joml/Matrix4f;", false);
-                
-                // Minecraft's native model invert
-                mvUpdate.visitLdcInsn(1.0f);
-                mvUpdate.visitLdcInsn(-1.0f);
-                mvUpdate.visitLdcInsn(-1.0f);
-                mvUpdate.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "org/joml/Matrix4f", "scale", "(FFF)Lorg/joml/Matrix4f;", false);
-                
-                mvUpdate.visitInsn(Opcodes.ICONST_0); // false
-                mvUpdate.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "dev/engine_room/flywheel/lib/model/part/InstanceTree", "propagateAnimation", "(Lorg/joml/Matrix4fc;Z)V", false);
             }
+        }
+        
+        // Propagate animation on ROOT trees only!
+        for (String layerField : uniqueLayerFields) {
+            mvUpdate.visitVarInsn(Opcodes.ALOAD, 0);
+            mvUpdate.visitFieldInsn(Opcodes.GETFIELD, generatedName, "rootTree_" + layerField, "Ldev/engine_room/flywheel/lib/model/part/InstanceTree;");
+            
+            mvUpdate.visitVarInsn(Opcodes.ALOAD, 0);
+            mvUpdate.visitMethodInsn(Opcodes.INVOKEVIRTUAL, generatedName, "getVisualPosition", "()Lnet/minecraft/core/BlockPos;", false);
+            mvUpdate.visitVarInsn(Opcodes.ALOAD, 0);
+            mvUpdate.visitFieldInsn(Opcodes.GETFIELD, "dev/engine_room/flywheel/lib/visual/AbstractBlockEntityVisual", "blockState", "Lnet/minecraft/world/level/block/state/BlockState;");
+            mvUpdate.visitMethodInsn(Opcodes.INVOKESTATIC, "proto/mechanicalarmory/client/flywheel/slicer/PoseHelper", "createInitialPose", "(Lnet/minecraft/core/BlockPos;Lnet/minecraft/world/level/block/state/BlockState;)Lorg/joml/Matrix4f;", false);
+            
+            mvUpdate.visitInsn(Opcodes.ICONST_0); // false
+            mvUpdate.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "dev/engine_room/flywheel/lib/model/part/InstanceTree", "propagateAnimation", "(Lorg/joml/Matrix4fc;Z)V", false);
         }
         
         mvUpdate.visitInsn(Opcodes.RETURN);
@@ -369,13 +388,11 @@ public class RuntimeVisualGenerator {
         mvLight.visitMethodInsn(Opcodes.INVOKESPECIAL, "dev/engine_room/flywheel/lib/visual/AbstractBlockEntityVisual", "computePackedLight", "()I", false);
         mvLight.visitVarInsn(Opcodes.ISTORE, 2);
         
-        for (String partName : dummyParts) {
-            if (fieldToChildName.containsKey(partName)) {
-                mvLight.visitVarInsn(Opcodes.ALOAD, 0);
-                mvLight.visitFieldInsn(Opcodes.GETFIELD, generatedName, "tree_" + partName, "Ldev/engine_room/flywheel/lib/model/part/InstanceTree;");
-                mvLight.visitVarInsn(Opcodes.ILOAD, 2);
-                mvLight.visitMethodInsn(Opcodes.INVOKESTATIC, "proto/mechanicalarmory/client/flywheel/slicer/LightHelper", "light", "(Ldev/engine_room/flywheel/lib/model/part/InstanceTree;I)V", false);
-            }
+        for (String layerField : uniqueLayerFields) {
+            mvLight.visitVarInsn(Opcodes.ALOAD, 0);
+            mvLight.visitFieldInsn(Opcodes.GETFIELD, generatedName, "rootTree_" + layerField, "Ldev/engine_room/flywheel/lib/model/part/InstanceTree;");
+            mvLight.visitVarInsn(Opcodes.ILOAD, 2);
+            mvLight.visitMethodInsn(Opcodes.INVOKESTATIC, "proto/mechanicalarmory/client/flywheel/slicer/LightHelper", "light", "(Ldev/engine_room/flywheel/lib/model/part/InstanceTree;I)V", false);
         }
         mvLight.visitInsn(Opcodes.RETURN);
         mvLight.visitMaxs(0, 0);
@@ -384,13 +401,11 @@ public class RuntimeVisualGenerator {
         // 5. Generate collectCrumblingInstances
         MethodVisitor mvCollect = cw.visitMethod(Opcodes.ACC_PUBLIC, "collectCrumblingInstances", "(Ljava/util/function/Consumer;)V", "(Ljava/util/function/Consumer<Ldev/engine_room/flywheel/api/instance/Instance;>;)V", null);
         mvCollect.visitCode();
-        for (String partName : dummyParts) {
-            if (fieldToChildName.containsKey(partName)) {
-                mvCollect.visitVarInsn(Opcodes.ALOAD, 0);
-                mvCollect.visitFieldInsn(Opcodes.GETFIELD, generatedName, "tree_" + partName, "Ldev/engine_room/flywheel/lib/model/part/InstanceTree;");
-                mvCollect.visitVarInsn(Opcodes.ALOAD, 1);
-                mvCollect.visitMethodInsn(Opcodes.INVOKESTATIC, "proto/mechanicalarmory/client/flywheel/slicer/LightHelper", "crumble", "(Ldev/engine_room/flywheel/lib/model/part/InstanceTree;Ljava/util/function/Consumer;)V", false);
-            }
+        for (String layerField : uniqueLayerFields) {
+            mvCollect.visitVarInsn(Opcodes.ALOAD, 0);
+            mvCollect.visitFieldInsn(Opcodes.GETFIELD, generatedName, "rootTree_" + layerField, "Ldev/engine_room/flywheel/lib/model/part/InstanceTree;");
+            mvCollect.visitVarInsn(Opcodes.ALOAD, 1);
+            mvCollect.visitMethodInsn(Opcodes.INVOKESTATIC, "proto/mechanicalarmory/client/flywheel/slicer/LightHelper", "crumble", "(Ldev/engine_room/flywheel/lib/model/part/InstanceTree;Ljava/util/function/Consumer;)V", false);
         }
         mvCollect.visitInsn(Opcodes.RETURN);
         mvCollect.visitMaxs(0, 0);
@@ -399,12 +414,10 @@ public class RuntimeVisualGenerator {
         // 6. Generate _delete
         MethodVisitor mvDelete = cw.visitMethod(Opcodes.ACC_PROTECTED, "_delete", "()V", null, null);
         mvDelete.visitCode();
-        for (String partName : dummyParts) {
-            if (fieldToChildName.containsKey(partName)) {
-                mvDelete.visitVarInsn(Opcodes.ALOAD, 0);
-                mvDelete.visitFieldInsn(Opcodes.GETFIELD, generatedName, "tree_" + partName, "Ldev/engine_room/flywheel/lib/model/part/InstanceTree;");
-                mvDelete.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "dev/engine_room/flywheel/lib/model/part/InstanceTree", "delete", "()V", false);
-            }
+        for (String layerField : uniqueLayerFields) {
+            mvDelete.visitVarInsn(Opcodes.ALOAD, 0);
+            mvDelete.visitFieldInsn(Opcodes.GETFIELD, generatedName, "rootTree_" + layerField, "Ldev/engine_room/flywheel/lib/model/part/InstanceTree;");
+            mvDelete.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "dev/engine_room/flywheel/lib/model/part/InstanceTree", "delete", "()V", false);
         }
         mvDelete.visitInsn(Opcodes.RETURN);
         mvDelete.visitMaxs(0, 0);

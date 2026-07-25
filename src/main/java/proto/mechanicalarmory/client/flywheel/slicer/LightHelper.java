@@ -8,7 +8,7 @@ import java.util.function.Consumer;
 public class LightHelper {
     public static void light(InstanceTree tree, int packedLight) {
         if (tree != null) {
-            tree.traverse(inst -> inst.light(packedLight));
+            tree.traverse(inst -> inst.light(packedLight).setChanged());
         }
     }
 
