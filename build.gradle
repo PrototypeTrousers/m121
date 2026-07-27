@@ -46,6 +46,7 @@ repositories {
     maven { url = "https://maven.teamresourceful.com/repository/maven-public/" }
     maven { url = "https://beta.cursemaven.com" }
     maven { url "https://api.modrinth.com/maven" }
+    google()
 }
 
 base {
@@ -130,6 +131,17 @@ dependencies {
     // And its provides the option to then use net.minecraft as the group, and one of; client, server or joined as the module name, plus the game version as version.
     // For all intends and purposes: You can treat this dependency as if it is a normal library you would use.
     implementation "net.neoforged:neoforge:${neo_version}"
+
+    implementation "org.soot-oss:sootup.core:2.0.0"
+    implementation "org.soot-oss:sootup.java.core:2.0.0"
+    implementation "org.soot-oss:sootup.interceptors:2.0.0"
+    implementation "org.soot-oss:sootup.java.bytecode.frontend:2.0.0"
+    implementation "org.soot-oss:sootup.jimple.frontend:2.0.0"
+    implementation "org.soot-oss:sootup.apk.frontend:2.0.0"
+    implementation "org.soot-oss:sootup.callgraph:2.0.0"
+    implementation "org.soot-oss:sootup.analysis.intraprocedural:2.0.0"
+    implementation "org.soot-oss:sootup.analysis.interprocedural:2.0.0"
+    implementation "org.soot-oss:sootup.codepropertygraph:2.0.0"
 
     // Example optional mod dependency with JEI
     // The JEI API is declared for compile time use, while the full JEI artifact is used at runtime
@@ -326,3 +338,4 @@ idea {
 }
 task runSlicerTest(type: JavaExec) { mainClass = 'proto.mechanicalarmory.client.flywheel.slicer.SlicerTest'; classpath = sourceSets.test.runtimeClasspath }
 task runRendererInspector(type: JavaExec) { mainClass = 'proto.mechanicalarmory.client.flywheel.slicer.RendererInspectorTest'; classpath = sourceSets.test.runtimeClasspath }
+task runEntitySlicerTest(type: JavaExec) { mainClass = 'proto.mechanicalarmory.client.flywheel.slicer.EntitySlicerTest'; classpath = sourceSets.test.runtimeClasspath }

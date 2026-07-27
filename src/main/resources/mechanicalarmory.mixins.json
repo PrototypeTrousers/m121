@@ -12,6 +12,7 @@
     "BufferSourceAccessor",
     "ClientLevelMixin",
     "CompositeRenderTypeAccessor",
+    "EntityRenderDispatcherAccessor",
     "EntityRenderersAccessor",
     "FullyBufferedMultiBufferSourceAccessor",
     "LevelRendererMixin",

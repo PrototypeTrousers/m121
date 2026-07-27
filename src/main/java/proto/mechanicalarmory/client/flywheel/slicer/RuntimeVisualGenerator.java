@@ -1,14 +1,23 @@
 package proto.mechanicalarmory.client.flywheel.slicer;
 
 import org.objectweb.asm.ClassWriter;
+import org.objectweb.asm.Label;
 import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.tree.AbstractInsnNode;
 import org.objectweb.asm.tree.FieldInsnNode;
+import org.objectweb.asm.tree.JumpInsnNode;
+import org.objectweb.asm.tree.LabelNode;
 import org.objectweb.asm.tree.MethodInsnNode;
+import org.objectweb.asm.tree.ClassNode;
 import org.objectweb.asm.tree.MethodNode;
+import org.objectweb.asm.tree.LineNumberNode;
+import org.objectweb.asm.tree.TableSwitchInsnNode;
+import org.objectweb.asm.tree.LookupSwitchInsnNode;
 
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Set;
 
@@ -20,11 +29,29 @@ public class RuntimeVisualGenerator {
      * @param slices The dual slice result containing the separated instructions.
      * @return The byte array representing the newly generated .class file.
      */
+    private static ClassWriter createClassWriter(String generatedName, String superClassName) {
+        return new ClassWriter(ClassWriter.COMPUTE_FRAMES | ClassWriter.COMPUTE_MAXS) {
+            @Override
+            protected String getCommonSuperClass(String type1, String type2) {
+                if (type1.equals(generatedName) || type2.equals(generatedName)) {
+                    return superClassName;
+                }
+                if (type1.startsWith("proto/mechanicalarmory") || type2.startsWith("proto/mechanicalarmory")) {
+                    return "java/lang/Object";
+                }
+                try {
+                    return super.getCommonSuperClass(type1, type2);
+                } catch (Exception e) {
+                    return "java/lang/Object";
+                }
+            }
+        };
+    }
+
     public static byte[] generateVisualClass(org.objectweb.asm.tree.ClassNode originalClassNode, BytecodeDualSlicer.SliceResult slices) {
         String originalClassName = originalClassNode.name;
-        ClassWriter cw = new ClassWriter(ClassWriter.COMPUTE_FRAMES | ClassWriter.COMPUTE_MAXS);
-        
         String generatedName = originalClassName.replace('/', '_') + "_FlywheelVisual";
+        ClassWriter cw = createClassWriter(generatedName, "dev/engine_room/flywheel/lib/visual/AbstractBlockEntityVisual");
         
         String beInternalName = "net/minecraft/world/level/block/entity/BlockEntity";
         for (MethodNode mn : originalClassNode.methods) {
@@ -120,6 +147,20 @@ public class RuntimeVisualGenerator {
             cw.visitField(Opcodes.ACC_PRIVATE, "tree_" + partName, "Ldev/engine_room/flywheel/lib/model/part/InstanceTree;", null, null).visitEnd();
         }
 
+        Set<String> generatedFields = new HashSet<>();
+        ClassNode currNode = originalClassNode;
+        while (currNode != null && !"java/lang/Object".equals(currNode.name)) {
+            for (org.objectweb.asm.tree.FieldNode fn : currNode.fields) {
+                if ((fn.access & Opcodes.ACC_STATIC) == 0 && !"Lnet/minecraft/client/model/geom/ModelPart;".equals(fn.desc)) {
+                    if (generatedFields.add(fn.name)) {
+                        cw.visitField(Opcodes.ACC_PUBLIC, fn.name, fn.desc, null, null).visitEnd();
+                    }
+                }
+            }
+            if (currNode.superName == null || "java/lang/Object".equals(currNode.superName)) break;
+            try { currNode = RendererAnalyzer.loadClassNode(currNode.superName); } catch (Exception e) { break; }
+        }
+
         // Generate rootTree fields and map
         for (String layerField : uniqueLayerFields) {
             cw.visitField(Opcodes.ACC_PRIVATE, "rootTree_" + layerField, "Ldev/engine_room/flywheel/lib/model/part/InstanceTree;", null, null).visitEnd();
@@ -136,7 +177,15 @@ public class RuntimeVisualGenerator {
         mvInit.visitVarInsn(Opcodes.FLOAD, 3); // partialTick
         mvInit.visitMethodInsn(Opcodes.INVOKESPECIAL, "dev/engine_room/flywheel/lib/visual/AbstractBlockEntityVisual", "<init>", "(Ldev/engine_room/flywheel/api/visualization/VisualizationContext;Lnet/minecraft/world/level/block/entity/BlockEntity;F)V", false);
         
-        // Initialize rootTreesMap = new HashMap()
+        for (String partName : dummyParts) {
+            mvInit.visitVarInsn(Opcodes.ALOAD, 0);
+            mvInit.visitTypeInsn(Opcodes.NEW, "proto/mechanicalarmory/client/flywheel/slicer/DummyModelPart");
+            mvInit.visitInsn(Opcodes.DUP);
+            mvInit.visitMethodInsn(Opcodes.INVOKESPECIAL, "proto/mechanicalarmory/client/flywheel/slicer/DummyModelPart", "<init>", "()V", false);
+            mvInit.visitFieldInsn(Opcodes.PUTFIELD, generatedName, "dummy_" + partName, "Lproto/mechanicalarmory/client/flywheel/slicer/DummyModelPart;");
+        }
+
+        // Initialize rootTreesMap = new HashMap<>();
         mvInit.visitVarInsn(Opcodes.ALOAD, 0);
         mvInit.visitTypeInsn(Opcodes.NEW, "java/util/HashMap");
         mvInit.visitInsn(Opcodes.DUP);
@@ -209,6 +258,10 @@ public class RuntimeVisualGenerator {
             }
         }
         
+        mvInit.visitVarInsn(Opcodes.ALOAD, 0);
+        mvInit.visitVarInsn(Opcodes.FLOAD, 3);
+        mvInit.visitMethodInsn(Opcodes.INVOKEVIRTUAL, generatedName, "updateLight", "(F)V", false);
+
         mvInit.visitInsn(Opcodes.RETURN);
         mvInit.visitMaxs(0, 0);
         mvInit.visitEnd();
@@ -217,8 +270,50 @@ public class RuntimeVisualGenerator {
         MethodVisitor mvTick = cw.visitMethod(Opcodes.ACC_PUBLIC, "tick", "(Ldev/engine_room/flywheel/api/visual/TickableVisual$Context;)V", null, null);
         mvTick.visitCode();
         
+        // Build fresh labels for the capture slice (same reason as beginFrame: stale Label objects)
+        Map<LabelNode, Label> tickLabelMap = new HashMap<>();
+        for (AbstractInsnNode insn : slices.captureSlice) {
+            if (insn instanceof LabelNode ln) tickLabelMap.put(ln, new Label());
+            else if (insn instanceof JumpInsnNode jin) tickLabelMap.computeIfAbsent(jin.label, k -> new Label());
+            else if (insn instanceof TableSwitchInsnNode tsin) {
+                tickLabelMap.computeIfAbsent(tsin.dflt, k -> new Label());
+                for (LabelNode l : tsin.labels) tickLabelMap.computeIfAbsent(l, k -> new Label());
+            } else if (insn instanceof LookupSwitchInsnNode lsin) {
+                tickLabelMap.computeIfAbsent(lsin.dflt, k -> new Label());
+                for (LabelNode l : lsin.labels) tickLabelMap.computeIfAbsent(l, k -> new Label());
+            } else if (insn instanceof LineNumberNode lnn) {
+                tickLabelMap.computeIfAbsent(lnn.start, k -> new Label());
+            }
+        }
+
         // Write all capture instructions in topological order
         for (AbstractInsnNode insn : slices.captureSlice) {
+            if (insn.getType() == AbstractInsnNode.FRAME) continue;
+            if (insn instanceof LineNumberNode lnn) {
+                Label fresh = tickLabelMap.get(lnn.start);
+                if (fresh != null) mvTick.visitLineNumber(lnn.line, fresh);
+                continue;
+            }
+            if (insn instanceof LabelNode ln) {
+                Label fresh = tickLabelMap.get(ln);
+                if (fresh != null) mvTick.visitLabel(fresh);
+                continue;
+            }
+            if (insn instanceof JumpInsnNode jin) {
+                mvTick.visitJumpInsn(jin.getOpcode(), tickLabelMap.get(jin.label));
+                continue;
+            }
+            if (insn instanceof TableSwitchInsnNode tsin) {
+                Label[] freshLabels = tsin.labels.stream().map(l -> tickLabelMap.get(l)).toArray(Label[]::new);
+                mvTick.visitTableSwitchInsn(tsin.min, tsin.max, tickLabelMap.get(tsin.dflt), freshLabels);
+                continue;
+            }
+            if (insn instanceof LookupSwitchInsnNode lsin) {
+                int[] keys = lsin.keys.stream().mapToInt(Integer::intValue).toArray();
+                Label[] freshLabels = lsin.labels.stream().map(l -> tickLabelMap.get(l)).toArray(Label[]::new);
+                mvTick.visitLookupSwitchInsn(tickLabelMap.get(lsin.dflt), keys, freshLabels);
+                continue;
+            }
             if (insn instanceof org.objectweb.asm.tree.VarInsnNode vin) {
                 if (vin.var == 1 && vin.getOpcode() == Opcodes.ALOAD) {
                     mvTick.visitVarInsn(Opcodes.ALOAD, 0); // this
@@ -233,9 +328,9 @@ public class RuntimeVisualGenerator {
                     continue;
                 }
             }
-            
+
             insn.accept(mvTick);
-            
+
             if (slices.captureStateMap.containsKey(insn)) {
                 String fieldName = slices.captureStateMap.get(insn);
                 String desc = "F";
@@ -285,7 +380,85 @@ public class RuntimeVisualGenerator {
         mvUpdate.visitFieldInsn(Opcodes.GETFIELD, generatedName, "rootTreesMap", "Ljava/util/Map;");
         mvUpdate.visitMethodInsn(Opcodes.INVOKESTATIC, "proto/mechanicalarmory/client/flywheel/slicer/PoseHelper", "updateVisibility", "(Lnet/minecraft/world/level/block/state/BlockState;Ljava/util/Map;)V", false);
 
+        for (String partName : dummyParts) {
+            mvUpdate.visitVarInsn(Opcodes.ALOAD, 0);
+            mvUpdate.visitFieldInsn(Opcodes.GETFIELD, generatedName, "dummy_" + partName, "Lproto/mechanicalarmory/client/flywheel/slicer/DummyModelPart;");
+            mvUpdate.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "proto/mechanicalarmory/client/flywheel/slicer/DummyModelPart", "resetPose", "()V", false);
+        }
+
+        Map<Integer, Integer> varMap = new HashMap<>();
+        int nextVar = 2;
         for (AbstractInsnNode insn : slices.animationSlice) {
+            int oldVar = -1;
+            int typeSize = 1;
+            if (insn instanceof org.objectweb.asm.tree.VarInsnNode vin && vin.var >= 3) {
+                oldVar = vin.var;
+                if (vin.getOpcode() == Opcodes.LLOAD || vin.getOpcode() == Opcodes.DLOAD || vin.getOpcode() == Opcodes.LSTORE || vin.getOpcode() == Opcodes.DSTORE) {
+                    typeSize = 2;
+                }
+            } else if (insn instanceof org.objectweb.asm.tree.IincInsnNode iin && iin.var >= 3) {
+                oldVar = iin.var;
+            }
+            if (oldVar >= 3 && !varMap.containsKey(oldVar)) {
+                varMap.put(oldVar, nextVar);
+                nextVar += typeSize;
+            }
+        }
+
+        // Build a fresh Label mapping so we never pass stale Label objects
+        // (with pre-set bytecodeOffset/frame/outgoingEdges from the original ClassNode) into the
+        // new MethodWriter. Reusing those stale Label instances corrupts ASM's CFG and triggers
+        // Frame.merge ArrayIndexOutOfBoundsException during COMPUTE_FRAMES.
+        Map<LabelNode, Label> labelMap = new HashMap<>();
+        for (AbstractInsnNode insn : slices.animationSlice) {
+            if (insn instanceof LabelNode ln) {
+                labelMap.put(ln, new Label());
+            } else if (insn instanceof JumpInsnNode jin) {
+                labelMap.computeIfAbsent(jin.label, k -> new Label());
+            } else if (insn instanceof TableSwitchInsnNode tsin) {
+                labelMap.computeIfAbsent(tsin.dflt, k -> new Label());
+                for (LabelNode l : tsin.labels) labelMap.computeIfAbsent(l, k -> new Label());
+            } else if (insn instanceof LookupSwitchInsnNode lsin) {
+                labelMap.computeIfAbsent(lsin.dflt, k -> new Label());
+                for (LabelNode l : lsin.labels) labelMap.computeIfAbsent(l, k -> new Label());
+            } else if (insn instanceof LineNumberNode lnn) {
+                labelMap.computeIfAbsent(lnn.start, k -> new Label());
+            }
+        }
+
+        for (AbstractInsnNode insn : slices.animationSlice) {
+            // Skip FrameNode — COMPUTE_FRAMES ignores visitFrame, but skipping avoids passing
+            // stale frame data.
+            if (insn.getType() == AbstractInsnNode.FRAME) continue;
+            // Remap LineNumberNode to use fresh label
+            if (insn instanceof LineNumberNode lnn) {
+                mvUpdate.visitLineNumber(lnn.line, labelMap.get(lnn.start));
+                continue;
+            }
+            // Remap LabelNode to use fresh label
+            if (insn instanceof LabelNode ln) {
+                mvUpdate.visitLabel(labelMap.get(ln));
+                continue;
+            }
+            // Remap JumpInsnNode to use fresh target label
+            if (insn instanceof JumpInsnNode jin) {
+                mvUpdate.visitJumpInsn(jin.getOpcode(), labelMap.get(jin.label));
+                continue;
+            }
+            // Remap TableSwitchInsnNode
+            if (insn instanceof TableSwitchInsnNode tsin) {
+                Label[] freshLabels = tsin.labels.stream().map(l -> labelMap.get(l)).toArray(Label[]::new);
+                mvUpdate.visitTableSwitchInsn(tsin.min, tsin.max, labelMap.get(tsin.dflt), freshLabels);
+                continue;
+            }
+            // Remap LookupSwitchInsnNode
+            if (insn instanceof LookupSwitchInsnNode lsin) {
+                int[] keys = lsin.keys.stream().mapToInt(Integer::intValue).toArray();
+                Label[] freshLabels = lsin.labels.stream().map(l -> labelMap.get(l)).toArray(Label[]::new);
+                mvUpdate.visitLookupSwitchInsn(labelMap.get(lsin.dflt), keys, freshLabels);
+                continue;
+            }
+
             if (slices.captureStateMap.containsKey(insn)) {
                 String fieldName = slices.captureStateMap.get(insn);
                 String desc = "F";
@@ -306,12 +479,11 @@ public class RuntimeVisualGenerator {
                 } else if (fin.owner.equals("net/minecraft/client/model/geom/ModelPart")) {
                     mvUpdate.visitFieldInsn(Opcodes.GETFIELD, "proto/mechanicalarmory/client/flywheel/slicer/DummyModelPart", fin.name, fin.desc);
                 } else {
-                    mvUpdate.visitInsn(Opcodes.POP);
-                    mvUpdate.visitInsn(Opcodes.ACONST_NULL);
+                    mvUpdate.visitFieldInsn(Opcodes.GETFIELD, generatedName, fin.name, fin.desc);
                 }
             } else if (insn instanceof MethodInsnNode min && min.desc.endsWith("Lnet/minecraft/client/model/geom/ModelPart;")) {
-                String partName = min.name.startsWith("get") && min.name.length() > 3 
-                    ? Character.toLowerCase(min.name.charAt(3)) + min.name.substring(4) 
+                String partName = min.name.startsWith("get") && min.name.length() > 3
+                    ? Character.toLowerCase(min.name.charAt(3)) + min.name.substring(4)
                     : min.name;
                 mvUpdate.visitVarInsn(Opcodes.ALOAD, 0);
                 mvUpdate.visitFieldInsn(Opcodes.GETFIELD, generatedName, "dummy_" + partName, "Lproto/mechanicalarmory/client/flywheel/slicer/DummyModelPart;");
@@ -322,7 +494,7 @@ public class RuntimeVisualGenerator {
                 if (fin.owner.equals("net/minecraft/client/model/geom/ModelPart")) {
                     mvUpdate.visitFieldInsn(Opcodes.PUTFIELD, "proto/mechanicalarmory/client/flywheel/slicer/DummyModelPart", fin.name, fin.desc);
                 } else {
-                    insn.accept(mvUpdate);
+                    mvUpdate.visitFieldInsn(Opcodes.PUTFIELD, generatedName, fin.name, fin.desc);
                 }
             } else {
                 if (insn instanceof org.objectweb.asm.tree.VarInsnNode vin) {
@@ -339,6 +511,13 @@ public class RuntimeVisualGenerator {
                         mvUpdate.visitMethodInsn(Opcodes.INVOKEINTERFACE, "dev/engine_room/flywheel/api/visual/DynamicVisual$Context", "partialTick", "()F", true);
                         continue;
                     }
+                    if (vin.var >= 3) {
+                        mvUpdate.visitVarInsn(vin.getOpcode(), varMap.get(vin.var));
+                        continue;
+                    }
+                } else if (insn instanceof org.objectweb.asm.tree.IincInsnNode iin && iin.var >= 3) {
+                    mvUpdate.visitIincInsn(varMap.get(iin.var), iin.incr);
+                    continue;
                 }
                 insn.accept(mvUpdate);
             }
@@ -346,54 +525,11 @@ public class RuntimeVisualGenerator {
         
         // SYNC: Apply dummy transformations to instances
         for (String partName : dummyParts) {
-            // Check if tree exists
-            if (fieldToChildName.containsKey(partName)) {
-                // tree.xRot(dummy.xRot)
-                mvUpdate.visitVarInsn(Opcodes.ALOAD, 0);
-                mvUpdate.visitFieldInsn(Opcodes.GETFIELD, generatedName, "tree_" + partName, "Ldev/engine_room/flywheel/lib/model/part/InstanceTree;");
-                mvUpdate.visitVarInsn(Opcodes.ALOAD, 0);
-                mvUpdate.visitFieldInsn(Opcodes.GETFIELD, generatedName, "dummy_" + partName, "Lproto/mechanicalarmory/client/flywheel/slicer/DummyModelPart;");
-                mvUpdate.visitFieldInsn(Opcodes.GETFIELD, "proto/mechanicalarmory/client/flywheel/slicer/DummyModelPart", "xRot", "F");
-                mvUpdate.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "dev/engine_room/flywheel/lib/model/part/InstanceTree", "xRot", "(F)V", false);
-
-                // tree.yRot(dummy.yRot)
-                mvUpdate.visitVarInsn(Opcodes.ALOAD, 0);
-                mvUpdate.visitFieldInsn(Opcodes.GETFIELD, generatedName, "tree_" + partName, "Ldev/engine_room/flywheel/lib/model/part/InstanceTree;");
-                mvUpdate.visitVarInsn(Opcodes.ALOAD, 0);
-                mvUpdate.visitFieldInsn(Opcodes.GETFIELD, generatedName, "dummy_" + partName, "Lproto/mechanicalarmory/client/flywheel/slicer/DummyModelPart;");
-                mvUpdate.visitFieldInsn(Opcodes.GETFIELD, "proto/mechanicalarmory/client/flywheel/slicer/DummyModelPart", "yRot", "F");
-                mvUpdate.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "dev/engine_room/flywheel/lib/model/part/InstanceTree", "yRot", "(F)V", false);
-
-                // tree.zRot(dummy.zRot)
-                mvUpdate.visitVarInsn(Opcodes.ALOAD, 0);
-                mvUpdate.visitFieldInsn(Opcodes.GETFIELD, generatedName, "tree_" + partName, "Ldev/engine_room/flywheel/lib/model/part/InstanceTree;");
-                mvUpdate.visitVarInsn(Opcodes.ALOAD, 0);
-                mvUpdate.visitFieldInsn(Opcodes.GETFIELD, generatedName, "dummy_" + partName, "Lproto/mechanicalarmory/client/flywheel/slicer/DummyModelPart;");
-                mvUpdate.visitFieldInsn(Opcodes.GETFIELD, "proto/mechanicalarmory/client/flywheel/slicer/DummyModelPart", "zRot", "F");
-                mvUpdate.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "dev/engine_room/flywheel/lib/model/part/InstanceTree", "zRot", "(F)V", false);
-
-                // x, y, z translation
-                mvUpdate.visitVarInsn(Opcodes.ALOAD, 0);
-                mvUpdate.visitFieldInsn(Opcodes.GETFIELD, generatedName, "tree_" + partName, "Ldev/engine_room/flywheel/lib/model/part/InstanceTree;");
-                mvUpdate.visitVarInsn(Opcodes.ALOAD, 0);
-                mvUpdate.visitFieldInsn(Opcodes.GETFIELD, generatedName, "dummy_" + partName, "Lproto/mechanicalarmory/client/flywheel/slicer/DummyModelPart;");
-                mvUpdate.visitFieldInsn(Opcodes.GETFIELD, "proto/mechanicalarmory/client/flywheel/slicer/DummyModelPart", "x", "F");
-                mvUpdate.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "dev/engine_room/flywheel/lib/model/part/InstanceTree", "xPos", "(F)V", false);
-                
-                mvUpdate.visitVarInsn(Opcodes.ALOAD, 0);
-                mvUpdate.visitFieldInsn(Opcodes.GETFIELD, generatedName, "tree_" + partName, "Ldev/engine_room/flywheel/lib/model/part/InstanceTree;");
-                mvUpdate.visitVarInsn(Opcodes.ALOAD, 0);
-                mvUpdate.visitFieldInsn(Opcodes.GETFIELD, generatedName, "dummy_" + partName, "Lproto/mechanicalarmory/client/flywheel/slicer/DummyModelPart;");
-                mvUpdate.visitFieldInsn(Opcodes.GETFIELD, "proto/mechanicalarmory/client/flywheel/slicer/DummyModelPart", "y", "F");
-                mvUpdate.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "dev/engine_room/flywheel/lib/model/part/InstanceTree", "yPos", "(F)V", false);
-                
-                mvUpdate.visitVarInsn(Opcodes.ALOAD, 0);
-                mvUpdate.visitFieldInsn(Opcodes.GETFIELD, generatedName, "tree_" + partName, "Ldev/engine_room/flywheel/lib/model/part/InstanceTree;");
-                mvUpdate.visitVarInsn(Opcodes.ALOAD, 0);
-                mvUpdate.visitFieldInsn(Opcodes.GETFIELD, generatedName, "dummy_" + partName, "Lproto/mechanicalarmory/client/flywheel/slicer/DummyModelPart;");
-                mvUpdate.visitFieldInsn(Opcodes.GETFIELD, "proto/mechanicalarmory/client/flywheel/slicer/DummyModelPart", "z", "F");
-                mvUpdate.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "dev/engine_room/flywheel/lib/model/part/InstanceTree", "zPos", "(F)V", false);
-            }
+            mvUpdate.visitVarInsn(Opcodes.ALOAD, 0);
+            mvUpdate.visitFieldInsn(Opcodes.GETFIELD, generatedName, "dummy_" + partName, "Lproto/mechanicalarmory/client/flywheel/slicer/DummyModelPart;");
+            mvUpdate.visitVarInsn(Opcodes.ALOAD, 0);
+            mvUpdate.visitFieldInsn(Opcodes.GETFIELD, generatedName, "tree_" + partName, "Ldev/engine_room/flywheel/lib/model/part/InstanceTree;");
+            mvUpdate.visitMethodInsn(Opcodes.INVOKESTATIC, "proto/mechanicalarmory/client/flywheel/slicer/PoseHelper", "syncDummyToTree", "(Lproto/mechanicalarmory/client/flywheel/slicer/DummyModelPart;Ldev/engine_room/flywheel/lib/model/part/InstanceTree;)V", false);
         }
         
         // Propagate animation on ROOT trees only!
@@ -413,6 +549,11 @@ public class RuntimeVisualGenerator {
             mvUpdate.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "dev/engine_room/flywheel/lib/model/part/InstanceTree", "propagateAnimation", "(Lorg/joml/Matrix4fc;Z)V", false);
         }
         
+        mvUpdate.visitVarInsn(Opcodes.ALOAD, 0);
+        mvUpdate.visitVarInsn(Opcodes.ALOAD, 1);
+        mvUpdate.visitMethodInsn(Opcodes.INVOKEINTERFACE, "dev/engine_room/flywheel/api/visual/DynamicVisual$Context", "partialTick", "()F", true);
+        mvUpdate.visitMethodInsn(Opcodes.INVOKEVIRTUAL, generatedName, "updateLight", "(F)V", false);
+
         mvUpdate.visitInsn(Opcodes.RETURN);
         mvUpdate.visitMaxs(0, 0);
         mvUpdate.visitEnd();
@@ -472,6 +613,306 @@ public class RuntimeVisualGenerator {
             e.printStackTrace();
         }
         
+        return bytes;
+    }
+
+    public static byte[] generateEntityVisualClass(ClassNode modelClassNode, Class<?> rendererClass, BytecodeDualSlicer.SliceResult slices, org.objectweb.asm.tree.FieldInsnNode layerField) {
+        String generatedName = rendererClass.getName().replace('.', '_') + "_FlywheelVisual";
+        ClassWriter cw = createClassWriter(generatedName, "dev/engine_room/flywheel/lib/visual/AbstractEntityVisual");
+
+        String entityInternalName = "net/minecraft/world/entity/Entity";
+        for (MethodNode mn : modelClassNode.methods) {
+            if (mn.name.equals("setupAnim") && mn.desc.endsWith(";FFFFF)V")) {
+                org.objectweb.asm.Type[] args = org.objectweb.asm.Type.getArgumentTypes(mn.desc);
+                if (args.length > 0 && args[0].getSort() == org.objectweb.asm.Type.OBJECT) {
+                    entityInternalName = args[0].getInternalName();
+                    break;
+                }
+            }
+        }
+
+        cw.visit(Opcodes.V17, Opcodes.ACC_PUBLIC, generatedName, null, "dev/engine_room/flywheel/lib/visual/AbstractEntityVisual", new String[]{"dev/engine_room/flywheel/lib/visual/SimpleTickableVisual", "dev/engine_room/flywheel/lib/visual/SimpleDynamicVisual", "dev/engine_room/flywheel/api/visual/LightUpdatedVisual"});
+
+        for (Map.Entry<AbstractInsnNode, String> entry : slices.captureStateMap.entrySet()) {
+            AbstractInsnNode insn = entry.getKey();
+            String fieldName = entry.getValue();
+            String desc = "F";
+            if (insn instanceof MethodInsnNode min) {
+                desc = org.objectweb.asm.Type.getReturnType(min.desc).getDescriptor();
+            } else if (insn instanceof FieldInsnNode fin) {
+                desc = fin.desc;
+            }
+            cw.visitField(Opcodes.ACC_PRIVATE, fieldName, desc, null, null).visitEnd();
+        }
+
+        Set<String> generatedFields = new HashSet<>();
+        ClassNode currModel = modelClassNode;
+        while (currModel != null && !"java/lang/Object".equals(currModel.name)) {
+            for (org.objectweb.asm.tree.FieldNode fn : currModel.fields) {
+                if ((fn.access & Opcodes.ACC_STATIC) == 0 && !"Lnet/minecraft/client/model/geom/ModelPart;".equals(fn.desc)) {
+                    if (generatedFields.add(fn.name)) {
+                        cw.visitField(Opcodes.ACC_PUBLIC, fn.name, fn.desc, null, null).visitEnd();
+                    }
+                }
+            }
+            if (currModel.superName == null || "java/lang/Object".equals(currModel.superName)) break;
+            try { currModel = RendererAnalyzer.loadClassNode(currModel.superName); } catch (Exception e) { break; }
+        }
+
+        Set<String> uniqueLayerFields = new LinkedHashSet<>();
+        Map<String, String> layerFieldToOwner = new HashMap<>();
+        if (layerField != null) {
+            uniqueLayerFields.add(layerField.name);
+            layerFieldToOwner.put(layerField.name, layerField.owner);
+        } else {
+            uniqueLayerFields.add("PIG");
+            layerFieldToOwner.put("PIG", "net/minecraft/client/model/geom/ModelLayers");
+        }
+
+        for (String lf : uniqueLayerFields) {
+            cw.visitField(Opcodes.ACC_PRIVATE, "rootTree_" + lf, "Ldev/engine_room/flywheel/lib/model/part/InstanceTree;", null, null).visitEnd();
+        }
+        cw.visitField(Opcodes.ACC_PRIVATE, "rootTreesMap", "Ljava/util/Map;", null, null).visitEnd();
+        cw.visitField(Opcodes.ACC_PRIVATE, "poseHelperState", "Ljava/lang/Object;", null, null).visitEnd();
+
+        MethodVisitor mvInit = cw.visitMethod(Opcodes.ACC_PUBLIC, "<init>", "(Ldev/engine_room/flywheel/api/visualization/VisualizationContext;Lnet/minecraft/world/entity/Entity;F)V", null, null);
+        mvInit.visitCode();
+        mvInit.visitVarInsn(Opcodes.ALOAD, 0);
+        mvInit.visitVarInsn(Opcodes.ALOAD, 1);
+        mvInit.visitVarInsn(Opcodes.ALOAD, 2);
+        mvInit.visitVarInsn(Opcodes.FLOAD, 3);
+        mvInit.visitMethodInsn(Opcodes.INVOKESPECIAL, "dev/engine_room/flywheel/lib/visual/AbstractEntityVisual", "<init>", "(Ldev/engine_room/flywheel/api/visualization/VisualizationContext;Lnet/minecraft/world/entity/Entity;F)V", false);
+
+        mvInit.visitVarInsn(Opcodes.ALOAD, 0);
+        mvInit.visitTypeInsn(Opcodes.NEW, "java/util/HashMap");
+        mvInit.visitInsn(Opcodes.DUP);
+        mvInit.visitMethodInsn(Opcodes.INVOKESPECIAL, "java/util/HashMap", "<init>", "()V", false);
+        mvInit.visitFieldInsn(Opcodes.PUTFIELD, generatedName, "rootTreesMap", "Ljava/util/Map;");
+
+        for (String lf : uniqueLayerFields) {
+            mvInit.visitVarInsn(Opcodes.ALOAD, 0);
+            mvInit.visitFieldInsn(Opcodes.GETFIELD, "dev/engine_room/flywheel/lib/visual/AbstractEntityVisual", "entity", "Lnet/minecraft/world/entity/Entity;");
+            mvInit.visitMethodInsn(Opcodes.INVOKESTATIC, generatedName, "createModelTree_" + lf, "(Lnet/minecraft/world/entity/Entity;)Ldev/engine_room/flywheel/lib/model/part/ModelTree;", false);
+
+            mvInit.visitVarInsn(Opcodes.ALOAD, 0);
+            mvInit.visitMethodInsn(Opcodes.INVOKEVIRTUAL, generatedName, "instancerProvider", "()Ldev/engine_room/flywheel/api/instance/InstancerProvider;", false);
+            mvInit.visitInsn(Opcodes.SWAP);
+            mvInit.visitMethodInsn(Opcodes.INVOKESTATIC, "dev/engine_room/flywheel/lib/model/part/InstanceTree", "create", "(Ldev/engine_room/flywheel/api/instance/InstancerProvider;Ldev/engine_room/flywheel/lib/model/part/ModelTree;)Ldev/engine_room/flywheel/lib/model/part/InstanceTree;", false);
+
+            mvInit.visitVarInsn(Opcodes.ALOAD, 0);
+            mvInit.visitInsn(Opcodes.SWAP);
+            mvInit.visitFieldInsn(Opcodes.PUTFIELD, generatedName, "rootTree_" + lf, "Ldev/engine_room/flywheel/lib/model/part/InstanceTree;");
+
+            mvInit.visitVarInsn(Opcodes.ALOAD, 0);
+            mvInit.visitFieldInsn(Opcodes.GETFIELD, generatedName, "rootTreesMap", "Ljava/util/Map;");
+            mvInit.visitLdcInsn(lf);
+            mvInit.visitVarInsn(Opcodes.ALOAD, 0);
+            mvInit.visitFieldInsn(Opcodes.GETFIELD, generatedName, "rootTree_" + lf, "Ldev/engine_room/flywheel/lib/model/part/InstanceTree;");
+            mvInit.visitMethodInsn(Opcodes.INVOKEINTERFACE, "java/util/Map", "put", "(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;", true);
+            mvInit.visitInsn(Opcodes.POP);
+        }
+
+        mvInit.visitVarInsn(Opcodes.ALOAD, 0);
+        mvInit.visitVarInsn(Opcodes.ALOAD, 2); // entity
+        mvInit.visitVarInsn(Opcodes.ALOAD, 0);
+        mvInit.visitFieldInsn(Opcodes.GETFIELD, generatedName, "rootTreesMap", "Ljava/util/Map;");
+        mvInit.visitMethodInsn(Opcodes.INVOKESTATIC, "proto/mechanicalarmory/client/flywheel/slicer/PoseHelper", "setupEntityVisual", "(Lnet/minecraft/world/entity/Entity;Ljava/util/Map;)Ljava/lang/Object;", false);
+        mvInit.visitFieldInsn(Opcodes.PUTFIELD, generatedName, "poseHelperState", "Ljava/lang/Object;");
+
+        mvInit.visitVarInsn(Opcodes.ALOAD, 0);
+        mvInit.visitVarInsn(Opcodes.FLOAD, 3);
+        mvInit.visitMethodInsn(Opcodes.INVOKEVIRTUAL, generatedName, "updateLight", "(F)V", false);
+
+        mvInit.visitInsn(Opcodes.RETURN);
+        mvInit.visitMaxs(0, 0);
+        mvInit.visitEnd();
+
+        MethodVisitor mvTick = cw.visitMethod(Opcodes.ACC_PUBLIC, "tick", "(Ldev/engine_room/flywheel/api/visual/TickableVisual$Context;)V", null, null);
+        mvTick.visitCode();
+        // Build fresh labels for entity capture slice
+        Map<LabelNode, Label> entityTickLabelMap = new HashMap<>();
+        for (AbstractInsnNode insn : slices.captureSlice) {
+            if (insn instanceof LabelNode ln) entityTickLabelMap.put(ln, new Label());
+            else if (insn instanceof JumpInsnNode jin) entityTickLabelMap.computeIfAbsent(jin.label, k -> new Label());
+            else if (insn instanceof TableSwitchInsnNode tsin) {
+                entityTickLabelMap.computeIfAbsent(tsin.dflt, k -> new Label());
+                for (LabelNode l : tsin.labels) entityTickLabelMap.computeIfAbsent(l, k -> new Label());
+            } else if (insn instanceof LookupSwitchInsnNode lsin) {
+                entityTickLabelMap.computeIfAbsent(lsin.dflt, k -> new Label());
+                for (LabelNode l : lsin.labels) entityTickLabelMap.computeIfAbsent(l, k -> new Label());
+            } else if (insn instanceof LineNumberNode lnn) {
+                entityTickLabelMap.computeIfAbsent(lnn.start, k -> new Label());
+            }
+        }
+        for (AbstractInsnNode insn : slices.captureSlice) {
+            if (insn.getType() == AbstractInsnNode.FRAME) continue;
+            if (insn instanceof LineNumberNode lnn) {
+                Label fresh = entityTickLabelMap.get(lnn.start);
+                if (fresh != null) mvTick.visitLineNumber(lnn.line, fresh);
+                continue;
+            }
+            if (insn instanceof LabelNode ln) {
+                Label fresh = entityTickLabelMap.get(ln);
+                if (fresh != null) mvTick.visitLabel(fresh);
+                continue;
+            }
+            if (insn instanceof JumpInsnNode jin) {
+                mvTick.visitJumpInsn(jin.getOpcode(), entityTickLabelMap.get(jin.label));
+                continue;
+            }
+            if (insn instanceof TableSwitchInsnNode tsin) {
+                Label[] freshLabels = tsin.labels.stream().map(l -> entityTickLabelMap.get(l)).toArray(Label[]::new);
+                mvTick.visitTableSwitchInsn(tsin.min, tsin.max, entityTickLabelMap.get(tsin.dflt), freshLabels);
+                continue;
+            }
+            if (insn instanceof LookupSwitchInsnNode lsin) {
+                int[] keys = lsin.keys.stream().mapToInt(Integer::intValue).toArray();
+                Label[] freshLabels = lsin.labels.stream().map(l -> entityTickLabelMap.get(l)).toArray(Label[]::new);
+                mvTick.visitLookupSwitchInsn(entityTickLabelMap.get(lsin.dflt), keys, freshLabels);
+                continue;
+            }
+            if (insn instanceof org.objectweb.asm.tree.VarInsnNode vin) {
+                if (vin.var == 1 && vin.getOpcode() == Opcodes.ALOAD) {
+                    mvTick.visitVarInsn(Opcodes.ALOAD, 0);
+                    mvTick.visitFieldInsn(Opcodes.GETFIELD, "dev/engine_room/flywheel/lib/visual/AbstractEntityVisual", "entity", "Lnet/minecraft/world/entity/Entity;");
+                    if (!"net/minecraft/world/entity/Entity".equals(entityInternalName)) {
+                        mvTick.visitTypeInsn(Opcodes.CHECKCAST, entityInternalName);
+                    }
+                    continue;
+                }
+                if (vin.var >= 2 && vin.var <= 6 && (vin.getOpcode() == Opcodes.FLOAD || vin.getOpcode() == Opcodes.FSTORE)) {
+                    mvTick.visitInsn(Opcodes.FCONST_0);
+                    continue;
+                }
+            }
+            insn.accept(mvTick);
+            if (slices.captureStateMap.containsKey(insn)) {
+                String fieldName = slices.captureStateMap.get(insn);
+                String desc = "F";
+                if (insn instanceof MethodInsnNode min) desc = org.objectweb.asm.Type.getReturnType(min.desc).getDescriptor();
+                else if (insn instanceof FieldInsnNode fin) desc = fin.desc;
+                boolean consumed = false;
+                for (AbstractInsnNode consumer : slices.captureSlice) {
+                    Set<AbstractInsnNode> deps = slices.dependencies.get(consumer);
+                    if (deps != null && deps.contains(insn)) { consumed = true; break; }
+                }
+                boolean isCat2 = desc.equals("J") || desc.equals("D");
+                if (consumed) mvTick.visitInsn(isCat2 ? Opcodes.DUP2 : Opcodes.DUP);
+                mvTick.visitVarInsn(Opcodes.ALOAD, 0);
+                if (isCat2) { mvTick.visitInsn(Opcodes.DUP_X2); mvTick.visitInsn(Opcodes.POP); }
+                else { mvTick.visitInsn(Opcodes.SWAP); }
+                mvTick.visitFieldInsn(Opcodes.PUTFIELD, generatedName, fieldName, desc);
+            }
+        }
+        mvTick.visitInsn(Opcodes.RETURN);
+        mvTick.visitMaxs(0, 0);
+        mvTick.visitEnd();
+
+        MethodVisitor mvUpdate = cw.visitMethod(Opcodes.ACC_PUBLIC, "beginFrame", "(Ldev/engine_room/flywheel/api/visual/DynamicVisual$Context;)V", null, null);
+        mvUpdate.visitCode();
+        for (String lf : uniqueLayerFields) {
+            mvUpdate.visitVarInsn(Opcodes.ALOAD, 0);
+            mvUpdate.visitFieldInsn(Opcodes.GETFIELD, generatedName, "rootTree_" + lf, "Ldev/engine_room/flywheel/lib/model/part/InstanceTree;");
+            mvUpdate.visitVarInsn(Opcodes.ALOAD, 0);
+            mvUpdate.visitFieldInsn(Opcodes.GETFIELD, "dev/engine_room/flywheel/lib/visual/AbstractEntityVisual", "entity", "Lnet/minecraft/world/entity/Entity;");
+            mvUpdate.visitVarInsn(Opcodes.ALOAD, 1);
+            mvUpdate.visitMethodInsn(Opcodes.INVOKEINTERFACE, "dev/engine_room/flywheel/api/visual/DynamicVisual$Context", "partialTick", "()F", true);
+            mvUpdate.visitVarInsn(Opcodes.ALOAD, 0);
+            mvUpdate.visitMethodInsn(Opcodes.INVOKEVIRTUAL, generatedName, "renderOrigin", "()Lnet/minecraft/core/Vec3i;", false);
+            mvUpdate.visitMethodInsn(Opcodes.INVOKESTATIC, "proto/mechanicalarmory/client/flywheel/slicer/PoseHelper", "createEntityPose", "(Lnet/minecraft/world/entity/Entity;FLnet/minecraft/core/Vec3i;)Lorg/joml/Matrix4f;", false);
+            mvUpdate.visitInsn(Opcodes.ICONST_0);
+            mvUpdate.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "dev/engine_room/flywheel/lib/model/part/InstanceTree", "propagateAnimation", "(Lorg/joml/Matrix4fc;Z)V", false);
+        }
+
+        mvUpdate.visitVarInsn(Opcodes.ALOAD, 0);
+        mvUpdate.visitFieldInsn(Opcodes.GETFIELD, generatedName, "poseHelperState", "Ljava/lang/Object;");
+        mvUpdate.visitVarInsn(Opcodes.ALOAD, 0);
+        mvUpdate.visitFieldInsn(Opcodes.GETFIELD, "dev/engine_room/flywheel/lib/visual/AbstractEntityVisual", "entity", "Lnet/minecraft/world/entity/Entity;");
+        mvUpdate.visitVarInsn(Opcodes.ALOAD, 1);
+        mvUpdate.visitMethodInsn(Opcodes.INVOKEINTERFACE, "dev/engine_room/flywheel/api/visual/DynamicVisual$Context", "partialTick", "()F", true);
+        mvUpdate.visitMethodInsn(Opcodes.INVOKESTATIC, "proto/mechanicalarmory/client/flywheel/slicer/PoseHelper", "animateEntityVisual", "(Ljava/lang/Object;Lnet/minecraft/world/entity/Entity;F)V", false);
+
+        mvUpdate.visitVarInsn(Opcodes.ALOAD, 0);
+        mvUpdate.visitVarInsn(Opcodes.ALOAD, 1);
+        mvUpdate.visitMethodInsn(Opcodes.INVOKEINTERFACE, "dev/engine_room/flywheel/api/visual/DynamicVisual$Context", "partialTick", "()F", true);
+        mvUpdate.visitMethodInsn(Opcodes.INVOKEVIRTUAL, generatedName, "updateLight", "(F)V", false);
+
+        mvUpdate.visitInsn(Opcodes.RETURN);
+        mvUpdate.visitMaxs(0, 0);
+        mvUpdate.visitEnd();
+
+        MethodVisitor mvLight = cw.visitMethod(Opcodes.ACC_PUBLIC, "updateLight", "(F)V", null, null);
+        mvLight.visitCode();
+        mvLight.visitVarInsn(Opcodes.ALOAD, 0);
+        mvLight.visitVarInsn(Opcodes.FLOAD, 1);
+        mvLight.visitMethodInsn(Opcodes.INVOKESPECIAL, "dev/engine_room/flywheel/lib/visual/AbstractEntityVisual", "computePackedLight", "(F)I", false);
+        mvLight.visitVarInsn(Opcodes.ISTORE, 2);
+        for (String lf : uniqueLayerFields) {
+            mvLight.visitVarInsn(Opcodes.ALOAD, 0);
+            mvLight.visitFieldInsn(Opcodes.GETFIELD, generatedName, "rootTree_" + lf, "Ldev/engine_room/flywheel/lib/model/part/InstanceTree;");
+            mvLight.visitVarInsn(Opcodes.ILOAD, 2);
+            mvLight.visitMethodInsn(Opcodes.INVOKESTATIC, "proto/mechanicalarmory/client/flywheel/slicer/LightHelper", "light", "(Ldev/engine_room/flywheel/lib/model/part/InstanceTree;I)V", false);
+        }
+        mvLight.visitInsn(Opcodes.RETURN);
+        mvLight.visitMaxs(0, 0);
+        mvLight.visitEnd();
+
+        MethodVisitor mvCollect = cw.visitMethod(Opcodes.ACC_PUBLIC, "collectCrumblingInstances", "(Ljava/util/function/Consumer;)V", "(Ljava/util/function/Consumer<Ldev/engine_room/flywheel/api/instance/Instance;>;)V", null);
+        mvCollect.visitCode();
+        for (String lf : uniqueLayerFields) {
+            mvCollect.visitVarInsn(Opcodes.ALOAD, 0);
+            mvCollect.visitFieldInsn(Opcodes.GETFIELD, generatedName, "rootTree_" + lf, "Ldev/engine_room/flywheel/lib/model/part/InstanceTree;");
+            mvCollect.visitVarInsn(Opcodes.ALOAD, 1);
+            mvCollect.visitMethodInsn(Opcodes.INVOKESTATIC, "proto/mechanicalarmory/client/flywheel/slicer/LightHelper", "crumble", "(Ldev/engine_room/flywheel/lib/model/part/InstanceTree;Ljava/util/function/Consumer;)V", false);
+        }
+        mvCollect.visitInsn(Opcodes.RETURN);
+        mvCollect.visitMaxs(0, 0);
+        mvCollect.visitEnd();
+
+        MethodVisitor mvDelete = cw.visitMethod(Opcodes.ACC_PROTECTED, "_delete", "()V", null, null);
+        mvDelete.visitCode();
+        for (String lf : uniqueLayerFields) {
+            mvDelete.visitVarInsn(Opcodes.ALOAD, 0);
+            mvDelete.visitFieldInsn(Opcodes.GETFIELD, generatedName, "rootTree_" + lf, "Ldev/engine_room/flywheel/lib/model/part/InstanceTree;");
+            mvDelete.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "dev/engine_room/flywheel/lib/model/part/InstanceTree", "delete", "()V", false);
+        }
+        mvDelete.visitInsn(Opcodes.RETURN);
+        mvDelete.visitMaxs(0, 0);
+        mvDelete.visitEnd();
+
+        for (String lf : uniqueLayerFields) {
+            String owner = layerFieldToOwner.getOrDefault(lf, "net/minecraft/client/model/geom/ModelLayers");
+            MethodVisitor mvCreate = cw.visitMethod(Opcodes.ACC_PRIVATE | Opcodes.ACC_STATIC, "createModelTree_" + lf, "(Lnet/minecraft/world/entity/Entity;)Ldev/engine_room/flywheel/lib/model/part/ModelTree;", null, null);
+            mvCreate.visitCode();
+            mvCreate.visitFieldInsn(Opcodes.GETSTATIC, owner, lf, "Lnet/minecraft/client/model/geom/ModelLayerLocation;");
+            mvCreate.visitVarInsn(Opcodes.ASTORE, 1);
+            mvCreate.visitMethodInsn(Opcodes.INVOKESTATIC, "net/minecraft/client/Minecraft", "getInstance", "()Lnet/minecraft/client/Minecraft;", false);
+            mvCreate.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "net/minecraft/client/Minecraft", "getEntityRenderDispatcher", "()Lnet/minecraft/client/renderer/entity/EntityRenderDispatcher;", false);
+            mvCreate.visitVarInsn(Opcodes.ALOAD, 0);
+            mvCreate.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "net/minecraft/client/renderer/entity/EntityRenderDispatcher", "getRenderer", "(Lnet/minecraft/world/entity/Entity;)Lnet/minecraft/client/renderer/entity/EntityRenderer;", false);
+            mvCreate.visitVarInsn(Opcodes.ALOAD, 0);
+            mvCreate.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "net/minecraft/client/renderer/entity/EntityRenderer", "getTextureLocation", "(Lnet/minecraft/world/entity/Entity;)Lnet/minecraft/resources/ResourceLocation;", false);
+            mvCreate.visitVarInsn(Opcodes.ASTORE, 2);
+            mvCreate.visitMethodInsn(Opcodes.INVOKESTATIC, "dev/engine_room/flywheel/lib/material/SimpleMaterial", "builder", "()Ldev/engine_room/flywheel/lib/material/SimpleMaterial$Builder;", false);
+            mvCreate.visitFieldInsn(Opcodes.GETSTATIC, "dev/engine_room/flywheel/api/material/CardinalLightingMode", "ENTITY", "Ldev/engine_room/flywheel/api/material/CardinalLightingMode;");
+            mvCreate.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "dev/engine_room/flywheel/lib/material/SimpleMaterial$Builder", "cardinalLightingMode", "(Ldev/engine_room/flywheel/api/material/CardinalLightingMode;)Ldev/engine_room/flywheel/lib/material/SimpleMaterial$Builder;", false);
+            mvCreate.visitVarInsn(Opcodes.ALOAD, 2);
+            mvCreate.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "dev/engine_room/flywheel/lib/material/SimpleMaterial$Builder", "texture", "(Lnet/minecraft/resources/ResourceLocation;)Ldev/engine_room/flywheel/lib/material/SimpleMaterial$Builder;", false);
+            mvCreate.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "dev/engine_room/flywheel/lib/material/SimpleMaterial$Builder", "build", "()Ldev/engine_room/flywheel/lib/material/SimpleMaterial;", false);
+            mvCreate.visitVarInsn(Opcodes.ASTORE, 3);
+            mvCreate.visitVarInsn(Opcodes.ALOAD, 1);
+            mvCreate.visitVarInsn(Opcodes.ALOAD, 3);
+            mvCreate.visitMethodInsn(Opcodes.INVOKESTATIC, "dev/engine_room/flywheel/lib/model/part/ModelTrees", "of", "(Lnet/minecraft/client/model/geom/ModelLayerLocation;Ldev/engine_room/flywheel/api/material/Material;)Ldev/engine_room/flywheel/lib/model/part/ModelTree;", false);
+            mvCreate.visitInsn(Opcodes.ARETURN);
+            mvCreate.visitMaxs(0, 0);
+            mvCreate.visitEnd();
+        }
+
+        cw.visitEnd();
+        byte[] bytes = cw.toByteArray();
+        try {
+            java.nio.file.Files.write(java.nio.file.Paths.get("DUMP_" + generatedName + ".class"), bytes);
+        } catch (Exception ignored) {}
         return bytes;
     }
 

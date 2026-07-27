@@ -13,24 +13,21 @@ public class MethodInliner {
 
     public static void inlineLocalMethods(ClassNode classNode, MethodNode targetMethod) {
         java.util.Set<String> callStack = new java.util.HashSet<>();
-        callStack.add(targetMethod.name + targetMethod.desc);
-        inlineRecursive(classNode, targetMethod, callStack, 0);
+        callStack.add(classNode.name + "#" + targetMethod.name + targetMethod.desc);
+        inlineRecursive(classNode, classNode, targetMethod, callStack, 0);
     }
 
-    private static void inlineRecursive(ClassNode classNode, MethodNode hostMethod, java.util.Set<String> callStack, int depth) {
+    private static void inlineRecursive(ClassNode rootClassNode, ClassNode currentClassNode, MethodNode hostMethod, java.util.Set<String> callStack, int depth) {
         if (depth > 5) {
             return; // Prevent runaway inlining depth in deep or cyclic helper chains
         }
 
-        // Collect all target MethodInsnNodes in a single pass before modifying the instruction list.
-        // This guarantees we never re-scan instructions that were just inlined from helper methods,
-        // which completely prevents infinite loops on recursive helpers!
         java.util.List<MethodInsnNode> toInline = new java.util.ArrayList<>();
         for (AbstractInsnNode insn : hostMethod.instructions) {
             if (insn instanceof MethodInsnNode min) {
-                if (min.owner.equals(classNode.name)) {
-                    if (!min.name.equals("<init>") && !min.name.equals("<clinit>")) {
-                        String sig = min.name + min.desc;
+                if (!min.name.equals("<init>") && !min.name.equals("<clinit>") && !min.owner.equals("net/minecraft/client/model/geom/ModelPart")) {
+                    if (min.owner.startsWith("net/minecraft/client/model/") || min.owner.startsWith("net/minecraft/client/renderer/") || min.owner.startsWith("proto/") || min.owner.equals(rootClassNode.name) || min.owner.equals(currentClassNode.name)) {
+                        String sig = min.owner + "#" + min.name + min.desc;
                         if (!callStack.contains(sig)) {
                             toInline.add(min);
                         }
@@ -40,20 +37,64 @@ public class MethodInliner {
         }
 
         for (MethodInsnNode min : toInline) {
-            MethodNode methodToInline = RendererAnalyzer.findMethod(classNode, min.name, min.desc).orElse(null);
+            ClassNode targetOwnerNode;
+            try {
+                targetOwnerNode = min.owner.equals(rootClassNode.name) ? rootClassNode : (min.owner.equals(currentClassNode.name) ? currentClassNode : RendererAnalyzer.loadClassNode(min.owner));
+            } catch (Exception e) {
+                continue;
+            }
+            MethodNode methodToInline = findConcreteMethodToInline(rootClassNode, targetOwnerNode, min.name, min.desc);
             if (methodToInline != null) {
-                // Clone the method so we don't mutate the original class definition's method node
                 MethodNode copy = cloneMethod(methodToInline);
-                
-                // Recursively inline helper methods into the copy first!
                 java.util.Set<String> nextStack = new java.util.HashSet<>(callStack);
-                nextStack.add(min.name + min.desc);
-                inlineRecursive(classNode, copy, nextStack, depth + 1);
-                
-                // Now inline the fully-inlined copy into hostMethod
+                nextStack.add(min.owner + "#" + min.name + min.desc);
+                inlineRecursive(rootClassNode, targetOwnerNode, copy, nextStack, depth + 1);
                 inlineMethodCall(hostMethod, min, copy);
             }
         }
+    }
+
+    private static MethodNode findConcreteMethodToInline(ClassNode currentClass, ClassNode targetOwnerClass, String name, String desc) {
+        ClassNode curr = currentClass;
+        while (curr != null) {
+            for (MethodNode m : curr.methods) {
+                if (m.name.equals(name) && m.desc.equals(desc)) {
+                    if ((m.access & (Opcodes.ACC_ABSTRACT | Opcodes.ACC_NATIVE)) == 0 && m.instructions.size() > 0) {
+                        return m;
+                    }
+                    break;
+                }
+            }
+            if (curr.superName == null || "java/lang/Object".equals(curr.superName)) {
+                break;
+            }
+            try {
+                curr = curr.superName.equals(targetOwnerClass.name) ? targetOwnerClass : RendererAnalyzer.loadClassNode(curr.superName);
+            } catch (Exception e) {
+                break;
+            }
+        }
+
+        curr = targetOwnerClass;
+        while (curr != null) {
+            for (MethodNode m : curr.methods) {
+                if (m.name.equals(name) && m.desc.equals(desc)) {
+                    if ((m.access & (Opcodes.ACC_ABSTRACT | Opcodes.ACC_NATIVE)) == 0 && m.instructions.size() > 0) {
+                        return m;
+                    }
+                    return null;
+                }
+            }
+            if (curr.superName == null || "java/lang/Object".equals(curr.superName)) {
+                break;
+            }
+            try {
+                curr = RendererAnalyzer.loadClassNode(curr.superName);
+            } catch (Exception e) {
+                break;
+            }
+        }
+        return null;
     }
 
     private static MethodNode cloneMethod(MethodNode source) {

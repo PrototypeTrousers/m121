@@ -27,6 +27,18 @@ public class PoseHelper {
     public static Matrix4f createInitialPose(BlockPos visualPos, BlockState blockState, net.minecraft.world.level.block.entity.BlockEntity blockEntity) {
         Matrix4f matrix = new Matrix4f().translate(visualPos.getX(), visualPos.getY(), visualPos.getZ());
 
+        if (blockState != null && (blockState.getBlock() instanceof net.minecraft.world.level.block.ShulkerBoxBlock || (blockEntity instanceof net.minecraft.world.level.block.entity.ShulkerBoxBlockEntity))) {
+            Direction direction = Direction.UP;
+            if (blockState.hasProperty(net.minecraft.world.level.block.ShulkerBoxBlock.FACING)) {
+                direction = blockState.getValue(net.minecraft.world.level.block.ShulkerBoxBlock.FACING);
+            }
+            matrix.translate(0.5F, 0.5F, 0.5F);
+            matrix.scale(0.9995F, 0.9995F, 0.9995F);
+            matrix.rotate(direction.getRotation());
+            matrix.scale(1.0F, -1.0F, -1.0F);
+            matrix.translate(0.0F, -1.0F, 0.0F);
+            return matrix;
+        }
         if (blockState != null) {
             Direction facing = null;
 
@@ -99,6 +111,236 @@ public class PoseHelper {
                     }
                 }
                 return;
+            }
+        }
+    }
+
+    public static Matrix4f createEntityPose(net.minecraft.world.entity.Entity entity, float partialTick, net.minecraft.core.Vec3i renderOrigin) {
+        double x = Mth.lerp((double) partialTick, entity.xo, entity.getX()) - (double) renderOrigin.getX();
+        double y = Mth.lerp((double) partialTick, entity.yo, entity.getY()) - (double) renderOrigin.getY();
+        double z = Mth.lerp((double) partialTick, entity.zo, entity.getZ()) - (double) renderOrigin.getZ();
+
+        float bodyRot = 0.0F;
+        if (entity instanceof net.minecraft.world.entity.LivingEntity living) {
+            bodyRot = Mth.lerp(partialTick, living.yBodyRotO, living.yBodyRot);
+        } else {
+            bodyRot = Mth.lerp(partialTick, entity.yRotO, entity.getYRot());
+        }
+
+        return new Matrix4f()
+                .translate((float) x, (float) y, (float) z)
+                .rotateY((180.0F - bodyRot) * Mth.DEG_TO_RAD)
+                .scale(-1.0F, -1.0F, 1.0F)
+                .translate(0.0F, -1.501F, 0.0F);
+    }
+
+    public static class EntityAnimationParams {
+        public float limbSwing;
+        public float limbSwingAmount;
+        public float ageInTicks;
+        public float netHeadYaw;
+        public float headPitch;
+    }
+
+    public static EntityAnimationParams getAnimationParams(net.minecraft.world.entity.Entity entity, float partialTick) {
+        EntityAnimationParams params = new EntityAnimationParams();
+        if (entity instanceof net.minecraft.world.entity.LivingEntity living) {
+            params.ageInTicks = (float) living.tickCount + partialTick;
+            float headYaw = Mth.lerp(partialTick, living.yHeadRotO, living.yHeadRot);
+            float bodyYaw = Mth.lerp(partialTick, living.yBodyRotO, living.yBodyRot);
+            params.netHeadYaw = headYaw - bodyYaw;
+            params.headPitch = Mth.lerp(partialTick, living.xRotO, living.getXRot());
+
+            if (!living.isPassenger() && living.isAlive()) {
+                params.limbSwingAmount = living.walkAnimation.speed(partialTick);
+                params.limbSwing = living.walkAnimation.position(partialTick);
+                if (living.isBaby()) {
+                    params.limbSwing *= 3.0F;
+                }
+                if (params.limbSwingAmount > 1.0F) {
+                    params.limbSwingAmount = 1.0F;
+                }
+            }
+        }
+        return params;
+    }
+
+    public static void syncDummyToTree(DummyModelPart dummy, dev.engine_room.flywheel.lib.model.part.InstanceTree tree) {
+        if (dummy != null && tree != null) {
+            tree.xPos(dummy.x);
+            tree.yPos(dummy.y);
+            tree.zPos(dummy.z);
+            tree.xRot(dummy.xRot);
+            tree.yRot(dummy.yRot);
+            tree.zRot(dummy.zRot);
+            tree.xScale(dummy.xScale);
+            tree.yScale(dummy.yScale);
+            tree.zScale(dummy.zScale);
+            tree.visible(dummy.visible);
+            tree.skipDraw(dummy.skipDraw);
+        }
+    }
+
+    public static class PartPair {
+        public final net.minecraft.client.model.geom.ModelPart vanillaPart;
+        public final dev.engine_room.flywheel.lib.model.part.InstanceTree flywheelTree;
+
+        public PartPair(net.minecraft.client.model.geom.ModelPart vanillaPart, dev.engine_room.flywheel.lib.model.part.InstanceTree flywheelTree) {
+            this.vanillaPart = vanillaPart;
+            this.flywheelTree = flywheelTree;
+        }
+
+        public void syncToFlywheel() {
+            if (vanillaPart == null || flywheelTree == null) return;
+            flywheelTree.xPos(vanillaPart.x);
+            flywheelTree.yPos(vanillaPart.y);
+            flywheelTree.zPos(vanillaPart.z);
+            flywheelTree.xRot(vanillaPart.xRot);
+            flywheelTree.yRot(vanillaPart.yRot);
+            flywheelTree.zRot(vanillaPart.zRot);
+            flywheelTree.xScale(vanillaPart.xScale);
+            flywheelTree.yScale(vanillaPart.yScale);
+            flywheelTree.zScale(vanillaPart.zScale);
+            flywheelTree.visible(vanillaPart.visible);
+            flywheelTree.skipDraw(vanillaPart.skipDraw);
+        }
+    }
+
+    public static class EntityVisualState {
+        public final net.minecraft.client.model.EntityModel<net.minecraft.world.entity.Entity> model;
+        public final java.util.List<PartPair> pairs;
+
+        @SuppressWarnings("unchecked")
+        public EntityVisualState(net.minecraft.client.model.EntityModel<?> model, java.util.List<PartPair> pairs) {
+            this.model = (net.minecraft.client.model.EntityModel<net.minecraft.world.entity.Entity>) model;
+            this.pairs = pairs;
+        }
+    }
+
+    public static void collectPartPairs(net.minecraft.client.model.geom.ModelPart vanillaPart, dev.engine_room.flywheel.lib.model.part.InstanceTree flywheelTree, java.util.List<PartPair> pairs) {
+        if (vanillaPart == null || flywheelTree == null) return;
+        pairs.add(new PartPair(vanillaPart, flywheelTree));
+        try {
+            for (java.lang.reflect.Field f : vanillaPart.getClass().getDeclaredFields()) {
+                if (java.util.Map.class.isAssignableFrom(f.getType())) {
+                    f.setAccessible(true);
+                    java.util.Map<?, ?> map = (java.util.Map<?, ?>) f.get(vanillaPart);
+                    if (map != null) {
+                        for (java.util.Map.Entry<?, ?> entry : map.entrySet()) {
+                            String childName = String.valueOf(entry.getKey());
+                            Object childObj = entry.getValue();
+                            if (childObj instanceof net.minecraft.client.model.geom.ModelPart childPart) {
+                                dev.engine_room.flywheel.lib.model.part.InstanceTree childTree = flywheelTree.child(childName);
+                                if (childTree != null) {
+                                    collectPartPairs(childPart, childTree, pairs);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (Exception ignored) {}
+    }
+
+    private static String toSnakeCase(String camel) {
+        StringBuilder sb = new StringBuilder();
+        for (char c : camel.toCharArray()) {
+            if (Character.isUpperCase(c)) {
+                if (sb.length() > 0) sb.append('_');
+                sb.append(Character.toLowerCase(c));
+            } else {
+                sb.append(c);
+            }
+        }
+        return sb.toString();
+    }
+
+    public static Object setupEntityVisual(net.minecraft.world.entity.Entity entity, Map<String, InstanceTree> rootTreesMap) {
+        try {
+            net.minecraft.client.renderer.entity.EntityRenderer<?> renderer = net.minecraft.client.Minecraft.getInstance().getEntityRenderDispatcher().getRenderer(entity);
+            if (renderer instanceof net.minecraft.client.renderer.entity.LivingEntityRenderer<?, ?> livingRenderer) {
+                net.minecraft.client.model.EntityModel<?> model = livingRenderer.getModel();
+                java.util.List<PartPair> pairs = new java.util.ArrayList<>();
+                
+                net.minecraft.client.model.geom.ModelPart rootPart = null;
+                if (model instanceof net.minecraft.client.model.HierarchicalModel<?> hm) {
+                    rootPart = hm.root();
+                } else {
+                    for (java.lang.reflect.Field f : model.getClass().getFields()) {
+                        if (net.minecraft.client.model.geom.ModelPart.class.isAssignableFrom(f.getType())) {
+                            f.setAccessible(true);
+                            try {
+                                net.minecraft.client.model.geom.ModelPart p = (net.minecraft.client.model.geom.ModelPart) f.get(model);
+                                if (p != null && rootPart == null) {
+                                    rootPart = p;
+                                }
+                            } catch (Exception ignored) {}
+                        }
+                    }
+                }
+
+                InstanceTree mainTree = rootTreesMap.isEmpty() ? null : rootTreesMap.values().iterator().next();
+                if (rootPart != null && mainTree != null) {
+                    collectPartPairs(rootPart, mainTree, pairs);
+                }
+                
+                if (mainTree != null) {
+                    java.util.Set<net.minecraft.client.model.geom.ModelPart> alreadyMatched = new java.util.HashSet<>();
+                    for (PartPair pair : pairs) alreadyMatched.add(pair.vanillaPart);
+
+                    Class<?> currClass = model.getClass();
+                    while (currClass != null && currClass != Object.class) {
+                        for (java.lang.reflect.Field f : currClass.getDeclaredFields()) {
+                            f.setAccessible(true);
+                            try {
+                                Object val = f.get(model);
+                                if (val instanceof net.minecraft.client.model.geom.ModelPart p && !alreadyMatched.contains(p)) {
+                                    String name = f.getName();
+                                    InstanceTree t = mainTree.child(name);
+                                    if (t == null) t = mainTree.child(toSnakeCase(name));
+                                    if (t != null) {
+                                        collectPartPairs(p, t, pairs);
+                                        for (PartPair pair : pairs) alreadyMatched.add(pair.vanillaPart);
+                                    }
+                                } else if (val instanceof net.minecraft.client.model.geom.ModelPart[] arr) {
+                                    for (int i = 0; i < arr.length; i++) {
+                                        if (arr[i] != null && !alreadyMatched.contains(arr[i])) {
+                                            String name = f.getName();
+                                            InstanceTree t = mainTree.child("part" + i);
+                                            if (t == null) t = mainTree.child(name + i);
+                                            if (t == null) t = mainTree.child(toSnakeCase(name) + "_" + i);
+                                            if (t != null) {
+                                                collectPartPairs(arr[i], t, pairs);
+                                                for (PartPair pair : pairs) alreadyMatched.add(pair.vanillaPart);
+                                            }
+                                        }
+                                    }
+                                }
+                            } catch (Exception ignored) {}
+                        }
+                        currClass = currClass.getSuperclass();
+                    }
+                }
+
+                return new EntityVisualState(model, pairs);
+            }
+        } catch (Exception e) {
+            System.err.println("[Flywheel Slicer] Failed to setup entity visual state: " + e.getMessage());
+        }
+        return null;
+    }
+
+    public static void animateEntityVisual(Object stateObj, net.minecraft.world.entity.Entity entity, float partialTick) {
+        if (stateObj instanceof EntityVisualState state && state.model != null && entity != null) {
+            EntityAnimationParams params = getAnimationParams(entity, partialTick);
+            synchronized (state.model) {
+                for (PartPair pair : state.pairs) {
+                    pair.vanillaPart.resetPose();
+                }
+                state.model.setupAnim(entity, params.limbSwing, params.limbSwingAmount, params.ageInTicks, params.netHeadYaw, params.headPitch);
+                for (PartPair pair : state.pairs) {
+                    pair.syncToFlywheel();
+                }
             }
         }
     }

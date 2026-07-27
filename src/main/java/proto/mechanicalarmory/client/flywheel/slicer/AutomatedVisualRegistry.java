@@ -7,21 +7,32 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.blockentity.BlockEntityRenderDispatcher;
 import net.minecraft.client.renderer.blockentity.BlockEntityRenderer;
 import net.minecraft.client.renderer.blockentity.BlockEntityRendererProvider;
+import net.minecraft.client.renderer.entity.EntityRenderDispatcher;
+import net.minecraft.client.renderer.entity.EntityRenderer;
+import net.minecraft.client.renderer.entity.EntityRendererProvider;
 import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import org.objectweb.asm.tree.ClassNode;
 import org.objectweb.asm.tree.MethodNode;
 import proto.mechanicalarmory.client.mixin.BlockEntityRenderDispatcherAccessor;
 import proto.mechanicalarmory.client.mixin.BlockEntityRenderersAccessor;
+import proto.mechanicalarmory.client.mixin.EntityRenderDispatcherAccessor;
+import proto.mechanicalarmory.client.mixin.EntityRenderersAccessor;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.NoSuchElementException;
+import java.util.Optional;
 
 public class AutomatedVisualRegistry {
 
     public static final Map<BlockEntityType<?>, Class<?>> GENERATED_VISUALS = new HashMap<>();
     private static final Map<Class<?>, Class<?>> RENDERER_CLASS_TO_VISUAL = new HashMap<>();
+    public static final Map<EntityType<?>, Class<?>> GENERATED_ENTITY_VISUALS = new HashMap<>();
+    private static final Map<Class<?>, Class<?>> RENDERER_CLASS_TO_ENTITY_VISUAL = new HashMap<>();
     private static VisualLoader loader;
 
     public static Class<?> getRendererClass(BlockEntityType<?> type) {
@@ -55,6 +66,45 @@ public class AutomatedVisualRegistry {
                         acc.getFont()
                 );
                 BlockEntityRenderer<?> r = provider.create(context);
+                if (r != null) return r.getClass();
+            }
+        } catch (Exception ignored) {}
+
+        return null;
+    }
+
+    public static Class<?> getEntityRendererClass(EntityType<?> type) {
+        try {
+            EntityRenderDispatcher dispatcher = Minecraft.getInstance().getEntityRenderDispatcher();
+            if (dispatcher != null) {
+                Map<EntityType<?>, EntityRenderer<?>> renderers = ((EntityRenderDispatcherAccessor) dispatcher).getRenderers();
+                if (renderers != null && renderers.containsKey(type)) {
+                    EntityRenderer<?> r = renderers.get(type);
+                    if (r != null) return r.getClass();
+                }
+            }
+        } catch (Exception ignored) {}
+
+        try {
+            Map<EntityType<?>, EntityRendererProvider<?>> providers = EntityRenderersAccessor.getProviders();
+            if (providers != null && providers.containsKey(type)) {
+                EntityRendererProvider<?> provider = providers.get(type);
+                if (provider == null) return null;
+
+                EntityRenderDispatcher dispatcher = Minecraft.getInstance().getEntityRenderDispatcher();
+                if (dispatcher == null) return null;
+                BlockEntityRenderDispatcherAccessor acc = (BlockEntityRenderDispatcherAccessor) Minecraft.getInstance().getBlockEntityRenderDispatcher();
+
+                EntityRendererProvider.Context context = new EntityRendererProvider.Context(
+                        dispatcher,
+                        acc.getItemRenderer().get(),
+                        acc.getBlockRenderDispatcher().get(),
+                        dispatcher.getItemInHandRenderer(),
+                        Minecraft.getInstance().getResourceManager(),
+                        acc.getEntityModelSet(),
+                        acc.getFont()
+                );
+                EntityRenderer<?> r = provider.create(context);
                 if (r != null) return r.getClass();
             }
         } catch (Exception ignored) {}
@@ -140,6 +190,79 @@ public class AutomatedVisualRegistry {
         }
     }
 
+    public static void generateAndMapAllEntities() {
+        BuiltInRegistries.ENTITY_TYPE.forEach(AutomatedVisualRegistry::generateAndMap);
+    }
+
+    public static void generateAndMap(EntityType<?> type) {
+        Class<?> rendererClass = getEntityRendererClass(type);
+        if (rendererClass != null) {
+            generateAndMap(type, rendererClass);
+        } else {
+            System.out.println("[Flywheel Slicer] Skipping entity " + BuiltInRegistries.ENTITY_TYPE.getKey(type) + " (no renderer registered)");
+        }
+    }
+
+    public static void generateAndMap(EntityType<?> type, Class<?> rendererClass) {
+        try {
+            if (loader == null) {
+                loader = new VisualLoader(Thread.currentThread().getContextClassLoader());
+            }
+
+            if (RENDERER_CLASS_TO_ENTITY_VISUAL.containsKey(rendererClass)) {
+                Class<?> existingClass = RENDERER_CLASS_TO_ENTITY_VISUAL.get(rendererClass);
+                GENERATED_ENTITY_VISUALS.put(type, existingClass);
+                System.out.println("[Flywheel Slicer] Reusing already generated entity visual for " + rendererClass.getSimpleName() + " on " + BuiltInRegistries.ENTITY_TYPE.getKey(type));
+                return;
+            }
+
+            ClassNode rendererNode = RendererAnalyzer.loadClassNode(rendererClass);
+            Optional<String> optModelName = RendererAnalyzer.findModelClassName(rendererNode);
+            if (optModelName.isEmpty()) {
+                System.out.println("[Flywheel Slicer] Skipping entity renderer " + rendererClass.getSimpleName() + " (no EntityModel found)");
+                return;
+            }
+            String modelClassName = optModelName.get();
+            ClassNode modelNode = RendererAnalyzer.loadClassNode(modelClassName);
+            Optional<MethodNode> optSetupAnim = RendererAnalyzer.findSetupAnimMethod(modelNode);
+            if (optSetupAnim.isEmpty()) {
+                System.out.println("[Flywheel Slicer] Skipping entity model " + modelClassName + " (no setupAnim method found)");
+                return;
+            }
+            MethodNode setupAnimMethod = optSetupAnim.get();
+
+            // Inline local helper methods in setupAnim
+            MethodInliner.inlineLocalMethods(modelNode, setupAnimMethod);
+
+            org.objectweb.asm.tree.FieldInsnNode layerField = RendererAnalyzer.findModelLayerLocationField(rendererNode).orElse(null);
+            System.out.println("[Flywheel Slicer] Found ModelLayerLocation field for " + rendererClass.getSimpleName() + ": " + (layerField != null ? layerField.owner + "." + layerField.name : "null (fallback)"));
+
+            BytecodeDualSlicer.SliceResult slices = BytecodeDualSlicer.slice(modelNode.name, setupAnimMethod);
+
+            String generatedName = rendererClass.getName().replace('.', '_') + "_FlywheelVisual";
+            byte[] classBytes = RuntimeVisualGenerator.generateEntityVisualClass(modelNode, rendererClass, slices, layerField);
+
+            // Dump class to disk for inspection
+            try {
+                java.nio.file.Path dumpPath = java.nio.file.Paths.get("run", generatedName + ".class");
+                java.nio.file.Files.createDirectories(dumpPath.getParent());
+                java.nio.file.Files.write(dumpPath, classBytes);
+                System.out.println("[Flywheel Slicer] Dumped generated entity class to " + dumpPath.toAbsolutePath());
+            } catch (Exception e) {
+                System.err.println("[Flywheel Slicer] Failed to dump entity class to disk: " + e.getMessage());
+            }
+
+            Class<?> generatedClass = loader.loadGeneratedClass(generatedName, classBytes);
+            RENDERER_CLASS_TO_ENTITY_VISUAL.put(rendererClass, generatedClass);
+            GENERATED_ENTITY_VISUALS.put(type, generatedClass);
+
+            System.out.println("[Flywheel Slicer] Successfully mapped entity renderer " + rendererClass.getSimpleName() + " for Flywheel integration.");
+        } catch (Exception e) {
+            System.err.println("[Flywheel Slicer] Failed to generate entity visual for " + rendererClass.getSimpleName());
+            e.printStackTrace();
+        }
+    }
+
     /**
      * Loops through the generated map and binds them to Flywheel.
      * Flywheel automatically skips the vanilla renderer when it detects a visual is present (in most configs).
@@ -169,5 +292,29 @@ public class AutomatedVisualRegistry {
             });
         }
         System.out.println("[Flywheel Slicer] Registered " + GENERATED_VISUALS.size() + " automated visuals to Flywheel.");
+
+        for (Map.Entry<EntityType<?>, Class<?>> entry : GENERATED_ENTITY_VISUALS.entrySet()) {
+            EntityType<?> type = entry.getKey();
+            Class<?> visualClass = entry.getValue();
+
+            VisualizerRegistry.setVisualizer((EntityType) type, new dev.engine_room.flywheel.api.visualization.EntityVisualizer<Entity>() {
+                @Override
+                public dev.engine_room.flywheel.api.visual.EntityVisual<? super Entity> createVisual(VisualizationContext ctx, Entity entity, float partialTick) {
+                    try {
+                        return (dev.engine_room.flywheel.api.visual.EntityVisual<? super Entity>) visualClass
+                                .getConstructor(VisualizationContext.class, Entity.class, float.class)
+                                .newInstance(ctx, entity, partialTick);
+                    } catch (Exception e) {
+                        throw new RuntimeException("Failed to instantiate generated entity visual for " + type, e);
+                    }
+                }
+
+                @Override
+                public boolean skipVanillaRender(Entity entity) {
+                    return true;
+                }
+            });
+        }
+        System.out.println("[Flywheel Slicer] Registered " + GENERATED_ENTITY_VISUALS.size() + " automated entity visuals to Flywheel.");
     }
 }

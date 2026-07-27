@@ -78,19 +78,6 @@ public class MechanicalArmoryClient {
 
         VisualizerRegistry.setVisualizer(MAEntities.BUSH_BLOCK_ENTITY.get(), CropVisualiser.CROP_VISUAL);
 
-        // -- Flywheel Slicer Automated Runtime Registry --
-        // Register the ChestRenderer for automated slicing and generation
-        AutomatedVisualRegistry.generateAndMap(BlockEntityType.CHEST, ChestRenderer.class, "render", "(Lnet/minecraft/world/level/block/entity/BlockEntity;FLcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/MultiBufferSource;II)V");
-
-        // You can add a loop here over BuiltInRegistries.BLOCK_ENTITY_TYPE or target specific ones like EnchantTableRenderer!
-        
-        // Finalize automated registration
-        // ------------------------------------------------
-
-        BuiltInRegistries.BLOCK_ENTITY_TYPE.forEach(AutomatedVisualRegistry::generateAndMap);
-
-        AutomatedVisualRegistry.registerAllToFlywheel();
-
         // Some client setup code
         MechanicalArmory.LOGGER.info("HELLO FROM CLIENT SETUP");
         MechanicalArmory.LOGGER.info("MINECRAFT NAME >> {}", Minecraft.getInstance().getUser().getName());
@@ -106,6 +93,18 @@ public class MechanicalArmoryClient {
                 // Pass the context to an empty (default) constructor call
                 ShredderRenderer::new
         );
+    }
+
+    @SubscribeEvent
+    public static void onAddLayers(EntityRenderersEvent.AddLayers event) {
+        // By the time AddLayers fires, all vanilla and modded Entity and BlockEntity renderers
+        // have been created and registered with EntityRenderDispatcher / BlockEntityRenderDispatcher!
+        AutomatedVisualRegistry.generateAndMap(BlockEntityType.CHEST, ChestRenderer.class, "render", "(Lnet/minecraft/world/level/block/entity/BlockEntity;FLcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/MultiBufferSource;II)V");
+
+        BuiltInRegistries.BLOCK_ENTITY_TYPE.forEach(AutomatedVisualRegistry::generateAndMap);
+        BuiltInRegistries.ENTITY_TYPE.forEach(AutomatedVisualRegistry::generateAndMap);
+
+        AutomatedVisualRegistry.registerAllToFlywheel();
     }
 
     @SubscribeEvent // on the mod event bus only on the physical client

@@ -67,6 +67,7 @@ public class SlicerTest {
                 
                 System.out.println("Capture slice size: " + result.captureSlice.size() + " instructions");
                 System.out.println("Animation slice size: " + result.animationSlice.size() + " instructions");
+
                 
                 byte[] bytes = RuntimeVisualGenerator.generateVisualClass(cn, result);
                 System.out.println("Generated visual class bytes: " + bytes.length);
@@ -80,7 +81,9 @@ public class SlicerTest {
                 TestClassLoader loader = new TestClassLoader();
                 String generatedName = cn.name.replace('/', '_') + "_FlywheelVisual";
                 Class<?> clazz = loader.load(generatedName, bytes);
-                System.out.println("Successfully loaded generated class into JVM without verification errors: " + clazz.getName());
+                clazz.getDeclaredConstructors();
+                clazz.getDeclaredMethods();
+                System.out.println("Successfully loaded and verified generated class in JVM: " + clazz.getName());
                 java.lang.reflect.Method m = clazz.getDeclaredMethod("createModelTree", net.minecraft.client.model.geom.ModelLayerLocation.class, net.minecraft.world.level.block.entity.BlockEntity.class);
                 System.out.println("Successfully verified createModelTree method: " + m.getName());
             }
