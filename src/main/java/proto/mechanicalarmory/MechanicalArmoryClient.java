@@ -8,13 +8,12 @@ import dev.engine_room.flywheel.impl.visual.BandedPrimeLimiter;
 import dev.engine_room.flywheel.lib.model.part.ModelTree;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.BlockEntityWithoutLevelRenderer;
-import net.minecraft.client.renderer.blockentity.BedRenderer;
-import net.minecraft.client.renderer.blockentity.BlockEntityRenderers;
+import net.minecraft.client.renderer.blockentity.ChestRenderer;
 import net.minecraft.client.resources.model.ModelResourceLocation;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.packs.resources.Resource;
-import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.EventPriority;
 import net.neoforged.bus.api.SubscribeEvent;
@@ -24,7 +23,6 @@ import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.event.lifecycle.FMLClientSetupEvent;
 import net.neoforged.neoforge.client.event.EntityRenderersEvent;
 import net.neoforged.neoforge.client.event.ModelEvent;
-import net.neoforged.neoforge.client.event.RegisterMenuScreensEvent;
 import net.neoforged.neoforge.client.event.RenderFrameEvent;
 import net.neoforged.neoforge.client.extensions.common.IClientItemExtensions;
 import net.neoforged.neoforge.client.extensions.common.RegisterClientExtensionsEvent;
@@ -34,13 +32,8 @@ import proto.mechanicalarmory.client.flywheel.gltf.GltfFlywheelModelTree;
 import proto.mechanicalarmory.client.flywheel.gltf.MyModelTree;
 import proto.mechanicalarmory.client.flywheel.instances.arm.ArmVisualiser;
 import proto.mechanicalarmory.client.flywheel.instances.crop.CropVisualiser;
-import proto.mechanicalarmory.client.flywheel.instances.generic.VanillaBlockVisualiser;
-import proto.mechanicalarmory.client.flywheel.instances.generic.VanillaEntityVisualiser;
 import proto.mechanicalarmory.client.flywheel.instances.shredder.ShredderVisualiser;
 import proto.mechanicalarmory.client.flywheel.slicer.AutomatedVisualRegistry;
-import net.minecraft.world.level.block.entity.BlockEntityType;
-import net.minecraft.client.renderer.blockentity.ChestRenderer;
-import proto.mechanicalarmory.client.mixin.BlockEntityRenderersAccessor;
 import proto.mechanicalarmory.client.renderer.arm.ArmRenderer;
 import proto.mechanicalarmory.client.renderer.arm.MyCustomItemBakedModel;
 import proto.mechanicalarmory.client.renderer.arm.MyItemRenderer;
@@ -97,14 +90,6 @@ public class MechanicalArmoryClient {
         BuiltInRegistries.BLOCK_ENTITY_TYPE.forEach(AutomatedVisualRegistry::generateAndMap);
 
         AutomatedVisualRegistry.registerAllToFlywheel();
-
-
-        BuiltInRegistries.ENTITY_TYPE.forEach(c -> {
-            if (c == EntityType.PLAYER) return;
-            if (VisualizerRegistry.getVisualizer(c) == null) {
-                VisualizerRegistry.setVisualizer(c, VanillaEntityVisualiser.VANILLA_ENTITY_VISUALISER);
-            }
-        });
 
         // Some client setup code
         MechanicalArmory.LOGGER.info("HELLO FROM CLIENT SETUP");
