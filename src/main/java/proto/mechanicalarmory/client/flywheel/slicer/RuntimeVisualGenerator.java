@@ -410,6 +410,10 @@ public class RuntimeVisualGenerator {
         // new MethodWriter. Reusing those stale Label instances corrupts ASM's CFG and triggers
         // Frame.merge ArrayIndexOutOfBoundsException during COMPUTE_FRAMES.
         Map<LabelNode, Label> labelMap = new HashMap<>();
+        // sliceEnd: all RETURN opcodes in the animation slice jump here so that our
+        // post-slice code (syncDummyToTree, propagateAnimation, updateLight) always runs.
+        Label sliceEnd = new Label();
+
         for (AbstractInsnNode insn : slices.animationSlice) {
             if (insn instanceof LabelNode ln) {
                 labelMap.put(ln, new Label());
@@ -519,9 +523,19 @@ public class RuntimeVisualGenerator {
                     mvUpdate.visitIincInsn(varMap.get(iin.var), iin.incr);
                     continue;
                 }
+                // Replace any RETURN from the animation slice with a jump to sliceEnd so
+                // the post-slice code (syncDummyToTree, propagateAnimation, updateLight) runs.
+                int op = insn.getOpcode();
+                if (op >= Opcodes.IRETURN && op <= Opcodes.RETURN) {
+                    mvUpdate.visitJumpInsn(Opcodes.GOTO, sliceEnd);
+                    continue;
+                }
                 insn.accept(mvUpdate);
             }
         }
+
+        // Place the end-of-slice label here so all RETURN-replaced GOTOs land here.
+        mvUpdate.visitLabel(sliceEnd);
         
         // SYNC: Apply dummy transformations to instances
         for (String partName : dummyParts) {
