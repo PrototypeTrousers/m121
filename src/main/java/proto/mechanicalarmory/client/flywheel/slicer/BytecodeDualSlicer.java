@@ -85,13 +85,22 @@ public class BytecodeDualSlicer {
         result.dependencies = interpreter.dependencies;
         Set<AbstractInsnNode> worklist = new HashSet<>();
 
-        // 1. Find all PUTFIELDs to ModelPart
+        // 1. Find all PUTFIELDs to ModelPart and mutating method calls on ModelPart
         for (int i = 0; i < method.instructions.size(); i++) {
             AbstractInsnNode insn = method.instructions.get(i);
             if (insn.getOpcode() == Opcodes.PUTFIELD) {
                 FieldInsnNode fin = (FieldInsnNode) insn;
                 if ("net/minecraft/client/model/geom/ModelPart".equals(fin.owner)) {
                     worklist.add(insn);
+                }
+            } else if (insn instanceof MethodInsnNode min) {
+                if ("net/minecraft/client/model/geom/ModelPart".equals(min.owner)) {
+                    if (min.name.equals("setPos") || min.name.equals("setRotation") || min.name.equals("setScale")
+                     || min.name.equals("offsetPos") || min.name.equals("offsetRotation") || min.name.equals("offsetScale")
+                     || min.name.equals("rotate") || min.name.equals("copyFrom") || min.name.equals("loadPose")
+                     || min.name.equals("resetPose")) {
+                        worklist.add(insn);
+                    }
                 }
             }
         }

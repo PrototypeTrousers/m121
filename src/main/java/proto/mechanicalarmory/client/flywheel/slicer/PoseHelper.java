@@ -113,6 +113,26 @@ public class PoseHelper {
                 return;
             }
         }
+
+        // If the block state has no "type" property (e.g. Ender Chest using ChestRenderer),
+        // but the visual has double-chest layers, default to single chest visibility.
+        boolean hasChestLayers = false;
+        for (String key : rootTrees.keySet()) {
+            String lower = key.toLowerCase();
+            if (lower.contains("double") || lower.contains("left") || lower.contains("right")) {
+                hasChestLayers = true;
+                break;
+            }
+        }
+        if (hasChestLayers) {
+            for (Map.Entry<String, InstanceTree> entry : rootTrees.entrySet()) {
+                String layerName = entry.getKey().toLowerCase();
+                boolean match = !layerName.contains("double") && !layerName.contains("left") && !layerName.contains("right");
+                if (entry.getValue() != null) {
+                    entry.getValue().visible(match);
+                }
+            }
+        }
     }
 
     public static Matrix4f createEntityPose(net.minecraft.world.entity.Entity entity, float partialTick, net.minecraft.core.Vec3i renderOrigin) {

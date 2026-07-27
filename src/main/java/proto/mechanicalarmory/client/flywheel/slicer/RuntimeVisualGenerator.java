@@ -493,6 +493,8 @@ public class RuntimeVisualGenerator {
                 mvUpdate.visitFieldInsn(Opcodes.GETFIELD, generatedName, "dummy_" + partName, "Lproto/mechanicalarmory/client/flywheel/slicer/DummyModelPart;");
                 mvUpdate.visitInsn(Opcodes.SWAP);
                 mvUpdate.visitInsn(Opcodes.POP);
+            } else if (insn instanceof MethodInsnNode min && min.owner.equals("net/minecraft/client/model/geom/ModelPart")) {
+                mvUpdate.visitMethodInsn(min.getOpcode(), "proto/mechanicalarmory/client/flywheel/slicer/DummyModelPart", min.name, min.desc, min.itf);
             } else if (insn.getOpcode() == Opcodes.PUTFIELD) {
                 FieldInsnNode fin = (FieldInsnNode) insn;
                 if (fin.owner.equals("net/minecraft/client/model/geom/ModelPart")) {
