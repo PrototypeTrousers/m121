@@ -387,6 +387,10 @@ public class BytecodeDualSlicer {
     private static boolean isCaptureBoundary(AbstractInsnNode insn) {
         if (insn.getOpcode() == Opcodes.INVOKEVIRTUAL || insn.getOpcode() == Opcodes.INVOKEINTERFACE) {
             MethodInsnNode min = (MethodInsnNode) insn;
+            // Methods taking float (like partialTick) or returning float/double are animation interpolation methods, NOT capture boundaries!
+            if (min.desc.contains("F)") || min.desc.contains(";F") || min.desc.startsWith("(F") || min.desc.startsWith("(IF") || min.desc.endsWith(")F")) {
+                return false;
+            }
             // Anything invoking on Level, BlockEntity, BlockState, Entity, Mob, Animal is a boundary
             if (min.owner.contains("Level") || min.owner.contains("BlockEntity") || min.owner.contains("BlockState")
                 || min.owner.contains("Entity") || min.owner.contains("Mob") || min.owner.contains("Animal")) {

@@ -257,7 +257,32 @@ public class RuntimeVisualGenerator {
                 mvInit.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "proto/mechanicalarmory/client/flywheel/slicer/DummyModelPart", "copyFrom", "(Ldev/engine_room/flywheel/lib/model/part/InstanceTree;)V", false);
             }
         }
-        
+        // Eagerly propagate the initial pose so instances are at the correct world position from the first frame,
+        // before beginFrame() has a chance to run. Without this they would sit at (0,0,0).
+        for (String lf2 : uniqueLayerFields) {
+            mvInit.visitVarInsn(Opcodes.ALOAD, 0);
+            mvInit.visitFieldInsn(Opcodes.GETFIELD, generatedName, "rootTree_" + lf2, "Ldev/engine_room/flywheel/lib/model/part/InstanceTree;");
+
+            mvInit.visitVarInsn(Opcodes.ALOAD, 0);
+            mvInit.visitMethodInsn(Opcodes.INVOKEVIRTUAL, generatedName, "getVisualPosition", "()Lnet/minecraft/core/BlockPos;", false);
+            mvInit.visitVarInsn(Opcodes.ALOAD, 0);
+            mvInit.visitFieldInsn(Opcodes.GETFIELD, "dev/engine_room/flywheel/lib/visual/AbstractBlockEntityVisual", "blockState", "Lnet/minecraft/world/level/block/state/BlockState;");
+            mvInit.visitVarInsn(Opcodes.ALOAD, 0);
+            mvInit.visitFieldInsn(Opcodes.GETFIELD, "dev/engine_room/flywheel/lib/visual/AbstractBlockEntityVisual", "blockEntity", "Lnet/minecraft/world/level/block/entity/BlockEntity;");
+            mvInit.visitMethodInsn(Opcodes.INVOKESTATIC, "proto/mechanicalarmory/client/flywheel/slicer/PoseHelper", "createInitialPose", "(Lnet/minecraft/core/BlockPos;Lnet/minecraft/world/level/block/state/BlockState;Lnet/minecraft/world/level/block/entity/BlockEntity;)Lorg/joml/Matrix4f;", false);
+
+            mvInit.visitInsn(Opcodes.ICONST_1); // force = true
+            mvInit.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "dev/engine_room/flywheel/lib/model/part/InstanceTree", "propagateAnimation", "(Lorg/joml/Matrix4fc;Z)V", false);
+        }
+
+        // Apply initial visibility (e.g. hide double-chest trees for a single chest) before the first frame renders.
+        // Without this, all root trees for a multi-layer renderer (chest single/left/right) would be visible.
+        mvInit.visitVarInsn(Opcodes.ALOAD, 0);
+        mvInit.visitFieldInsn(Opcodes.GETFIELD, "dev/engine_room/flywheel/lib/visual/AbstractBlockEntityVisual", "blockState", "Lnet/minecraft/world/level/block/state/BlockState;");
+        mvInit.visitVarInsn(Opcodes.ALOAD, 0);
+        mvInit.visitFieldInsn(Opcodes.GETFIELD, generatedName, "rootTreesMap", "Ljava/util/Map;");
+        mvInit.visitMethodInsn(Opcodes.INVOKESTATIC, "proto/mechanicalarmory/client/flywheel/slicer/PoseHelper", "updateVisibility", "(Lnet/minecraft/world/level/block/state/BlockState;Ljava/util/Map;)V", false);
+
         mvInit.visitVarInsn(Opcodes.ALOAD, 0);
         mvInit.visitVarInsn(Opcodes.FLOAD, 3);
         mvInit.visitMethodInsn(Opcodes.INVOKEVIRTUAL, generatedName, "updateLight", "(F)V", false);
@@ -265,6 +290,8 @@ public class RuntimeVisualGenerator {
         mvInit.visitInsn(Opcodes.RETURN);
         mvInit.visitMaxs(0, 0);
         mvInit.visitEnd();
+
+
         
         // 2. Generate tick() method (The Capture Slice)
         MethodVisitor mvTick = cw.visitMethod(Opcodes.ACC_PUBLIC, "tick", "(Ldev/engine_room/flywheel/api/visual/TickableVisual$Context;)V", null, null);
@@ -373,18 +400,12 @@ public class RuntimeVisualGenerator {
         MethodVisitor mvUpdate = cw.visitMethod(Opcodes.ACC_PUBLIC, "beginFrame", "(Ldev/engine_room/flywheel/api/visual/DynamicVisual$Context;)V", null, null);
         mvUpdate.visitCode();
         
-        // Update visibility of root trees based on blockState (e.g. single vs double chest)
-        mvUpdate.visitVarInsn(Opcodes.ALOAD, 0);
-        mvUpdate.visitFieldInsn(Opcodes.GETFIELD, "dev/engine_room/flywheel/lib/visual/AbstractBlockEntityVisual", "blockState", "Lnet/minecraft/world/level/block/state/BlockState;");
-        mvUpdate.visitVarInsn(Opcodes.ALOAD, 0);
-        mvUpdate.visitFieldInsn(Opcodes.GETFIELD, generatedName, "rootTreesMap", "Ljava/util/Map;");
-        mvUpdate.visitMethodInsn(Opcodes.INVOKESTATIC, "proto/mechanicalarmory/client/flywheel/slicer/PoseHelper", "updateVisibility", "(Lnet/minecraft/world/level/block/state/BlockState;Ljava/util/Map;)V", false);
-
         for (String partName : dummyParts) {
             mvUpdate.visitVarInsn(Opcodes.ALOAD, 0);
             mvUpdate.visitFieldInsn(Opcodes.GETFIELD, generatedName, "dummy_" + partName, "Lproto/mechanicalarmory/client/flywheel/slicer/DummyModelPart;");
             mvUpdate.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "proto/mechanicalarmory/client/flywheel/slicer/DummyModelPart", "resetPose", "()V", false);
         }
+
 
         Map<Integer, Integer> varMap = new HashMap<>();
         int nextVar = 2;
@@ -548,6 +569,13 @@ public class RuntimeVisualGenerator {
             mvUpdate.visitMethodInsn(Opcodes.INVOKESTATIC, "proto/mechanicalarmory/client/flywheel/slicer/PoseHelper", "syncDummyToTree", "(Lproto/mechanicalarmory/client/flywheel/slicer/DummyModelPart;Ldev/engine_room/flywheel/lib/model/part/InstanceTree;)V", false);
         }
         
+        // Update visibility of root trees AFTER dummy syncing so hidden root trees properly hide their children
+        mvUpdate.visitVarInsn(Opcodes.ALOAD, 0);
+        mvUpdate.visitFieldInsn(Opcodes.GETFIELD, "dev/engine_room/flywheel/lib/visual/AbstractBlockEntityVisual", "blockState", "Lnet/minecraft/world/level/block/state/BlockState;");
+        mvUpdate.visitVarInsn(Opcodes.ALOAD, 0);
+        mvUpdate.visitFieldInsn(Opcodes.GETFIELD, generatedName, "rootTreesMap", "Ljava/util/Map;");
+        mvUpdate.visitMethodInsn(Opcodes.INVOKESTATIC, "proto/mechanicalarmory/client/flywheel/slicer/PoseHelper", "updateVisibility", "(Lnet/minecraft/world/level/block/state/BlockState;Ljava/util/Map;)V", false);
+
         // Propagate animation on ROOT trees only!
         for (String layerField : uniqueLayerFields) {
             mvUpdate.visitVarInsn(Opcodes.ALOAD, 0);
@@ -637,13 +665,11 @@ public class RuntimeVisualGenerator {
         ClassWriter cw = createClassWriter(generatedName, "dev/engine_room/flywheel/lib/visual/AbstractEntityVisual");
 
         String entityInternalName = "net/minecraft/world/entity/Entity";
-        for (MethodNode mn : modelClassNode.methods) {
-            if (mn.name.equals("setupAnim") && mn.desc.endsWith(";FFFFF)V")) {
-                org.objectweb.asm.Type[] args = org.objectweb.asm.Type.getArgumentTypes(mn.desc);
-                if (args.length > 0 && args[0].getSort() == org.objectweb.asm.Type.OBJECT) {
-                    entityInternalName = args[0].getInternalName();
-                    break;
-                }
+        java.util.Optional<MethodNode> setupAnimOpt = RendererAnalyzer.findSetupAnimMethod(modelClassNode);
+        if (setupAnimOpt.isPresent()) {
+            org.objectweb.asm.Type[] args = org.objectweb.asm.Type.getArgumentTypes(setupAnimOpt.get().desc);
+            if (args.length > 0 && args[0].getSort() == org.objectweb.asm.Type.OBJECT) {
+                entityInternalName = args[0].getInternalName();
             }
         }
 
@@ -690,8 +716,10 @@ public class RuntimeVisualGenerator {
         }
         cw.visitField(Opcodes.ACC_PRIVATE, "rootTreesMap", "Ljava/util/Map;", null, null).visitEnd();
         cw.visitField(Opcodes.ACC_PRIVATE, "poseHelperState", "Ljava/lang/Object;", null, null).visitEnd();
+        cw.visitField(Opcodes.ACC_PRIVATE, "lightSections", "Ldev/engine_room/flywheel/api/visual/SectionTrackedVisual$SectionCollector;", null, null).visitEnd();
 
         MethodVisitor mvInit = cw.visitMethod(Opcodes.ACC_PUBLIC, "<init>", "(Ldev/engine_room/flywheel/api/visualization/VisualizationContext;Lnet/minecraft/world/entity/Entity;F)V", null, null);
+
         mvInit.visitCode();
         mvInit.visitVarInsn(Opcodes.ALOAD, 0);
         mvInit.visitVarInsn(Opcodes.ALOAD, 1);
@@ -826,6 +854,15 @@ public class RuntimeVisualGenerator {
 
         MethodVisitor mvUpdate = cw.visitMethod(Opcodes.ACC_PUBLIC, "beginFrame", "(Ldev/engine_room/flywheel/api/visual/DynamicVisual$Context;)V", null, null);
         mvUpdate.visitCode();
+
+        mvUpdate.visitVarInsn(Opcodes.ALOAD, 0);
+        mvUpdate.visitFieldInsn(Opcodes.GETFIELD, generatedName, "poseHelperState", "Ljava/lang/Object;");
+        mvUpdate.visitVarInsn(Opcodes.ALOAD, 0);
+        mvUpdate.visitFieldInsn(Opcodes.GETFIELD, "dev/engine_room/flywheel/lib/visual/AbstractEntityVisual", "entity", "Lnet/minecraft/world/entity/Entity;");
+        mvUpdate.visitVarInsn(Opcodes.ALOAD, 1);
+        mvUpdate.visitMethodInsn(Opcodes.INVOKEINTERFACE, "dev/engine_room/flywheel/api/visual/DynamicVisual$Context", "partialTick", "()F", true);
+        mvUpdate.visitMethodInsn(Opcodes.INVOKESTATIC, "proto/mechanicalarmory/client/flywheel/slicer/PoseHelper", "animateEntityVisual", "(Ljava/lang/Object;Lnet/minecraft/world/entity/Entity;F)V", false);
+
         for (String lf : uniqueLayerFields) {
             mvUpdate.visitVarInsn(Opcodes.ALOAD, 0);
             mvUpdate.visitFieldInsn(Opcodes.GETFIELD, generatedName, "rootTree_" + lf, "Ldev/engine_room/flywheel/lib/model/part/InstanceTree;");
@@ -836,17 +873,15 @@ public class RuntimeVisualGenerator {
             mvUpdate.visitVarInsn(Opcodes.ALOAD, 0);
             mvUpdate.visitMethodInsn(Opcodes.INVOKEVIRTUAL, generatedName, "renderOrigin", "()Lnet/minecraft/core/Vec3i;", false);
             mvUpdate.visitMethodInsn(Opcodes.INVOKESTATIC, "proto/mechanicalarmory/client/flywheel/slicer/PoseHelper", "createEntityPose", "(Lnet/minecraft/world/entity/Entity;FLnet/minecraft/core/Vec3i;)Lorg/joml/Matrix4f;", false);
-            mvUpdate.visitInsn(Opcodes.ICONST_0);
+            mvUpdate.visitInsn(Opcodes.ICONST_1);
             mvUpdate.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "dev/engine_room/flywheel/lib/model/part/InstanceTree", "propagateAnimation", "(Lorg/joml/Matrix4fc;Z)V", false);
         }
 
         mvUpdate.visitVarInsn(Opcodes.ALOAD, 0);
-        mvUpdate.visitFieldInsn(Opcodes.GETFIELD, generatedName, "poseHelperState", "Ljava/lang/Object;");
+        mvUpdate.visitFieldInsn(Opcodes.GETFIELD, generatedName, "lightSections", "Ldev/engine_room/flywheel/api/visual/SectionTrackedVisual$SectionCollector;");
         mvUpdate.visitVarInsn(Opcodes.ALOAD, 0);
         mvUpdate.visitFieldInsn(Opcodes.GETFIELD, "dev/engine_room/flywheel/lib/visual/AbstractEntityVisual", "entity", "Lnet/minecraft/world/entity/Entity;");
-        mvUpdate.visitVarInsn(Opcodes.ALOAD, 1);
-        mvUpdate.visitMethodInsn(Opcodes.INVOKEINTERFACE, "dev/engine_room/flywheel/api/visual/DynamicVisual$Context", "partialTick", "()F", true);
-        mvUpdate.visitMethodInsn(Opcodes.INVOKESTATIC, "proto/mechanicalarmory/client/flywheel/slicer/PoseHelper", "animateEntityVisual", "(Ljava/lang/Object;Lnet/minecraft/world/entity/Entity;F)V", false);
+        mvUpdate.visitMethodInsn(Opcodes.INVOKESTATIC, "proto/mechanicalarmory/client/flywheel/slicer/LightHelper", "notifySections", "(Ldev/engine_room/flywheel/api/visual/SectionTrackedVisual$SectionCollector;Lnet/minecraft/world/entity/Entity;)V", false);
 
         mvUpdate.visitVarInsn(Opcodes.ALOAD, 0);
         mvUpdate.visitVarInsn(Opcodes.ALOAD, 1);
@@ -872,6 +907,20 @@ public class RuntimeVisualGenerator {
         mvLight.visitInsn(Opcodes.RETURN);
         mvLight.visitMaxs(0, 0);
         mvLight.visitEnd();
+
+        MethodVisitor mvSetSec = cw.visitMethod(Opcodes.ACC_PUBLIC, "setSectionCollector", "(Ldev/engine_room/flywheel/api/visual/SectionTrackedVisual$SectionCollector;)V", null, null);
+        mvSetSec.visitCode();
+        mvSetSec.visitVarInsn(Opcodes.ALOAD, 0);
+        mvSetSec.visitVarInsn(Opcodes.ALOAD, 1);
+        mvSetSec.visitFieldInsn(Opcodes.PUTFIELD, generatedName, "lightSections", "Ldev/engine_room/flywheel/api/visual/SectionTrackedVisual$SectionCollector;");
+        mvSetSec.visitVarInsn(Opcodes.ALOAD, 1);
+        mvSetSec.visitVarInsn(Opcodes.ALOAD, 0);
+        mvSetSec.visitFieldInsn(Opcodes.GETFIELD, "dev/engine_room/flywheel/lib/visual/AbstractEntityVisual", "entity", "Lnet/minecraft/world/entity/Entity;");
+        mvSetSec.visitMethodInsn(Opcodes.INVOKESTATIC, "proto/mechanicalarmory/client/flywheel/slicer/LightHelper", "notifySections", "(Ldev/engine_room/flywheel/api/visual/SectionTrackedVisual$SectionCollector;Lnet/minecraft/world/entity/Entity;)V", false);
+        mvSetSec.visitInsn(Opcodes.RETURN);
+        mvSetSec.visitMaxs(0, 0);
+        mvSetSec.visitEnd();
+
 
         MethodVisitor mvCollect = cw.visitMethod(Opcodes.ACC_PUBLIC, "collectCrumblingInstances", "(Ljava/util/function/Consumer;)V", "(Ljava/util/function/Consumer<Ldev/engine_room/flywheel/api/instance/Instance;>;)V", null);
         mvCollect.visitCode();
@@ -910,6 +959,8 @@ public class RuntimeVisualGenerator {
             mvCreate.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "net/minecraft/client/renderer/entity/EntityRenderer", "getTextureLocation", "(Lnet/minecraft/world/entity/Entity;)Lnet/minecraft/resources/ResourceLocation;", false);
             mvCreate.visitVarInsn(Opcodes.ASTORE, 2);
             mvCreate.visitMethodInsn(Opcodes.INVOKESTATIC, "dev/engine_room/flywheel/lib/material/SimpleMaterial", "builder", "()Ldev/engine_room/flywheel/lib/material/SimpleMaterial$Builder;", false);
+            mvCreate.visitFieldInsn(Opcodes.GETSTATIC, "dev/engine_room/flywheel/lib/material/CutoutShaders", "ONE_TENTH", "Ldev/engine_room/flywheel/api/material/CutoutShader;");
+            mvCreate.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "dev/engine_room/flywheel/lib/material/SimpleMaterial$Builder", "cutout", "(Ldev/engine_room/flywheel/api/material/CutoutShader;)Ldev/engine_room/flywheel/lib/material/SimpleMaterial$Builder;", false);
             mvCreate.visitFieldInsn(Opcodes.GETSTATIC, "dev/engine_room/flywheel/api/material/CardinalLightingMode", "ENTITY", "Ldev/engine_room/flywheel/api/material/CardinalLightingMode;");
             mvCreate.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "dev/engine_room/flywheel/lib/material/SimpleMaterial$Builder", "cardinalLightingMode", "(Ldev/engine_room/flywheel/api/material/CardinalLightingMode;)Ldev/engine_room/flywheel/lib/material/SimpleMaterial$Builder;", false);
             mvCreate.visitVarInsn(Opcodes.ALOAD, 2);
@@ -1000,6 +1051,8 @@ public class RuntimeVisualGenerator {
         mv.visitMethodInsn(Opcodes.INVOKESTATIC, "net/minecraft/client/renderer/Sheets", "chooseMaterial", "(Lnet/minecraft/world/level/block/entity/BlockEntity;Lnet/minecraft/world/level/block/state/properties/ChestType;Z)Lnet/minecraft/client/resources/model/Material;", false);
         mv.visitVarInsn(Opcodes.ASTORE, 4);
         mv.visitMethodInsn(Opcodes.INVOKESTATIC, "dev/engine_room/flywheel/lib/material/SimpleMaterial", "builder", "()Ldev/engine_room/flywheel/lib/material/SimpleMaterial$Builder;", false);
+        mv.visitFieldInsn(Opcodes.GETSTATIC, "dev/engine_room/flywheel/lib/material/CutoutShaders", "ONE_TENTH", "Ldev/engine_room/flywheel/api/material/CutoutShader;");
+        mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "dev/engine_room/flywheel/lib/material/SimpleMaterial$Builder", "cutout", "(Ldev/engine_room/flywheel/api/material/CutoutShader;)Ldev/engine_room/flywheel/lib/material/SimpleMaterial$Builder;", false);
         mv.visitFieldInsn(Opcodes.GETSTATIC, "dev/engine_room/flywheel/api/material/CardinalLightingMode", "ENTITY", "Ldev/engine_room/flywheel/api/material/CardinalLightingMode;");
         mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "dev/engine_room/flywheel/lib/material/SimpleMaterial$Builder", "cardinalLightingMode", "(Ldev/engine_room/flywheel/api/material/CardinalLightingMode;)Ldev/engine_room/flywheel/lib/material/SimpleMaterial$Builder;", false);
         mv.visitVarInsn(Opcodes.ALOAD, 4);
@@ -1023,6 +1076,8 @@ public class RuntimeVisualGenerator {
         mv.visitInsn(Opcodes.AALOAD);
         mv.visitVarInsn(Opcodes.ASTORE, 2);
         mv.visitMethodInsn(Opcodes.INVOKESTATIC, "dev/engine_room/flywheel/lib/material/SimpleMaterial", "builder", "()Ldev/engine_room/flywheel/lib/material/SimpleMaterial$Builder;", false);
+        mv.visitFieldInsn(Opcodes.GETSTATIC, "dev/engine_room/flywheel/lib/material/CutoutShaders", "ONE_TENTH", "Ldev/engine_room/flywheel/api/material/CutoutShader;");
+        mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "dev/engine_room/flywheel/lib/material/SimpleMaterial$Builder", "cutout", "(Ldev/engine_room/flywheel/api/material/CutoutShader;)Ldev/engine_room/flywheel/lib/material/SimpleMaterial$Builder;", false);
         mv.visitFieldInsn(Opcodes.GETSTATIC, "dev/engine_room/flywheel/api/material/CardinalLightingMode", "ENTITY", "Ldev/engine_room/flywheel/api/material/CardinalLightingMode;");
         mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "dev/engine_room/flywheel/lib/material/SimpleMaterial$Builder", "cardinalLightingMode", "(Ldev/engine_room/flywheel/api/material/CardinalLightingMode;)Ldev/engine_room/flywheel/lib/material/SimpleMaterial$Builder;", false);
         mv.visitVarInsn(Opcodes.ALOAD, 2);
@@ -1058,6 +1113,8 @@ public class RuntimeVisualGenerator {
         mv.visitVarInsn(Opcodes.ASTORE, 3);
         mv.visitLabel(l5);
         mv.visitMethodInsn(Opcodes.INVOKESTATIC, "dev/engine_room/flywheel/lib/material/SimpleMaterial", "builder", "()Ldev/engine_room/flywheel/lib/material/SimpleMaterial$Builder;", false);
+        mv.visitFieldInsn(Opcodes.GETSTATIC, "dev/engine_room/flywheel/lib/material/CutoutShaders", "ONE_TENTH", "Ldev/engine_room/flywheel/api/material/CutoutShader;");
+        mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "dev/engine_room/flywheel/lib/material/SimpleMaterial$Builder", "cutout", "(Ldev/engine_room/flywheel/api/material/CutoutShader;)Ldev/engine_room/flywheel/lib/material/SimpleMaterial$Builder;", false);
         mv.visitFieldInsn(Opcodes.GETSTATIC, "dev/engine_room/flywheel/api/material/CardinalLightingMode", "ENTITY", "Ldev/engine_room/flywheel/api/material/CardinalLightingMode;");
         mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "dev/engine_room/flywheel/lib/material/SimpleMaterial$Builder", "cardinalLightingMode", "(Ldev/engine_room/flywheel/api/material/CardinalLightingMode;)Ldev/engine_room/flywheel/lib/material/SimpleMaterial$Builder;", false);
         mv.visitVarInsn(Opcodes.ALOAD, 3);
@@ -1074,6 +1131,8 @@ public class RuntimeVisualGenerator {
 
     private static void generateFallbackMaterialResolver(MethodVisitor mv) {
         mv.visitMethodInsn(Opcodes.INVOKESTATIC, "dev/engine_room/flywheel/lib/material/SimpleMaterial", "builder", "()Ldev/engine_room/flywheel/lib/material/SimpleMaterial$Builder;", false);
+        mv.visitFieldInsn(Opcodes.GETSTATIC, "dev/engine_room/flywheel/lib/material/CutoutShaders", "ONE_TENTH", "Ldev/engine_room/flywheel/api/material/CutoutShader;");
+        mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "dev/engine_room/flywheel/lib/material/SimpleMaterial$Builder", "cutout", "(Ldev/engine_room/flywheel/api/material/CutoutShader;)Ldev/engine_room/flywheel/lib/material/SimpleMaterial$Builder;", false);
         mv.visitFieldInsn(Opcodes.GETSTATIC, "dev/engine_room/flywheel/api/material/CardinalLightingMode", "ENTITY", "Ldev/engine_room/flywheel/api/material/CardinalLightingMode;");
         mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "dev/engine_room/flywheel/lib/material/SimpleMaterial$Builder", "cardinalLightingMode", "(Ldev/engine_room/flywheel/api/material/CardinalLightingMode;)Ldev/engine_room/flywheel/lib/material/SimpleMaterial$Builder;", false);
         mv.visitLdcInsn("minecraft");

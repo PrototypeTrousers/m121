@@ -9,6 +9,7 @@ import de.javagl.jgltf.model.TextureModel;
 import de.javagl.jgltf.model.v2.MaterialModelV2;
 import dev.engine_room.flywheel.api.material.CardinalLightingMode;
 import dev.engine_room.flywheel.api.model.Model;
+import dev.engine_room.flywheel.lib.material.CutoutShaders;
 import dev.engine_room.flywheel.lib.material.SimpleMaterial;
 import dev.engine_room.flywheel.lib.model.ModelUtil;
 import net.minecraft.client.Minecraft;
@@ -49,6 +50,7 @@ public class GltfFlywheelModel implements Model {
 
         meshes.add(new ConfiguredMesh(SimpleMaterial.builder()
                 .texture(rl)
+                .cutout(CutoutShaders.ONE_TENTH)
                 .cardinalLightingMode(CardinalLightingMode.ENTITY)
                 .ambientOcclusion(false)
                 .build(),

@@ -31,6 +31,7 @@ public class AutomatedVisualRegistry {
 
     public static final Map<BlockEntityType<?>, Class<?>> GENERATED_VISUALS = new HashMap<>();
     private static final Map<Class<?>, Class<?>> RENDERER_CLASS_TO_VISUAL = new HashMap<>();
+    private static final Map<Class<?>, PartPoseConfig> RENDERER_CLASS_TO_POSE_CONFIG = new HashMap<>();
     public static final Map<EntityType<?>, Class<?>> GENERATED_ENTITY_VISUALS = new HashMap<>();
     private static final Map<Class<?>, Class<?>> RENDERER_CLASS_TO_ENTITY_VISUAL = new HashMap<>();
     private static VisualLoader loader;
@@ -150,6 +151,9 @@ public class AutomatedVisualRegistry {
             if (RENDERER_CLASS_TO_VISUAL.containsKey(rendererClass)) {
                 Class<?> existingClass = RENDERER_CLASS_TO_VISUAL.get(rendererClass);
                 GENERATED_VISUALS.put(type, existingClass);
+                if (RENDERER_CLASS_TO_POSE_CONFIG.containsKey(rendererClass)) {
+                    PoseHelper.registerPoseConfig(type, RENDERER_CLASS_TO_POSE_CONFIG.get(rendererClass));
+                }
                 System.out.println("[Flywheel Slicer] Reusing already generated visual for " + rendererClass.getSimpleName() + " on " + BuiltInRegistries.BLOCK_ENTITY_TYPE.getKey(type));
                 return;
             }
@@ -162,9 +166,15 @@ public class AutomatedVisualRegistry {
 
             PartPoseConfig poseConfig = PartPoseExtractor.extract(classNode);
             PoseHelper.registerPoseConfig(type, poseConfig);
+            RENDERER_CLASS_TO_POSE_CONFIG.put(rendererClass, poseConfig);
             System.out.println("[Flywheel Slicer] Extracted pose config for " + rendererClass.getSimpleName() + ": " + poseConfig);
 
             BytecodeDualSlicer.SliceResult slices = BytecodeDualSlicer.slice(classNode.name, renderMethod);
+
+            if (slices.animationSlice.isEmpty()) {
+                System.out.println("[Flywheel Slicer] Skipping " + rendererClass.getSimpleName() + " — no ModelPart mutations found in render method.");
+                return;
+            }
 
             String generatedName = classNode.name.replace('/', '_') + "_FlywheelVisual";
             byte[] classBytes = RuntimeVisualGenerator.generateVisualClass(classNode, slices);
@@ -238,6 +248,11 @@ public class AutomatedVisualRegistry {
             System.out.println("[Flywheel Slicer] Found ModelLayerLocation field for " + rendererClass.getSimpleName() + ": " + (layerField != null ? layerField.owner + "." + layerField.name : "null (fallback)"));
 
             BytecodeDualSlicer.SliceResult slices = BytecodeDualSlicer.slice(modelNode.name, setupAnimMethod);
+
+            if (slices.animationSlice.isEmpty()) {
+                System.out.println("[Flywheel Slicer] Skipping entity " + rendererClass.getSimpleName() + " — no ModelPart mutations found in setupAnim.");
+                return;
+            }
 
             String generatedName = rendererClass.getName().replace('.', '_') + "_FlywheelVisual";
             byte[] classBytes = RuntimeVisualGenerator.generateEntityVisualClass(modelNode, rendererClass, slices, layerField);

@@ -13,6 +13,7 @@ import java.io.StringWriter;
 public class SlicerTest {
     
     public static void main(String[] args) {
+
         try {
             Class<?>[] testClasses = new Class<?>[] {
                 net.minecraft.client.renderer.blockentity.ChestRenderer.class,

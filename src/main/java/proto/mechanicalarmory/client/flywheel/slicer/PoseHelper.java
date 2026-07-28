@@ -27,32 +27,35 @@ public class PoseHelper {
     public static Matrix4f createInitialPose(BlockPos visualPos, BlockState blockState, net.minecraft.world.level.block.entity.BlockEntity blockEntity) {
         Matrix4f matrix = new Matrix4f().translate(visualPos.getX(), visualPos.getY(), visualPos.getZ());
 
-        if (blockState != null && (blockState.getBlock() instanceof net.minecraft.world.level.block.ShulkerBoxBlock || (blockEntity instanceof net.minecraft.world.level.block.entity.ShulkerBoxBlockEntity))) {
-            Direction direction = Direction.UP;
-            if (blockState.hasProperty(net.minecraft.world.level.block.ShulkerBoxBlock.FACING)) {
-                direction = blockState.getValue(net.minecraft.world.level.block.ShulkerBoxBlock.FACING);
-            }
-            matrix.translate(0.5F, 0.5F, 0.5F);
-            matrix.scale(0.9995F, 0.9995F, 0.9995F);
-            matrix.rotate(direction.getRotation());
-            matrix.scale(1.0F, -1.0F, -1.0F);
-            matrix.translate(0.0F, -1.0F, 0.0F);
-            return matrix;
-        }
         if (blockState != null) {
+            // Detect the facing direction from any Direction-typed block state property
             Direction facing = null;
-
             for (Property<?> prop : blockState.getProperties()) {
-                String name = prop.getName();
-                if (name.equals("facing") || prop.getValueClass() == Direction.class) {
-                    Object val = blockState.getValue(prop);
-                    if (val instanceof Direction dir && dir.getAxis().isHorizontal()) {
-                        facing = dir;
-                    }
+                Object val = blockState.getValue(prop);
+                if (val instanceof Direction dir) {
+                    facing = dir;
+                    break;
                 }
             }
 
             PartPoseConfig config = (blockEntity != null) ? POSE_CONFIGS.get(blockEntity.getType()) : null;
+
+            if (config != null && config.usesFacingRotation) {
+                // Generic renderer-driven transform: translate to center, apply facing quaternion from BlockState,
+                // then optionally flip vertically and apply post-rotation Y offset.
+                // This reconstructs what vanilla does with poseStack.mulPose(direction.getRotation()) + scale(1,-1,-1).
+                Direction dir = (facing != null) ? facing : Direction.UP;
+                matrix.translate(0.5F, 0.5F + config.yOffset, 0.5F);
+                matrix.scale(0.9995F, 0.9995F, 0.9995F);
+                matrix.rotate(dir.getRotation());
+                if (config.verticallyFlipped) {
+                    matrix.scale(1.0F, -1.0F, -1.0F);
+                }
+                if (config.postRotationYOffset != 0.0F) {
+                    matrix.translate(0.0F, config.postRotationYOffset, 0.0F);
+                }
+                return matrix;
+            }
 
             if (config != null && config.customPose && facing != null) {
                 matrix.translate(0.0F, config.yOffset, 0.0F);
@@ -67,7 +70,7 @@ public class PoseHelper {
                 }
                 matrix.translate(-0.5F, -0.5F, -0.5F);
                 return matrix;
-            } else if (facing != null) {
+            } else if (facing != null && facing.getAxis().isHorizontal()) {
                 float horizontalAngle = facing.toYRot();
                 matrix.translate(0.5F, 0.5F, 0.5F)
                       .rotateY(-horizontalAngle * Mth.DEG_TO_RAD)

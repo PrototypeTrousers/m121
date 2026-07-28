@@ -50,7 +50,7 @@ public class CapturedModel implements Model {
 
             meshes.add(new Model.ConfiguredMesh(SimpleMaterial.builder()
                     .texture(atlas)
-                    .cutout(CutoutShaders.EPSILON)
+                    .cutout(CutoutShaders.ONE_TENTH)
                     .light(LightShaders.FLAT)
                     .cardinalLightingMode(CardinalLightingMode.CHUNK)
                     .ambientOcclusion(false)
