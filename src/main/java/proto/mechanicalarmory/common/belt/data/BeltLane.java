@@ -268,7 +268,9 @@ public final class BeltLane {
     }
 
     public static BeltLane load(CompoundTag tag, net.minecraft.core.HolderLookup.Provider registries) {
-        BeltLane lane = new BeltLane(tag.getFloat("speed"));
+        float spd = tag.contains("speed") ? tag.getFloat("speed") : SPEED_DEFAULT;
+        if (spd <= 0.0f) spd = SPEED_DEFAULT;
+        BeltLane lane = new BeltLane(spd);
         ListTag list = tag.getList("groups", Tag.TAG_COMPOUND);
         for (int i = 0; i < list.size(); i++) {
             lane.groups.addLast(ItemGroup.load(list.getCompound(i), registries));

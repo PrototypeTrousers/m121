@@ -141,6 +141,17 @@ public class MechanicalArmoryClient {
     @SubscribeEvent
     public static void onRenderFrame(RenderFrameEvent.Pre event) {
         limiter.tick();
+        proto.mechanicalarmory.client.belt.ClientBeltNetwork.get().syncToFlywheel();
+    }
+
+    @EventBusSubscriber(modid = MechanicalArmory.MODID, bus = EventBusSubscriber.Bus.GAME, value = Dist.CLIENT)
+    public static class GameEvents {
+        @SubscribeEvent
+        public static void onLevelUnload(net.neoforged.neoforge.event.level.LevelEvent.Unload event) {
+            if (event.getLevel().isClientSide()) {
+                proto.mechanicalarmory.client.belt.ClientBeltNetwork.get().clear();
+            }
+        }
     }
 
     public static GltfModel loadglTFModel(ModelResourceLocation modelResourceLocation) {

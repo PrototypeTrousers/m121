@@ -205,6 +205,44 @@ public final class BeltNetworkData extends SavedData {
         }
     }
 
+    /**
+     * Called when a player starts watching a chunk (ChunkWatchEvent.Watch).
+     * Sends the current state of all belts in the chunk directly to that player.
+     */
+    public void sendChunkInitToPlayer(net.minecraft.world.level.ChunkPos chunkPos, net.minecraft.server.level.ServerPlayer player) {
+        int minX = chunkPos.getMinBlockX();
+        int minZ = chunkPos.getMinBlockZ();
+        int maxX = chunkPos.getMaxBlockX();
+        int maxZ = chunkPos.getMaxBlockZ();
+
+        List<BeltInitPayload.NodeSnapshot> snapshots = new ArrayList<>();
+
+        for (Map.Entry<BlockPos, UUID> entry : posToSubnet.entrySet()) {
+            BlockPos bpos = entry.getKey();
+            if (bpos.getX() < minX || bpos.getX() > maxX) continue;
+            if (bpos.getZ() < minZ || bpos.getZ() > maxZ) continue;
+
+            BeltSubnetwork subnet = subnetworks.get(entry.getValue());
+            if (subnet == null) continue;
+            BeltNode node = subnet.nodeAt(bpos);
+            if (node == null) continue;
+
+            snapshots.add(new BeltInitPayload.NodeSnapshot(
+                    bpos,
+                    node.lane(0).deepCopy(),
+                    node.lane(1).deepCopy(),
+                    node.isWrapPoint(),
+                    node.outputId() != null
+            ));
+        }
+
+        if (!snapshots.isEmpty()) {
+            long tick = player.serverLevel().getGameTime();
+            BeltInitPayload pkt = new BeltInitPayload(snapshots, tick);
+            PacketDistributor.sendToPlayer(player, pkt);
+        }
+    }
+
     // ── Accessors ─────────────────────────────────────────────────────────────
 
     @Nullable

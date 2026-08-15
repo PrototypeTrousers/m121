@@ -57,6 +57,10 @@ public final class BeltNetworkTick {
         // Group topo-ordered nodes into layers.
         // Since topoOrder already guarantees correct processing order, and nodes
         // within the same layer share no edges, we can run each layer in parallel.
+        for (BeltNode node : topo) {
+            updateNodeSpeeds(node, level);
+        }
+
         List<List<BeltNode>> layers = buildLayers(topo);
 
         for (List<BeltNode> layer : layers) {
@@ -72,6 +76,44 @@ public final class BeltNetworkTick {
                 CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
             }
         }
+    }
+
+    private static void updateNodeSpeeds(BeltNode node, ServerLevel level) {
+        net.minecraft.core.BlockPos pos = node.pos();
+        net.minecraft.world.level.block.state.BlockState state = level.getBlockState(pos);
+        if (!(state.getBlock() instanceof proto.mechanicalarmory.common.blocks.BlockBelt)) return;
+
+        net.minecraft.core.Direction facing = state.getValue(proto.mechanicalarmory.common.blocks.BlockBelt.FACING);
+        net.minecraft.core.Direction back = facing.getOpposite();
+        net.minecraft.core.Direction left = facing.getCounterClockWise();
+        net.minecraft.core.Direction right = facing.getClockWise();
+
+        boolean hasBack = isBeltFacingInto(level, pos.relative(back), pos);
+        boolean hasLeft = isBeltFacingInto(level, pos.relative(left), pos);
+        boolean hasRight = isBeltFacingInto(level, pos.relative(right), pos);
+
+        if (!hasBack) {
+            if (hasRight && !hasLeft) {
+                node.lane(1).setSpeed(BeltLane.SPEED_INNER);
+                node.lane(0).setSpeed(BeltLane.SPEED_OUTER);
+                return;
+            } else if (hasLeft && !hasRight) {
+                node.lane(0).setSpeed(BeltLane.SPEED_INNER);
+                node.lane(1).setSpeed(BeltLane.SPEED_OUTER);
+                return;
+            }
+        }
+        node.lane(0).setSpeed(BeltLane.SPEED_DEFAULT);
+        node.lane(1).setSpeed(BeltLane.SPEED_DEFAULT);
+    }
+
+    private static boolean isBeltFacingInto(ServerLevel level, net.minecraft.core.BlockPos fromPos, net.minecraft.core.BlockPos toPos) {
+        net.minecraft.world.level.block.state.BlockState state = level.getBlockState(fromPos);
+        if (state.getBlock() instanceof proto.mechanicalarmory.common.blocks.BlockBelt) {
+            net.minecraft.core.Direction f = state.getValue(proto.mechanicalarmory.common.blocks.BlockBelt.FACING);
+            return fromPos.relative(f).equals(toPos);
+        }
+        return false;
     }
 
     /**
@@ -109,19 +151,24 @@ public final class BeltNetworkTick {
     private static void tickNode(BeltNode node, BeltSubnetwork subnet) {
         if (node.isStopped()) return;
 
-        boolean hasOutput = node.outputId() != null;
+        boolean hasOutput = false;
+        BeltNode output = null;
+        if (node.outputId() != null) {
+            output = subnet.node(node.outputId());
+            if (output != null && !output.isStopped()) {
+                hasOutput = true;
+            }
+        }
+
         for (int l = 0; l < 2; l++) {
             BeltLane lane = node.lane(l);
 
-            // 1. Advance items
+            // 1. Advance items (clamped to 1.0f if terminal or output is stopped)
             lane.advance(1.0f, hasOutput ? Float.MAX_VALUE : 1.0f);
 
             // 2. Handle output
-            if (hasOutput) {
-                BeltNode output = subnet.node(node.outputId());
-                if (output != null && !output.isStopped()) {
-                    lane.transferOut(output.lane(l));
-                }
+            if (hasOutput && output != null) {
+                lane.transferOut(output.lane(l));
             }
         }
     }

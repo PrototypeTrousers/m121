@@ -68,6 +68,7 @@ public class MechanicalArmory {
         // Belt network events
         NeoForge.EVENT_BUS.addListener(this::onLevelTick);
         NeoForge.EVENT_BUS.addListener(this::onChunkLoad);
+        NeoForge.EVENT_BUS.addListener(this::onChunkWatch);
 
         // Register our mod's ModConfigSpec so that FML can create and load the config file for us
         modContainer.registerConfig(ModConfig.Type.COMMON, Config.SPEC);
@@ -107,5 +108,12 @@ public class MechanicalArmory {
                     .get(srv)
                     .onChunkLoaded(event.getChunk().getPos(), srv);
         }
+    }
+
+    /** Notify the belt network when a player starts watching a chunk so it can seed client data. */
+    private void onChunkWatch(net.neoforged.neoforge.event.level.ChunkWatchEvent.Watch event) {
+        proto.mechanicalarmory.common.belt.network.BeltNetworkData
+                .get(event.getLevel())
+                .sendChunkInitToPlayer(event.getPos(), event.getPlayer());
     }
 }

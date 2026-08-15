@@ -32,6 +32,7 @@ import proto.mechanicalarmory.common.belt.data.ItemGroup;
 import proto.mechanicalarmory.common.belt.network.BeltSubnetwork;
 import proto.mechanicalarmory.common.blocks.BlockBelt;
 
+import javax.annotation.Nullable;
 import java.util.*;
 import java.util.function.Consumer;
 
@@ -103,24 +104,49 @@ public class BeltSubnetworkVisual extends AbstractVisual
 
                 updateNodeSpeeds(node);
 
-                boolean hasOutput = node.outputId() != null;
+                boolean hasOutput = hasValidOutput(node);
+                BeltNode outNode = hasOutput ? getOutputNode(node) : null;
                 for (int l = 0; l < 2; l++) {
                     BeltLane lane = node.lane(l);
                     lane.advance(1.0f, hasOutput ? Float.MAX_VALUE : 1.0f);
 
-                    if (hasOutput) {
-                        BeltNode outNode = subnet.node(node.outputId());
-                        if (outNode != null) {
-                            lane.transferOut(outNode.lane(l));
-                        } else {
-                            while (!lane.groups().isEmpty() && lane.groups().peekFirst().headPos() >= 1.0f) {
-                                lane.groups().pollFirst();
-                            }
-                        }
+                    if (hasOutput && outNode != null && !outNode.isStopped()) {
+                        lane.transferOut(outNode.lane(l));
                     }
                 }
             }
         }
+    }
+
+    private boolean hasValidOutput(BeltNode node) {
+        if (level == null) return false;
+        BlockPos pos = node.pos();
+        BlockState state = level.getBlockState(pos);
+        if (!(state.getBlock() instanceof BlockBelt)) return false;
+
+        Direction facing = state.getValue(BlockBelt.FACING);
+        BlockPos outPos = pos.relative(facing);
+        BlockState outState = level.getBlockState(outPos);
+        return outState.getBlock() instanceof BlockBelt;
+    }
+
+    @Nullable
+    private BeltNode getOutputNode(BeltNode node) {
+        if (level == null) return null;
+        BlockPos pos = node.pos();
+        BlockState state = level.getBlockState(pos);
+        if (!(state.getBlock() instanceof BlockBelt)) return null;
+
+        Direction facing = state.getValue(BlockBelt.FACING);
+        BlockPos outPos = pos.relative(facing);
+        BlockState outState = level.getBlockState(outPos);
+        if (!(outState.getBlock() instanceof BlockBelt)) return null;
+
+        BeltNode out = subnet.nodeAt(outPos);
+        if (out == null) {
+            out = proto.mechanicalarmory.client.belt.ClientBeltNetwork.get().getNode(outPos);
+        }
+        return out;
     }
 
     private void updateNodeSpeeds(BeltNode node) {
@@ -190,9 +216,19 @@ public class BeltSubnetworkVisual extends AbstractVisual
     private void renderNode(BeltNode node, float partialTick) {
         BlockPos pos = node.pos();
         BlockState state = level.getBlockState(pos);
-        if (!(state.getBlock() instanceof BlockBelt)) return;
+        if (!(state.getBlock() instanceof BlockBelt)) {
+            List<List<TransformedInstance>> lanes = nodeInstances.remove(node.nodeId());
+            if (lanes != null) {
+                for (List<TransformedInstance> list : lanes) {
+                    list.forEach(Instance::delete);
+                    list.clear();
+                }
+            }
+            return;
+        }
 
         Direction facing = state.getValue(BlockBelt.FACING);
+        updateNodeSpeeds(node);
         CurveType curve = getCurveType(pos, facing);
         int packedLight = LevelRenderer.getLightColor(level, pos);
 
@@ -221,9 +257,9 @@ public class BeltSubnetworkVisual extends AbstractVisual
         // Calculate max forward advance available for the front group
         float maxFrontAdvance = 0.0f;
         if (!node.isStopped()) {
-            if (node.outputId() != null) {
-                BeltNode outNode = subnet.node(node.outputId());
-                if (outNode != null) {
+            if (hasValidOutput(node)) {
+                BeltNode outNode = getOutputNode(node);
+                if (outNode != null && !outNode.isStopped()) {
                     BeltLane nextLane = outNode.lane(laneIdx);
                     float nextRoom = nextLane.isEmpty()
                             ? Float.MAX_VALUE
@@ -233,10 +269,10 @@ public class BeltSubnetworkVisual extends AbstractVisual
                     } else {
                         maxFrontAdvance = Math.max(0.0f, 1.0f - lane.groups().peekFirst().headPos());
                     }
-                } else {
-                    maxFrontAdvance = lane.speed();
+                } else if (!lane.isEmpty()) {
+                    maxFrontAdvance = Math.max(0.0f, 1.0f - lane.groups().peekFirst().headPos());
                 }
-            } else {
+            } else if (!lane.isEmpty()) {
                 maxFrontAdvance = Math.max(0.0f, 1.0f - lane.groups().peekFirst().headPos());
             }
         }
@@ -439,6 +475,7 @@ public class BeltSubnetworkVisual extends AbstractVisual
     @Override
     protected void _delete() {
         this.deleted = true;
+        proto.mechanicalarmory.client.belt.ClientBeltNetwork.get().onVisualDeleted(subnet.subnetId());
         for (List<List<TransformedInstance>> lanes : nodeInstances.values()) {
             for (List<TransformedInstance> list : lanes) {
                 list.forEach(Instance::delete);

@@ -73,6 +73,24 @@ public class BeltEntity extends BlockEntity {
         super(MAEntities.BELT_ENTITY.get(), pos, state);
     }
 
+    @Override
+    public void onLoad() {
+        super.onLoad();
+        if (level != null && level.isClientSide()) {
+            proto.mechanicalarmory.common.belt.data.BeltNode existing =
+                    proto.mechanicalarmory.client.belt.ClientBeltNetwork.get().getNode(worldPosition);
+            if (existing != null) {
+                // Restore clientLanes from existing simulated network node
+                this.clientLanes[0] = existing.lane(0).deepCopy();
+                this.clientLanes[1] = existing.lane(1).deepCopy();
+                this.clientStopped = existing.isStopped();
+            } else {
+                proto.mechanicalarmory.client.belt.ClientBeltNetwork.get().updateNode(
+                        worldPosition, clientLanes[0], clientLanes[1], clientStopped, clientWrapPoint, clientHasOutput);
+            }
+        }
+    }
+
     // ── Server sync ───────────────────────────────────────────────────────────
 
     /** Called by BeltNetworkData when the chunk this BE is in loads. */
@@ -204,12 +222,26 @@ public class BeltEntity extends BlockEntity {
     protected void saveAdditional(@NotNull CompoundTag tag, HolderLookup.@NotNull Provider registries) {
         super.saveAdditional(tag, registries);
         if (nodeId != null) tag.putUUID("nodeId", nodeId);
+        if (level instanceof net.minecraft.server.level.ServerLevel srv) {
+            proto.mechanicalarmory.common.belt.network.BeltNetworkData data =
+                    proto.mechanicalarmory.common.belt.network.BeltNetworkData.get(srv);
+            BeltNode node = data.nodeAt(worldPosition);
+            if (node != null) {
+                tag.put("lane0", node.lane(0).save(registries));
+                tag.put("lane1", node.lane(1).save(registries));
+                tag.putBoolean("wrapPoint", node.isWrapPoint());
+                tag.putBoolean("hasOutput", node.outputId() != null);
+                tag.putBoolean("stopped", node.isStopped());
+                tag.putLong("serverTick", srv.getGameTime());
+            }
+        }
     }
 
     @Override
     protected void loadAdditional(@NotNull CompoundTag tag, HolderLookup.@NotNull Provider registries) {
         super.loadAdditional(tag, registries);
         if (tag.contains("nodeId")) nodeId = tag.getUUID("nodeId");
+        applySyncTag(tag, registries);
     }
 
     // ── Update packet (vanilla BE sync on chunk load & client join) ─────────
@@ -237,6 +269,10 @@ public class BeltEntity extends BlockEntity {
     @Override
     public void handleUpdateTag(CompoundTag tag, HolderLookup.Provider lookupProvider) {
         super.handleUpdateTag(tag, lookupProvider);
+        applySyncTag(tag, lookupProvider);
+    }
+
+    private void applySyncTag(CompoundTag tag, HolderLookup.Provider lookupProvider) {
         if (tag.contains("lane0") && tag.contains("lane1")) {
             BeltLane l0 = BeltLane.load(tag.getCompound("lane0"), lookupProvider);
             BeltLane l1 = BeltLane.load(tag.getCompound("lane1"), lookupProvider);
@@ -245,6 +281,11 @@ public class BeltEntity extends BlockEntity {
             boolean stopped = tag.getBoolean("stopped");
             long serverTick = tag.getLong("serverTick");
             applyClientSeed(l0, l1, serverTick, stopped, wrap, hasOut);
+
+            if (level != null && level.isClientSide()) {
+                proto.mechanicalarmory.client.belt.ClientBeltNetwork.get().updateNode(
+                        worldPosition, l0, l1, stopped, wrap, hasOut);
+            }
         }
     }
 
