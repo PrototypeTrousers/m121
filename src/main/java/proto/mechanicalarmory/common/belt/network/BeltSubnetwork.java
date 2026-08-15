@@ -90,31 +90,15 @@ public final class BeltSubnetwork {
     // ── Edge linking ──────────────────────────────────────────────────────────
 
     /**
-     * Connect {@code fromPos} → {@code toPos}.  If the connection would close a
-     * cycle, a random node in the cycle is designated the wrap-point instead of
-     * adding a real output edge.
+     * Connect {@code fromPos} → {@code toPos}.
      */
     public void link(BlockPos fromPos, BlockPos toPos) {
         BeltNode from = nodeAt(fromPos);
         BeltNode to   = nodeAt(toPos);
         if (from == null || to == null) return;
 
-        // Cycle check: would connecting from→to create a cycle?
-        if (wouldCycle(from.nodeId(), to.nodeId())) {
-            // Pick the wrap-point randomly among all nodes in the cycle
-            List<UUID> cycle = findCycle(from.nodeId(), to.nodeId());
-            if (!cycle.isEmpty()) {
-                UUID wrapId = cycle.get(new Random().nextInt(cycle.size()));
-                BeltNode wrapNode = nodes.get(wrapId);
-                if (wrapNode != null) {
-                    wrapNode.setWrapPoint(true);
-                    wrapNode.setOutputId(null); // no real output
-                }
-            }
-        } else {
-            from.setOutputId(to.nodeId());
-            to.addInput(from.nodeId());
-        }
+        from.setOutputId(to.nodeId());
+        to.addInput(from.nodeId());
         topoDirty = true;
     }
 
@@ -142,95 +126,63 @@ public final class BeltSubnetwork {
     }
 
     private void rebuildTopo() {
-        // 1. Wrap-points go in layer 0.
-        List<BeltNode> result = new ArrayList<>();
+        List<BeltNode> result = new ArrayList<>(nodes.size());
         Set<UUID> visited = new HashSet<>();
 
+        // In output-first sorting, a node is ready when its downstream output has been placed.
+        Map<UUID, Integer> outDegree = new HashMap<>();
         for (BeltNode n : nodes.values()) {
-            if (n.isWrapPoint()) {
-                result.add(n);
-                visited.add(n.nodeId());
+            if (n.outputId() != null && nodes.containsKey(n.outputId())) {
+                outDegree.put(n.nodeId(), 1);
+            } else {
+                outDegree.put(n.nodeId(), 0);
             }
         }
 
-        // 2. Kahn's algorithm on the remaining graph (back-edges from wrap-points removed).
-        // Build in-degree map (excluding back edges from wrap-points).
-        Map<UUID, Integer> inDegree = new HashMap<>();
-        for (BeltNode n : nodes.values()) {
-            inDegree.putIfAbsent(n.nodeId(), 0);
-            UUID outId = n.outputId();
-            if (outId != null && !n.isWrapPoint()) {
-                inDegree.merge(outId, 1, Integer::sum);
-            }
-        }
-
-        // Terminals (inDegree == 0 from non-wrap edges, not already added)
         Queue<UUID> queue = new ArrayDeque<>();
-        for (Map.Entry<UUID, Integer> e : inDegree.entrySet()) {
-            if (e.getValue() == 0 && !visited.contains(e.getKey())) {
+        // 1. Initial drains / terminals (outDegree == 0)
+        for (Map.Entry<UUID, Integer> e : outDegree.entrySet()) {
+            if (e.getValue() == 0) {
                 queue.add(e.getKey());
             }
         }
 
-        while (!queue.isEmpty()) {
-            UUID id = queue.poll();
-            if (visited.contains(id)) continue;
-            BeltNode node = nodes.get(id);
-            if (node == null) continue;
-            result.add(node);
-            visited.add(id);
-
-            // Reduce in-degree of inputs (they come after this in topo)
-            for (UUID inputId : node.inputIds()) {
-                if (!visited.contains(inputId)) {
-                    int deg = inDegree.merge(inputId, -1, Integer::sum);
-                    if (deg == 0) queue.add(inputId);
+        while (result.size() < nodes.size()) {
+            if (queue.isEmpty()) {
+                // Graph contains a cycle among unvisited nodes.
+                // Pick an unvisited node to break the cycle.
+                UUID cycleBreak = null;
+                for (UUID id : nodes.keySet()) {
+                    if (!visited.contains(id)) {
+                        cycleBreak = id;
+                        break;
+                    }
                 }
+                if (cycleBreak == null) break;
+                queue.add(cycleBreak);
             }
-        }
 
-        // Add any remaining nodes not reached (disconnected or in unresolved cycles)
-        for (BeltNode n : nodes.values()) {
-            if (!visited.contains(n.nodeId())) {
-                result.add(n);
+            while (!queue.isEmpty()) {
+                UUID id = queue.poll();
+                if (!visited.add(id)) continue;
+                BeltNode node = nodes.get(id);
+                if (node == null) continue;
+                result.add(node);
+
+                // Notify inputs that this output node has been placed
+                for (UUID inputId : node.inputIds()) {
+                    if (!visited.contains(inputId)) {
+                        int remaining = outDegree.merge(inputId, -1, Integer::sum);
+                        if (remaining <= 0) {
+                            queue.add(inputId);
+                        }
+                    }
+                }
             }
         }
 
         topoOrder = result;
         topoDirty = false;
-    }
-
-    // ── Cycle detection helpers ───────────────────────────────────────────────
-
-    private boolean wouldCycle(UUID fromId, UUID toId) {
-        // DFS: can we reach fromId starting from toId?
-        Set<UUID> seen = new HashSet<>();
-        Deque<UUID> stack = new ArrayDeque<>();
-        stack.push(toId);
-        while (!stack.isEmpty()) {
-            UUID cur = stack.pop();
-            if (cur.equals(fromId)) return true;
-            if (!seen.add(cur)) continue;
-            BeltNode n = nodes.get(cur);
-            if (n != null && n.outputId() != null) stack.push(n.outputId());
-        }
-        return false;
-    }
-
-    /** Collect all node UUIDs on the cycle that would be formed by fromId→toId. */
-    private List<UUID> findCycle(UUID fromId, UUID toId) {
-        List<UUID> cycle = new ArrayList<>();
-        // Walk from toId following outputs until we hit fromId
-        Set<UUID> seen = new HashSet<>();
-        UUID cur = toId;
-        while (cur != null && !cur.equals(fromId)) {
-            if (!seen.add(cur)) break; // safety
-            cycle.add(cur);
-            BeltNode n = nodes.get(cur);
-            cur = (n != null) ? n.outputId() : null;
-        }
-        if (cur != null) cycle.add(fromId);
-        return cycle;
     }
 
     // ── Subnetwork split check ────────────────────────────────────────────────

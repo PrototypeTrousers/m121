@@ -80,8 +80,6 @@ public final class BeltNetworkTick {
      * Subsequent layers are determined by walking the outputId chain.
      */
     private static List<List<BeltNode>> buildLayers(List<BeltNode> topo) {
-        // Simple approach: assign each node a depth via its outputId chain.
-        // Because topo is already in output-first order, a linear pass works.
         java.util.Map<java.util.UUID, Integer> depth = new java.util.HashMap<>();
 
         for (BeltNode node : topo) {
@@ -89,13 +87,10 @@ public final class BeltNetworkTick {
             java.util.UUID outId = node.outputId();
             if (outId != null && depth.containsKey(outId)) {
                 myDepth = depth.get(outId) + 1;
-            } else if (node.isWrapPoint()) {
-                myDepth = 0;
             }
             depth.put(node.nodeId(), myDepth);
         }
 
-        // Find max depth to size the layer list
         int maxDepth = depth.values().stream().mapToInt(Integer::intValue).max().orElse(0);
         List<List<BeltNode>> layers = new ArrayList<>(maxDepth + 1);
         for (int i = 0; i <= maxDepth; i++) layers.add(new ArrayList<>());
@@ -109,34 +104,25 @@ public final class BeltNetworkTick {
     // ── Per-node tick ─────────────────────────────────────────────────────────
 
     /**
-     * Advance a single node's lanes and handle transfers / wraps.
-     * This method is the only thing called from worker threads; it touches
-     * only data owned by {@code node} and {@code node.outputId()}'s lane
-     * (already finished for this tick).
+     * Advance a single node's lanes and handle transfers.
      */
     private static void tickNode(BeltNode node, BeltSubnetwork subnet) {
         if (node.isStopped()) return;
 
+        boolean hasOutput = node.outputId() != null;
         for (int l = 0; l < 2; l++) {
             BeltLane lane = node.lane(l);
 
             // 1. Advance items
-            lane.advance(1.0f); // 1 tick
+            lane.advance(1.0f, hasOutput ? Float.MAX_VALUE : 1.0f);
 
             // 2. Handle output
-            if (node.isWrapPoint()) {
-                // Wrap: re-queue groups that have fully exited
-                lane.applyWrap();
-            } else if (node.outputId() != null) {
-                // Transfer: push exited groups into the output belt's same lane
+            if (hasOutput) {
                 BeltNode output = subnet.node(node.outputId());
                 if (output != null && !output.isStopped()) {
                     lane.transferOut(output.lane(l));
                 }
-                // If output is stopped or full, groups stall past 1.0 — that's fine,
-                // they just accumulate at the front until there's room.
             }
-            // Null outputId and not a wrap-point = terminal (drops or awaits machine pull)
         }
     }
 }

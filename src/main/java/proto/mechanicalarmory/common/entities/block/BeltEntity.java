@@ -118,24 +118,15 @@ public class BeltEntity extends BlockEntity {
         for (int t = 0; t < ticks; t++) {
             for (int l = 0; l < 2; l++) {
                 BeltLane lane = clientLanes[l];
-                lane.advance(1.0f);
+                lane.advance(1.0f, clientHasOutput ? Float.MAX_VALUE : 1.0f);
 
-                if (clientWrapPoint) {
-                    lane.applyWrap();
-                } else if (clientHasOutput) {
+                if (clientHasOutput) {
                     BlockEntity next = lvl.getBlockEntity(worldPosition.relative(facing));
                     if (next instanceof BeltEntity outBe) {
                         lane.transferOut(outBe.clientLane(l));
                     } else {
                         while (!lane.groups().isEmpty() && lane.groups().peekFirst().headPos() >= 1.0f) {
                             lane.groups().pollFirst();
-                        }
-                    }
-                } else {
-                    if (!lane.groups().isEmpty()) {
-                        proto.mechanicalarmory.common.belt.data.ItemGroup front = lane.groups().peekFirst();
-                        if (front.headPos() > 1.0f) {
-                            front.setHeadPos(1.0f);
                         }
                     }
                 }
@@ -163,13 +154,40 @@ public class BeltEntity extends BlockEntity {
         if (tag.contains("nodeId")) nodeId = tag.getUUID("nodeId");
     }
 
-    // ── Update packet (vanilla BE sync on chunk load) ─────────────────────────
+    // ── Update packet (vanilla BE sync on chunk load & client join) ─────────
 
     @Override
     public @NotNull CompoundTag getUpdateTag(HolderLookup.@NotNull Provider registries) {
         CompoundTag tag = new CompoundTag();
         saveAdditional(tag, registries);
+        if (level instanceof net.minecraft.server.level.ServerLevel srv) {
+            proto.mechanicalarmory.common.belt.network.BeltNetworkData data =
+                    proto.mechanicalarmory.common.belt.network.BeltNetworkData.get(srv);
+            BeltNode node = data.nodeAt(worldPosition);
+            if (node != null) {
+                tag.put("lane0", node.lane(0).save(registries));
+                tag.put("lane1", node.lane(1).save(registries));
+                tag.putBoolean("wrapPoint", node.isWrapPoint());
+                tag.putBoolean("hasOutput", node.outputId() != null);
+                tag.putBoolean("stopped", node.isStopped());
+                tag.putLong("serverTick", srv.getGameTime());
+            }
+        }
         return tag;
+    }
+
+    @Override
+    public void handleUpdateTag(CompoundTag tag, HolderLookup.Provider lookupProvider) {
+        super.handleUpdateTag(tag, lookupProvider);
+        if (tag.contains("lane0") && tag.contains("lane1")) {
+            BeltLane l0 = BeltLane.load(tag.getCompound("lane0"), lookupProvider);
+            BeltLane l1 = BeltLane.load(tag.getCompound("lane1"), lookupProvider);
+            boolean wrap = tag.getBoolean("wrapPoint");
+            boolean hasOut = tag.getBoolean("hasOutput");
+            boolean stopped = tag.getBoolean("stopped");
+            long serverTick = tag.getLong("serverTick");
+            applyClientSeed(l0, l1, serverTick, stopped, wrap, hasOut);
+        }
     }
 
     @Override
@@ -181,7 +199,10 @@ public class BeltEntity extends BlockEntity {
     public void onDataPacket(@NotNull Connection net, @NotNull ClientboundBlockEntityDataPacket pkt,
                               HolderLookup.@NotNull Provider lookupProvider) {
         super.onDataPacket(net, pkt, lookupProvider);
-        handleUpdateTag(pkt.getTag(), lookupProvider);
+        CompoundTag tag = pkt.getTag();
+        if (tag != null) {
+            handleUpdateTag(tag, lookupProvider);
+        }
     }
 
     @Nullable

@@ -102,12 +102,11 @@ public class BeltVisual extends AbstractBlockEntityVisual<BeltEntity>
         for (ItemGroup group : lane.groups()) {
             CapturedModel model = getOrCaptureModel(group.item());
             if (model == null) continue;
-
             for (int i = 0; i < group.count(); i++) {
                 float itemHead = group.headPos() - i * BeltLane.ITEM_SPACING;
                 float renderPos = itemHead + (blockEntity.isClientStopped() ? 0f : lane.speed() * partialTick);
-                if (!blockEntity.clientHasOutput() && !blockEntity.isClientWrapPoint()) {
-                    renderPos = Math.min(renderPos, 1.0f);
+                if (!blockEntity.clientHasOutput()) {
+                    renderPos = Math.min(renderPos, 1.0f - i * BeltLane.ITEM_SPACING);
                 }
 
                 if (renderPos < 0f || renderPos > 1f) continue;

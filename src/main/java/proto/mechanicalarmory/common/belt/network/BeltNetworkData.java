@@ -82,8 +82,13 @@ public final class BeltNetworkData extends SavedData {
         subnetworks.put(solo.subnetId(), solo);
         posToSubnet.put(pos, solo.subnetId());
 
+        if (level.getBlockEntity(pos) instanceof BeltEntity be) {
+            be.syncFromNetwork(node);
+        }
+
         // Merge with neighbours and link edges
         relinkNeighbours(pos, facing, level);
+        sendCorrection(pos, level);
         setDirty();
     }
 
@@ -98,7 +103,18 @@ public final class BeltNetworkData extends SavedData {
         if (subnet == null) return;
 
         BeltNode node = subnet.nodeAt(pos);
-        if (node != null) subnet.removeNode(node.nodeId());
+        List<BlockPos> affected = new ArrayList<>();
+        if (node != null) {
+            if (node.outputId() != null) {
+                BeltNode out = subnet.node(node.outputId());
+                if (out != null) affected.add(out.pos());
+            }
+            for (UUID inId : node.inputIds()) {
+                BeltNode in = subnet.node(inId);
+                if (in != null) affected.add(in.pos());
+            }
+            subnet.removeNode(node.nodeId());
+        }
 
         if (subnet.isEmpty()) {
             subnetworks.remove(subnetId);
@@ -115,6 +131,11 @@ public final class BeltNetworkData extends SavedData {
                 }
             }
         }
+
+        for (BlockPos affPos : affected) {
+            sendCorrection(affPos, level);
+        }
+
         setDirty();
     }
 
@@ -201,14 +222,14 @@ public final class BeltNetworkData extends SavedData {
      * horizontal neighbours to create edges and merge subnetworks.
      */
     private void relinkNeighbours(BlockPos pos, Direction facing, ServerLevel level) {
-        BeltSubnetwork mySub = subnetworkAt(pos);
-        if (mySub == null) return;
-
-        // The belt at pos outputs in the direction it faces
+        // 1. The belt at pos outputs in the direction it faces
         BlockPos outputPos = pos.relative(facing);
-        mergeAndLink(mySub, pos, outputPos, level, true);
+        BlockState outState = level.getBlockState(outputPos);
+        if (outState.getBlock() instanceof BlockBelt) {
+            mergeAndLink(pos, outputPos, level);
+        }
 
-        // Belts that face toward pos feed into it
+        // 2. Belts that face toward pos feed into it
         for (Direction d : Direction.Plane.HORIZONTAL) {
             if (d == facing) continue;
             BlockPos neighbourPos = pos.relative(d);
@@ -216,35 +237,39 @@ public final class BeltNetworkData extends SavedData {
             if (state.getBlock() instanceof BlockBelt) {
                 Direction neighbourFacing = state.getValue(BlockBelt.FACING);
                 if (neighbourFacing == d.getOpposite()) {
-                    // Neighbour faces toward pos → neighbour outputs into pos
-                    mergeAndLink(mySub, neighbourPos, pos, level, false);
+                    mergeAndLink(neighbourPos, pos, level);
                 }
             }
         }
     }
 
     /**
-     * Merge the subnetwork owning {@code fromPos} with {@code mySub}, then link
-     * the edge fromPos→toPos.
+     * Merge the subnetwork owning {@code toPos} into the one owning {@code fromPos},
+     * then link the edge fromPos→toPos and notify clients.
      */
-    private void mergeAndLink(BeltSubnetwork mySub, BlockPos fromPos, BlockPos toPos,
-                               ServerLevel level, boolean fromIsSelf) {
+    private void mergeAndLink(BlockPos fromPos, BlockPos toPos, ServerLevel level) {
+        UUID fromSubId = posToSubnet.get(fromPos);
         UUID toSubId = posToSubnet.get(toPos);
-        if (toSubId == null) return; // toPos has no belt
+        if (fromSubId == null || toSubId == null) return;
 
+        BeltSubnetwork fromSub = subnetworks.get(fromSubId);
         BeltSubnetwork toSub = subnetworks.get(toSubId);
-        if (toSub == null) return;
+        if (fromSub == null || toSub == null) return;
 
-        // Merge toSub into mySub if different
-        if (!toSub.subnetId().equals(mySub.subnetId())) {
+        // Merge toSub into fromSub if they are distinct subnetworks
+        if (!fromSubId.equals(toSubId)) {
             for (BeltNode n : toSub.allNodes()) {
-                mySub.addNode(n);
-                posToSubnet.put(n.pos(), mySub.subnetId());
+                fromSub.addNode(n);
+                posToSubnet.put(n.pos(), fromSub.subnetId());
             }
-            subnetworks.remove(toSub.subnetId());
+            subnetworks.remove(toSubId);
         }
 
-        mySub.link(fromPos, toPos);
+        fromSub.link(fromPos, toPos);
+
+        // Notify client simulation on both belts about the connection change
+        sendCorrection(fromPos, level);
+        sendCorrection(toPos, level);
     }
 
     @Nullable

@@ -26,7 +26,7 @@ public final class BeltLane {
     public static final float ITEM_SPACING = 0.25f;
 
     /** 4 blocks/s / 20 ticks/s = 0.20 belt-lengths per tick. */
-    public static final float SPEED_DEFAULT = 0.20f;
+    public static final float SPEED_DEFAULT = 0.10f;
 
     /** Groups whose gap is smaller than this are merged (same item type). */
     private static final float GAP_MERGE_THRESHOLD = 0.01f;
@@ -55,54 +55,61 @@ public final class BeltLane {
 
     /**
      * Advance all groups by {@code dt} belt-lengths.
-     * <p>This does NOT pop groups that exceed 1.0 — callers are responsible for
-     * that so they can decide whether to transfer or wrap.
+     * Groups back up behind preceding groups when blocked.
+     *
+     * @param dt delta time in ticks (1.0f for full tick)
+     * @param maxExitPos maximum position the front group can reach before stopping
+     *                   (1.0f for dead-end terminals, Float.MAX_VALUE if it can exit)
      */
-    public void advance(float dt) {
+    public void advance(float dt, float maxExitPos) {
         float delta = speed * dt;
-        for (ItemGroup g : groups) {
-            g.advanceHead(delta);
+        if (delta <= 0 || groups.isEmpty()) return;
+
+        List<ItemGroup> list = new ArrayList<>(groups);
+        int n = list.size();
+
+        // 1. Advance front group up to maxExitPos
+        ItemGroup front = list.get(0);
+        float newHead = Math.min(front.headPos() + delta, maxExitPos);
+        front.setHeadPos(newHead);
+
+        // 2. Advance subsequent groups, clamping behind previous group's tail
+        for (int i = 1; i < n; i++) {
+            ItemGroup prev = list.get(i - 1);
+            ItemGroup curr = list.get(i);
+            float maxHeadForCurr = prev.tailPos();
+            float desiredHead = curr.headPos() + delta;
+            curr.setHeadPos(Math.min(desiredHead, maxHeadForCurr));
         }
+
+        // 3. Merge adjacent groups of same item type that have touched
+        groups.clear();
+        ItemGroup currentMerged = list.get(0);
+        for (int i = 1; i < n; i++) {
+            ItemGroup next = list.get(i);
+            float gap = currentMerged.tailPos() - next.headPos();
+            if (gap <= GAP_MERGE_THRESHOLD && currentMerged.sameType(next)) {
+                currentMerged.setCount(currentMerged.count() + next.count());
+            } else {
+                groups.addLast(currentMerged);
+                currentMerged = next;
+            }
+        }
+        groups.addLast(currentMerged);
     }
 
     /**
-     * Called by the network tick on a <em>wrap-point</em> node after
-     * {@link #advance}.  Any group whose <em>entire body</em> has passed 1.0
-     * (i.e. {@code tailPos >= 1.0}) is popped from the front and re-queued at
-     * the back with a negative headPos such that the group immediately follows
-     * the current last group.
+     * Backward-compatible overload.
      */
-    public void applyWrap() {
-        while (!groups.isEmpty()) {
-            ItemGroup front = groups.peekFirst();
-            if (front.tailPos() < 1.0f) {
-                // Part of the group is still on the belt — stop here.
-                break;
-            }
-            groups.pollFirst();
-
-            // Calculate headPos so the wrapping group's tail is just behind the
-            // current last group (or at 0 minus one item-length if empty).
-            float newHeadPos;
-            if (groups.isEmpty()) {
-                // Re-enter just behind position 0
-                newHeadPos = -(front.count() * ITEM_SPACING) + speed;
-            } else {
-                ItemGroup last = groups.peekLast();
-                float lastTail = last.tailPos();
-                newHeadPos = lastTail - GAP_MERGE_THRESHOLD - (front.count() * ITEM_SPACING)
-                        + front.count() * ITEM_SPACING; // = lastTail - GAP_MERGE_THRESHOLD
-                newHeadPos = lastTail - GAP_MERGE_THRESHOLD;
-            }
-            front.setHeadPos(newHeadPos);
-            groups.addLast(front);
-        }
+    public void advance(float dt) {
+        advance(dt, Float.MAX_VALUE);
     }
 
     /**
      * Attempt to transfer items to the given output lane.
-     * <p>Groups whose {@code headPos >= 1.0} are pushed into the output lane's
-     * back. This is called for non-wrap terminals during the tick.
+     * Groups whose {@code headPos >= 1.0} are pushed into the output lane's
+     * back if the output lane has room. If the output lane is backed up, items
+     * wait at position 1.0 on this belt.
      *
      * @return true if any item was transferred
      */
@@ -112,11 +119,27 @@ public final class BeltLane {
             ItemGroup front = groups.peekFirst();
             if (front.headPos() < 1.0f) break;
 
-            groups.pollFirst();
+            // Check space at the back of the output lane
+            float outputRoom = output.groups.isEmpty()
+                    ? Float.MAX_VALUE
+                    : output.groups.peekLast().tailPos();
 
-            // Re-centre headPos at the output belt's output-most entry point
-            float newHead = front.headPos() - 1.0f;
-            front.setHeadPos(Math.min(newHead, ITEM_SPACING * front.count()));
+            if (outputRoom <= 0.0f) {
+                // Output lane is backed up; clamp front at 1.0 on this belt
+                if (front.headPos() > 1.0f) {
+                    front.setHeadPos(1.0f);
+                }
+                break;
+            }
+
+            // Transfer front group
+            groups.pollFirst();
+            float excess = front.headPos() - 1.0f;
+            float newHead = Math.min(excess, outputRoom);
+            if (newHead <= 0f) {
+                newHead = Math.min(ITEM_SPACING, outputRoom);
+            }
+            front.setHeadPos(newHead);
             output.insertBack(front);
             transferred = true;
         }
@@ -130,12 +153,12 @@ public final class BeltLane {
     public void insertBack(ItemGroup incoming) {
         if (!groups.isEmpty()) {
             ItemGroup last = groups.peekLast();
+            if (incoming.headPos() > last.tailPos()) {
+                incoming.setHeadPos(last.tailPos());
+            }
             float gap = last.tailPos() - incoming.headPos();
             if (gap <= GAP_MERGE_THRESHOLD && incoming.sameType(last)) {
-                // Merge: extend the existing last group
-                int extra = incoming.count();
-                last.setCount(last.count() + extra);
-                // Tail expands backward automatically via tailPos() = headPos - count*spacing
+                last.setCount(last.count() + incoming.count());
                 return;
             }
         }
@@ -147,14 +170,15 @@ public final class BeltLane {
      * Returns {@code false} if there is no room (the last group's tail is <= 0).
      */
     public boolean insertItem(ItemStack item) {
-        float entryHead = groups.isEmpty()
+        float maxAvailableHead = groups.isEmpty()
                 ? ITEM_SPACING
-                : groups.peekLast().tailPos() - GAP_MERGE_THRESHOLD;
+                : groups.peekLast().tailPos();
 
-        if (entryHead <= 0 && !groups.isEmpty()) {
-            return false; // Lane is backed up to the input
+        if (maxAvailableHead <= 0.0f && !groups.isEmpty()) {
+            return false; // Lane is full / backed up to input
         }
-        insertBack(new ItemGroup(item, 1, Math.max(entryHead, ITEM_SPACING)));
+        float entryHead = Math.min(ITEM_SPACING, maxAvailableHead);
+        insertBack(new ItemGroup(item, 1, entryHead));
         return true;
     }
 
