@@ -78,7 +78,6 @@ public class MechanicalArmoryClient {
         VisualizerRegistry.setVisualizer(MAEntities.SHREDDER_ENTITY.get(), ShredderVisualiser.SHREDDER_VISUAL);
         VisualizerRegistry.setVisualizer(MAEntities.BELT_ENTITY.get(), BeltVisualiser.BELT_VISUAL);
 
-
         VisualizerRegistry.setVisualizer(MAEntities.BUSH_BLOCK_ENTITY.get(), CropVisualiser.CROP_VISUAL);
         BuiltInRegistries.BLOCK_ENTITY_TYPE.forEach(c -> {
             if (VisualizerRegistry.getVisualizer(c) == null) {

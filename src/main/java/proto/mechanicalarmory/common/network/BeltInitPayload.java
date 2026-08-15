@@ -70,14 +70,18 @@ public record BeltInitPayload(List<NodeSnapshot> snapshots, long serverTick)
             if (level == null) return;
             long clientTick = level.getGameTime();
             for (NodeSnapshot snap : pkt.snapshots()) {
+                BeltLane l0 = snap.lane0();
+                BeltLane l1 = snap.lane1();
+                float catchUp = (clientTick - pkt.serverTick()) / 20.0f;
+                if (catchUp > 0) { l0.advance(catchUp); l1.advance(catchUp); }
+
                 if (level.getBlockEntity(snap.pos()) instanceof BeltEntity be) {
-                    BeltLane l0 = snap.lane0();
-                    BeltLane l1 = snap.lane1();
-                    float catchUp = (clientTick - pkt.serverTick()) / 20.0f;
-                    if (catchUp > 0) { l0.advance(catchUp); l1.advance(catchUp); }
                     be.applyClientSeed(l0, l1, pkt.serverTick(), false,
                             snap.wrapPoint(), snap.hasOutput());
                 }
+
+                proto.mechanicalarmory.client.belt.ClientBeltNetwork.get().updateNode(
+                        snap.pos(), l0, l1, false, snap.wrapPoint(), snap.hasOutput());
             }
         });
     }

@@ -1,5 +1,8 @@
 package proto.mechanicalarmory.common.belt.network;
 
+import dev.engine_room.flywheel.api.visual.Effect;
+import dev.engine_room.flywheel.api.visual.Visual;
+import dev.engine_room.flywheel.api.visualization.VisualizationContext;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.HolderLookup;
@@ -17,16 +20,8 @@ import java.util.*;
  * <p>Nodes are stored in topological order (output-first / layer-0 first) so
  * that {@link BeltNetworkTick} can walk them in-order without recomputing the
  * sort each tick.
- *
- * <h3>Topo-sort rules</h3>
- * <ol>
- *   <li>Wrap-point nodes are unconditionally placed in layer 0 (they are the
- *       "drain" for any belts feeding into the loop).</li>
- *   <li>All remaining nodes are sorted with Kahn's algorithm on the graph with
- *       wrap-point back-edges removed.</li>
- * </ol>
  */
-public final class BeltSubnetwork {
+public final class BeltSubnetwork implements Effect {
 
     private final UUID subnetId;
 
@@ -43,13 +38,29 @@ public final class BeltSubnetwork {
     private List<BeltNode> topoOrder = new ArrayList<>();
     private boolean topoDirty = true;
 
-    // ── Construction ──────────────────────────────────────────────────────────
+    @Nullable
+    private net.minecraft.world.level.Level level;
 
     public BeltSubnetwork(UUID subnetId) {
         this.subnetId = subnetId;
     }
 
     public UUID subnetId() { return subnetId; }
+
+    public void setLevel(@Nullable net.minecraft.world.level.Level level) {
+        this.level = level;
+    }
+
+    @Override
+    public net.minecraft.world.level.Level level() {
+        if (level != null) return level;
+        return net.minecraft.client.Minecraft.getInstance().level;
+    }
+
+    @Override
+    public dev.engine_room.flywheel.api.visual.EffectVisual<?> visualize(VisualizationContext ctx, float partialTick) {
+        return new proto.mechanicalarmory.client.flywheel.instances.belt.BeltSubnetworkVisual(ctx, this, partialTick);
+    }
 
     // ── Node management ───────────────────────────────────────────────────────
 

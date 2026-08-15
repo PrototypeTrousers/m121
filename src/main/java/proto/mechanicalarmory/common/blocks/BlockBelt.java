@@ -97,8 +97,12 @@ public class BlockBelt extends Block implements EntityBlock {
     @Override
     protected void onRemove(@NotNull BlockState state, @NotNull Level level,
                              @NotNull BlockPos pos, @NotNull BlockState newState, boolean movedByPiston) {
-        if (!newState.is(this) && !level.isClientSide && level instanceof ServerLevel srv) {
-            BeltNetworkData.get(srv).onBeltRemoved(pos, srv);
+        if (!newState.is(this)) {
+            if (!level.isClientSide && level instanceof ServerLevel srv) {
+                BeltNetworkData.get(srv).onBeltRemoved(pos, srv);
+            } else if (level.isClientSide) {
+                proto.mechanicalarmory.client.belt.ClientBeltNetwork.get().removeNode(pos);
+            }
         }
         super.onRemove(state, level, pos, newState, movedByPiston);
     }

@@ -69,7 +69,6 @@ public record BeltCorrectionPayload(BlockPos pos, BeltLane lane0, BeltLane lane1
         ctx.enqueueWork(() -> {
             var level = net.minecraft.client.Minecraft.getInstance().level;
             if (level == null) return;
-            if (!(level.getBlockEntity(pkt.pos()) instanceof BeltEntity be)) return;
 
             long clientTick = level.getGameTime();
             BeltLane l0 = pkt.lane0();
@@ -80,8 +79,14 @@ public record BeltCorrectionPayload(BlockPos pos, BeltLane lane0, BeltLane lane1
                 float catchUp = (clientTick - pkt.serverTick()) / 20.0f;
                 if (catchUp > 0) { l0.advance(catchUp); l1.advance(catchUp); }
             }
-            be.applyClientSeed(l0, l1, pkt.serverTick(), stopped,
-                    pkt.wrapPoint(), pkt.hasOutput());
+
+            if (level.getBlockEntity(pkt.pos()) instanceof BeltEntity be) {
+                be.applyClientSeed(l0, l1, pkt.serverTick(), stopped,
+                        pkt.wrapPoint(), pkt.hasOutput());
+            }
+
+            proto.mechanicalarmory.client.belt.ClientBeltNetwork.get().updateNode(
+                    pkt.pos(), l0, l1, stopped, pkt.wrapPoint(), pkt.hasOutput());
         });
     }
 }
