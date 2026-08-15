@@ -79,7 +79,7 @@ public class BlockBelt extends Block implements EntityBlock {
 
     @Override
     protected @NotNull RenderShape getRenderShape(@NotNull BlockState state) {
-        return RenderShape.ENTITYBLOCK_ANIMATED;
+        return RenderShape.MODEL;
     }
 
     // ── Placement & removal ───────────────────────────────────────────────────

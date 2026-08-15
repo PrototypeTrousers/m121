@@ -26,7 +26,13 @@ public final class BeltLane {
     public static final float ITEM_SPACING = 0.25f;
 
     /** 4 blocks/s / 20 ticks/s = 0.20 belt-lengths per tick. */
-    public static final float SPEED_DEFAULT = 0.10f;
+    public static final float SPEED_DEFAULT = 0.20f;
+
+    /** Speed on the inner lane of a 90-degree turn (R = 0.35, L = 0.55). */
+    public static final float SPEED_INNER = SPEED_DEFAULT * (2.0f / (float) (Math.PI * 0.35));
+
+    /** Speed on the outer lane of a 90-degree turn (R = 0.65, L = 1.02). */
+    public static final float SPEED_OUTER = SPEED_DEFAULT * (2.0f / (float) (Math.PI * 0.65));
 
     /** Groups whose gap is smaller than this are merged (same item type). */
     private static final float GAP_MERGE_THRESHOLD = 0.01f;
@@ -51,6 +57,11 @@ public final class BeltLane {
         return new BeltLane(SPEED_DEFAULT);
     }
 
+    public float itemSpacing() {
+        if (speed <= 0) return ITEM_SPACING;
+        return (speed / SPEED_DEFAULT) * ITEM_SPACING;
+    }
+
     // ── Simulation ────────────────────────────────────────────────────────────
 
     /**
@@ -65,6 +76,7 @@ public final class BeltLane {
         float delta = speed * dt;
         if (delta <= 0 || groups.isEmpty()) return;
 
+        float spacing = itemSpacing();
         List<ItemGroup> list = new ArrayList<>(groups);
         int n = list.size();
 
@@ -77,7 +89,7 @@ public final class BeltLane {
         for (int i = 1; i < n; i++) {
             ItemGroup prev = list.get(i - 1);
             ItemGroup curr = list.get(i);
-            float maxHeadForCurr = prev.tailPos();
+            float maxHeadForCurr = prev.tailPos(spacing);
             float desiredHead = curr.headPos() + delta;
             curr.setHeadPos(Math.min(desiredHead, maxHeadForCurr));
         }
@@ -87,7 +99,7 @@ public final class BeltLane {
         ItemGroup currentMerged = list.get(0);
         for (int i = 1; i < n; i++) {
             ItemGroup next = list.get(i);
-            float gap = currentMerged.tailPos() - next.headPos();
+            float gap = currentMerged.tailPos(spacing) - next.headPos();
             if (gap <= GAP_MERGE_THRESHOLD && currentMerged.sameType(next)) {
                 currentMerged.setCount(currentMerged.count() + next.count());
             } else {
@@ -120,27 +132,36 @@ public final class BeltLane {
             if (front.headPos() < 1.0f) break;
 
             // Check space at the back of the output lane
+            float outputSpacing = output.itemSpacing();
             float outputRoom = output.groups.isEmpty()
                     ? Float.MAX_VALUE
-                    : output.groups.peekLast().tailPos();
+                    : output.groups.peekLast().tailPos(outputSpacing);
 
-            if (outputRoom <= 0.0f) {
-                // Output lane is backed up; clamp front at 1.0 on this belt
-                if (front.headPos() > 1.0f) {
-                    front.setHeadPos(1.0f);
-                }
+            if (outputRoom <= 0.001f) {
+                // Downstream lane is backed up; clamp lead item at 1.0 on this belt
+                front.setHeadPos(1.0f);
                 break;
             }
 
-            // Transfer front group
-            groups.pollFirst();
+            // Excess distance into the output lane
             float excess = front.headPos() - 1.0f;
             float newHead = Math.min(excess, outputRoom);
             if (newHead <= 0f) {
-                newHead = Math.min(ITEM_SPACING, outputRoom);
+                newHead = Math.min(outputSpacing, outputRoom);
             }
-            front.setHeadPos(newHead);
-            output.insertBack(front);
+
+            if (front.count() == 1) {
+                groups.pollFirst();
+                front.setHeadPos(newHead);
+                output.insertBack(front);
+            } else {
+                // Split 1 item from front of group to transfer
+                front.setCount(front.count() - 1);
+                front.advanceHead(-itemSpacing());
+
+                ItemGroup single = new ItemGroup(front.item(), 1, newHead);
+                output.insertBack(single);
+            }
             transferred = true;
         }
         return transferred;
@@ -151,12 +172,13 @@ public final class BeltLane {
      * Merges with the current last group if same type and gap is small.
      */
     public void insertBack(ItemGroup incoming) {
+        float spacing = itemSpacing();
         if (!groups.isEmpty()) {
             ItemGroup last = groups.peekLast();
-            if (incoming.headPos() > last.tailPos()) {
-                incoming.setHeadPos(last.tailPos());
+            if (incoming.headPos() > last.tailPos(spacing)) {
+                incoming.setHeadPos(last.tailPos(spacing));
             }
-            float gap = last.tailPos() - incoming.headPos();
+            float gap = last.tailPos(spacing) - incoming.headPos();
             if (gap <= GAP_MERGE_THRESHOLD && incoming.sameType(last)) {
                 last.setCount(last.count() + incoming.count());
                 return;
@@ -170,14 +192,15 @@ public final class BeltLane {
      * Returns {@code false} if there is no room (the last group's tail is <= 0).
      */
     public boolean insertItem(ItemStack item) {
+        float spacing = itemSpacing();
         float maxAvailableHead = groups.isEmpty()
-                ? ITEM_SPACING
-                : groups.peekLast().tailPos();
+                ? spacing
+                : groups.peekLast().tailPos(spacing);
 
         if (maxAvailableHead <= 0.0f && !groups.isEmpty()) {
             return false; // Lane is full / backed up to input
         }
-        float entryHead = Math.min(ITEM_SPACING, maxAvailableHead);
+        float entryHead = Math.min(spacing, maxAvailableHead);
         insertBack(new ItemGroup(item, 1, entryHead));
         return true;
     }

@@ -134,19 +134,63 @@ public class BeltVisual extends AbstractBlockEntityVisual<BeltEntity>
         BeltLane lane = blockEntity.clientLane(laneIdx);
         List<TransformedInstance> instances = laneInstances.get(laneIdx);
         CurveType curve = getCurveType();
+        if (lane.isEmpty()) {
+            while (instances.size() > 0) {
+                instances.remove(instances.size() - 1).delete();
+            }
+            return;
+        }
+
+        // Calculate maximum forward advance available for the front group this frame
+        float maxFrontAdvance = 0.0f;
+        if (!blockEntity.isClientStopped()) {
+            if (blockEntity.clientHasOutput()) {
+                net.minecraft.world.level.block.entity.BlockEntity next =
+                        level.getBlockEntity(pos.relative(facing));
+                if (next instanceof BeltEntity nextBe) {
+                    BeltLane nextLane = nextBe.clientLane(laneIdx);
+                    float nextRoom = nextLane.isEmpty()
+                            ? Float.MAX_VALUE
+                            : nextLane.groups().peekLast().tailPos(nextLane.itemSpacing());
+                    if (nextRoom > 0.0f) {
+                        maxFrontAdvance = lane.speed();
+                    } else {
+                        // Downstream belt is backed up
+                        maxFrontAdvance = Math.max(0.0f, 1.0f - lane.groups().peekFirst().headPos());
+                    }
+                } else {
+                    maxFrontAdvance = lane.speed();
+                }
+            } else {
+                // Dead end
+                maxFrontAdvance = Math.max(0.0f, 1.0f - lane.groups().peekFirst().headPos());
+            }
+        }
+
+        float spacing = lane.itemSpacing();
+        float prevTail = Float.MAX_VALUE;
+        boolean isFront = true;
 
         int idx = 0;
         for (ItemGroup group : lane.groups()) {
             CapturedModel model = getOrCaptureModel(group.item());
             if (model == null) continue;
-            for (int i = 0; i < group.count(); i++) {
-                float itemHead = group.headPos() - i * BeltLane.ITEM_SPACING;
-                float renderPos = itemHead + (blockEntity.isClientStopped() ? 0f : lane.speed() * partialTick);
-                if (!blockEntity.clientHasOutput()) {
-                    renderPos = Math.min(renderPos, 1.0f - i * BeltLane.ITEM_SPACING);
-                }
 
-                if (renderPos < 0f || renderPos > 1f) continue;
+            float advanceForThisGroup;
+            if (isFront) {
+                advanceForThisGroup = Math.min(lane.speed() * partialTick, maxFrontAdvance);
+                isFront = false;
+            } else {
+                float roomToPrev = Math.max(0.0f, prevTail - group.headPos());
+                advanceForThisGroup = Math.min(lane.speed() * partialTick, roomToPrev);
+            }
+
+            float groupRenderHead = group.headPos() + (blockEntity.isClientStopped() ? 0.0f : advanceForThisGroup);
+            prevTail = groupRenderHead - group.count() * spacing;
+
+            for (int i = 0; i < group.count(); i++) {
+                float renderPos = groupRenderHead - i * spacing;
+                float[] pos3d = getRenderWorldPos(renderPos, laneIdx, curve);
 
                 // Lazily grow the instance list
                 if (idx >= instances.size()) {
@@ -156,39 +200,7 @@ public class BeltVisual extends AbstractBlockEntityVisual<BeltEntity>
                 }
 
                 TransformedInstance inst = instances.get(idx++);
-
-                float cx = visualPos.getX() + 0.5f;
-                float cy = visualPos.getY() + 0.1f;
-                float cz = visualPos.getZ() + 0.5f;
-                float wy = cy;
-                float laneOffset = (laneIdx == 0 ? -0.15f : 0.15f);
-
-                float wx, wz;
-                if (curve == CurveType.STRAIGHT) {
-                    float beltT = renderPos;
-                    wx = cx + facing.getStepX() * (beltT - 0.5f) + laneOffset * facing.getClockWise().getStepX();
-                    wz = cz + facing.getStepZ() * (beltT - 0.5f) + laneOffset * facing.getClockWise().getStepZ();
-                } else {
-                    Direction sideDir = (curve == CurveType.CURVE_RIGHT)
-                            ? facing.getClockWise()
-                            : facing.getCounterClockWise();
-
-                    float radius = (curve == CurveType.CURVE_RIGHT)
-                            ? (0.5f - laneOffset)
-                            : (0.5f + laneOffset);
-
-                    double theta = renderPos * (Math.PI / 2.0);
-                    double sinT = Math.sin(theta);
-                    double cosT = Math.cos(theta);
-
-                    float cornerX = cx + 0.5f * facing.getStepX() + 0.5f * sideDir.getStepX();
-                    float cornerZ = cz + 0.5f * facing.getStepZ() + 0.5f * sideDir.getStepZ();
-
-                    wx = (float) (cornerX - radius * (cosT * facing.getStepX() + sinT * sideDir.getStepX()));
-                    wz = (float) (cornerZ - radius * (cosT * facing.getStepZ() + sinT * sideDir.getStepZ()));
-                }
-
-                inst.setTransform(new Matrix4f().translate(wx, wy, wz).scale(0.25f))
+                inst.setTransform(new Matrix4f().translate(pos3d[0], pos3d[1], pos3d[2]).scale(0.25f))
                         .light(packedLight)
                         .setChanged();
             }
@@ -198,6 +210,85 @@ public class BeltVisual extends AbstractBlockEntityVisual<BeltEntity>
         while (instances.size() > idx) {
             instances.remove(instances.size() - 1).delete();
         }
+    }
+
+    private float[] getRenderWorldPos(float renderPos, int laneIdx, CurveType curve) {
+        float cx = visualPos.getX() + 0.5f;
+        float cy = visualPos.getY() + 0.1f;
+        float cz = visualPos.getZ() + 0.5f;
+        float laneOffset = (laneIdx == 0 ? -0.15f : 0.15f);
+
+        // Within this block
+        if (renderPos <= 1.0f) {
+            if (curve == CurveType.STRAIGHT) {
+                float beltT = Math.max(0.0f, renderPos);
+                float wx = cx + facing.getStepX() * (beltT - 0.5f) + laneOffset * facing.getClockWise().getStepX();
+                float wz = cz + facing.getStepZ() * (beltT - 0.5f) + laneOffset * facing.getClockWise().getStepZ();
+                return new float[]{wx, cy, wz};
+            } else {
+                Direction sideDir = (curve == CurveType.CURVE_RIGHT)
+                        ? facing.getClockWise()
+                        : facing.getCounterClockWise();
+
+                float radius = (curve == CurveType.CURVE_RIGHT)
+                        ? (0.5f - laneOffset)
+                        : (0.5f + laneOffset);
+
+                double theta = Math.max(0.0, renderPos) * (Math.PI / 2.0);
+                double sinT = Math.sin(theta);
+                double cosT = Math.cos(theta);
+
+                float cornerX = cx + 0.5f * facing.getStepX() + 0.5f * sideDir.getStepX();
+                float cornerZ = cz + 0.5f * facing.getStepZ() + 0.5f * sideDir.getStepZ();
+
+                float wx = (float) (cornerX - radius * (cosT * facing.getStepX() + sinT * sideDir.getStepX()));
+                float wz = (float) (cornerZ - radius * (cosT * facing.getStepZ() + sinT * sideDir.getStepZ()));
+                return new float[]{wx, cy, wz};
+            }
+        }
+
+        // Exceeded exit boundary (renderPos > 1.0f) — project into connected downstream belt
+        float excess = renderPos - 1.0f;
+        net.minecraft.core.BlockPos nextPos = pos.relative(facing);
+        net.minecraft.world.level.block.state.BlockState nextState = level.getBlockState(nextPos);
+        if (nextState.getBlock() instanceof BlockBelt) {
+            Direction nextFacing = nextState.getValue(BlockBelt.FACING);
+            float nextCx = nextPos.getX() + 0.5f;
+            float nextCz = nextPos.getZ() + 0.5f;
+
+            if (nextFacing == facing) {
+                // Straight continuation
+                float wx = nextCx + nextFacing.getStepX() * (excess - 0.5f) + laneOffset * nextFacing.getClockWise().getStepX();
+                float wz = nextCz + nextFacing.getStepZ() * (excess - 0.5f) + laneOffset * nextFacing.getClockWise().getStepZ();
+                return new float[]{wx, cy, wz};
+            } else {
+                // Next belt is a curve
+                Direction entrySide = facing.getOpposite();
+                CurveType nextCurve = (nextFacing.getClockWise() == entrySide)
+                        ? CurveType.CURVE_RIGHT
+                        : CurveType.CURVE_LEFT;
+
+                float nextRadius = (nextCurve == CurveType.CURVE_RIGHT)
+                        ? (0.5f - laneOffset)
+                        : (0.5f + laneOffset);
+
+                double theta = Math.min(1.0, excess) * (Math.PI / 2.0);
+                double sinT = Math.sin(theta);
+                double cosT = Math.cos(theta);
+
+                float cornerX = nextCx + 0.5f * nextFacing.getStepX() + 0.5f * entrySide.getStepX();
+                float cornerZ = nextCz + 0.5f * nextFacing.getStepZ() + 0.5f * entrySide.getStepZ();
+
+                float wx = (float) (cornerX - nextRadius * (cosT * nextFacing.getStepX() + sinT * entrySide.getStepX()));
+                float wz = (float) (cornerZ - nextRadius * (cosT * nextFacing.getStepZ() + sinT * entrySide.getStepZ()));
+                return new float[]{wx, cy, wz};
+            }
+        }
+
+        // Default: straight linear projection
+        float wx = cx + facing.getStepX() * (renderPos - 0.5f) + laneOffset * facing.getClockWise().getStepX();
+        float wz = cz + facing.getStepZ() * (renderPos - 0.5f) + laneOffset * facing.getClockWise().getStepZ();
+        return new float[]{wx, cy, wz};
     }
 
     private CapturedModel getOrCaptureModel(ItemStack item) {

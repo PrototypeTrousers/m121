@@ -37,7 +37,12 @@ public final class ItemGroup {
     public int       count()   { return count; }
     public float     headPos() { return headPos; }
 
-    /** Position of the trailing edge (may be negative for wrapping groups). */
+    /** Position of the trailing edge with custom spacing. */
+    public float tailPos(float spacing) {
+        return headPos - count * spacing;
+    }
+
+    /** Position of the trailing edge with default spacing. */
     public float tailPos() {
         return headPos - count * BeltLane.ITEM_SPACING;
     }

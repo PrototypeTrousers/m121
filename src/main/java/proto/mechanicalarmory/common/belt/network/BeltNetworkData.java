@@ -88,6 +88,7 @@ public final class BeltNetworkData extends SavedData {
 
         // Merge with neighbours and link edges
         relinkNeighbours(pos, facing, level);
+        updateCurveSpeeds(pos, level);
         sendCorrection(pos, level);
         setDirty();
     }
@@ -133,6 +134,7 @@ public final class BeltNetworkData extends SavedData {
         }
 
         for (BlockPos affPos : affected) {
+            updateCurveSpeeds(affPos, level);
             sendCorrection(affPos, level);
         }
 
@@ -267,9 +269,51 @@ public final class BeltNetworkData extends SavedData {
 
         fromSub.link(fromPos, toPos);
 
+        updateCurveSpeeds(fromPos, level);
+        updateCurveSpeeds(toPos, level);
+
         // Notify client simulation on both belts about the connection change
         sendCorrection(fromPos, level);
         sendCorrection(toPos, level);
+    }
+
+    public void updateCurveSpeeds(BlockPos pos, ServerLevel level) {
+        BeltNode node = nodeAt(pos);
+        if (node == null) return;
+        BlockState state = level.getBlockState(pos);
+        if (!(state.getBlock() instanceof BlockBelt)) return;
+
+        Direction facing = state.getValue(BlockBelt.FACING);
+        Direction back = facing.getOpposite();
+        Direction left = facing.getCounterClockWise();
+        Direction right = facing.getClockWise();
+
+        boolean hasBack = isBeltFacing(level, pos.relative(back), pos);
+        boolean hasLeft = isBeltFacing(level, pos.relative(left), pos);
+        boolean hasRight = isBeltFacing(level, pos.relative(right), pos);
+
+        if (!hasBack) {
+            if (hasRight && !hasLeft) {
+                node.lane(1).setSpeed(BeltLane.SPEED_INNER);
+                node.lane(0).setSpeed(BeltLane.SPEED_OUTER);
+                return;
+            } else if (hasLeft && !hasRight) {
+                node.lane(0).setSpeed(BeltLane.SPEED_INNER);
+                node.lane(1).setSpeed(BeltLane.SPEED_OUTER);
+                return;
+            }
+        }
+        node.lane(0).setSpeed(BeltLane.SPEED_DEFAULT);
+        node.lane(1).setSpeed(BeltLane.SPEED_DEFAULT);
+    }
+
+    private static boolean isBeltFacing(ServerLevel level, BlockPos fromPos, BlockPos toPos) {
+        BlockState state = level.getBlockState(fromPos);
+        if (state.getBlock() instanceof BlockBelt) {
+            Direction f = state.getValue(BlockBelt.FACING);
+            return fromPos.relative(f).equals(toPos);
+        }
+        return false;
     }
 
     @Nullable

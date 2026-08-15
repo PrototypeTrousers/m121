@@ -99,8 +99,11 @@ public class BeltEntity extends BlockEntity {
         }
     }
 
+    private boolean isAdvancing = false;
+
     /**
      * Advance the client-side simulation when the game tick advances.
+     * Evaluates downstream belts first so space is freed up before upstream transfers.
      */
     public void advanceClientSimulation(net.minecraft.world.level.Level lvl, net.minecraft.core.Direction facing) {
         long gameTime = lvl.getGameTime();
@@ -110,28 +113,83 @@ public class BeltEntity extends BlockEntity {
         }
         long elapsed = gameTime - clientLastTickedGameTime;
         if (elapsed <= 0) return;
-        clientLastTickedGameTime = gameTime;
 
-        if (clientStopped) return;
+        if (isAdvancing) return;
+        isAdvancing = true;
 
-        long ticks = Math.min(elapsed, 20);
-        for (int t = 0; t < ticks; t++) {
-            for (int l = 0; l < 2; l++) {
-                BeltLane lane = clientLanes[l];
-                lane.advance(1.0f, clientHasOutput ? Float.MAX_VALUE : 1.0f);
+        try {
+            clientLastTickedGameTime = gameTime;
+            if (clientStopped) return;
 
-                if (clientHasOutput) {
-                    BlockEntity next = lvl.getBlockEntity(worldPosition.relative(facing));
-                    if (next instanceof BeltEntity outBe) {
-                        lane.transferOut(outBe.clientLane(l));
-                    } else {
-                        while (!lane.groups().isEmpty() && lane.groups().peekFirst().headPos() >= 1.0f) {
-                            lane.groups().pollFirst();
+            updateClientCurveSpeeds(lvl, facing);
+
+            // Ensure downstream belt ticks first so space is freed up
+            if (clientHasOutput) {
+                net.minecraft.core.BlockPos nextPos = worldPosition.relative(facing);
+                BlockEntity next = lvl.getBlockEntity(nextPos);
+                if (next instanceof BeltEntity outBe) {
+                    net.minecraft.world.level.block.state.BlockState outState = lvl.getBlockState(nextPos);
+                    if (outState.getBlock() instanceof proto.mechanicalarmory.common.blocks.BlockBelt) {
+                        net.minecraft.core.Direction outFacing = outState.getValue(proto.mechanicalarmory.common.blocks.BlockBelt.FACING);
+                        outBe.advanceClientSimulation(lvl, outFacing);
+                    }
+                }
+            }
+
+            long ticks = Math.min(elapsed, 20);
+            for (int t = 0; t < ticks; t++) {
+                for (int l = 0; l < 2; l++) {
+                    BeltLane lane = clientLanes[l];
+                    lane.advance(1.0f, clientHasOutput ? Float.MAX_VALUE : 1.0f);
+
+                    if (clientHasOutput) {
+                        BlockEntity next = lvl.getBlockEntity(worldPosition.relative(facing));
+                        if (next instanceof BeltEntity outBe) {
+                            lane.transferOut(outBe.clientLane(l));
+                        } else {
+                            while (!lane.groups().isEmpty() && lane.groups().peekFirst().headPos() >= 1.0f) {
+                                lane.groups().pollFirst();
+                            }
                         }
                     }
                 }
             }
+        } finally {
+            isAdvancing = false;
         }
+    }
+
+    private void updateClientCurveSpeeds(net.minecraft.world.level.Level lvl, net.minecraft.core.Direction facing) {
+        net.minecraft.core.Direction back = facing.getOpposite();
+        net.minecraft.core.Direction left = facing.getCounterClockWise();
+        net.minecraft.core.Direction right = facing.getClockWise();
+
+        boolean hasBack = isBeltFacingInto(lvl, worldPosition.relative(back), worldPosition);
+        boolean hasLeft = isBeltFacingInto(lvl, worldPosition.relative(left), worldPosition);
+        boolean hasRight = isBeltFacingInto(lvl, worldPosition.relative(right), worldPosition);
+
+        if (!hasBack) {
+            if (hasRight && !hasLeft) {
+                clientLanes[1].setSpeed(BeltLane.SPEED_INNER);
+                clientLanes[0].setSpeed(BeltLane.SPEED_OUTER);
+                return;
+            } else if (hasLeft && !hasRight) {
+                clientLanes[0].setSpeed(BeltLane.SPEED_INNER);
+                clientLanes[1].setSpeed(BeltLane.SPEED_OUTER);
+                return;
+            }
+        }
+        clientLanes[0].setSpeed(BeltLane.SPEED_DEFAULT);
+        clientLanes[1].setSpeed(BeltLane.SPEED_DEFAULT);
+    }
+
+    private static boolean isBeltFacingInto(net.minecraft.world.level.Level lvl, BlockPos fromPos, BlockPos toPos) {
+        net.minecraft.world.level.block.state.BlockState state = lvl.getBlockState(fromPos);
+        if (state.getBlock() instanceof proto.mechanicalarmory.common.blocks.BlockBelt) {
+            net.minecraft.core.Direction f = state.getValue(proto.mechanicalarmory.common.blocks.BlockBelt.FACING);
+            return fromPos.relative(f).equals(toPos);
+        }
+        return false;
     }
 
     public BeltLane clientLane(int i)   { return clientLanes[i]; }
