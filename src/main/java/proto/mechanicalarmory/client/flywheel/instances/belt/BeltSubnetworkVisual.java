@@ -32,7 +32,6 @@ import proto.mechanicalarmory.common.belt.data.ItemGroup;
 import proto.mechanicalarmory.common.belt.network.BeltSubnetwork;
 import proto.mechanicalarmory.common.blocks.BlockBelt;
 
-import javax.annotation.Nullable;
 import java.util.*;
 import java.util.function.Consumer;
 
@@ -133,37 +132,6 @@ public class BeltSubnetworkVisual extends AbstractVisual
                 }
             }
         }
-    }
-
-    private boolean hasValidOutput(BeltNode node) {
-        if (level == null) return false;
-        BlockPos pos = node.pos();
-        BlockState state = level.getBlockState(pos);
-        if (!(state.getBlock() instanceof BlockBelt)) return false;
-
-        Direction facing = state.getValue(BlockBelt.FACING);
-        BlockPos outPos = pos.relative(facing);
-        BlockState outState = level.getBlockState(outPos);
-        return outState.getBlock() instanceof BlockBelt;
-    }
-
-    @Nullable
-    private BeltNode getOutputNode(BeltNode node) {
-        if (level == null) return null;
-        BlockPos pos = node.pos();
-        BlockState state = level.getBlockState(pos);
-        if (!(state.getBlock() instanceof BlockBelt)) return null;
-
-        Direction facing = state.getValue(BlockBelt.FACING);
-        BlockPos outPos = pos.relative(facing);
-        BlockState outState = level.getBlockState(outPos);
-        if (!(outState.getBlock() instanceof BlockBelt)) return null;
-
-        BeltNode out = subnet.nodeAt(outPos);
-        if (out == null) {
-            out = proto.mechanicalarmory.client.belt.ClientBeltNetwork.get().getNode(outPos);
-        }
-        return out;
     }
 
     private void updateNodeSpeeds(BeltNode node) {
@@ -271,37 +239,25 @@ public class BeltSubnetworkVisual extends AbstractVisual
             return;
         }
 
-        // Calculate max forward advance available for the front group
-        float maxFrontAdvance = 0.0f;
+        // Compute a single advance delta for every group in this lane.
+        // The front item is the constraint; all trailing items ride with it
+        // (opening and closing gaps cancel out over one partial tick).
+        float laneAdvance = 0.0f;
         if (!node.isStopped()) {
-            boolean hasOutput = false;
-            BeltNode outNode = null;
-            if (node.outputId() != null) {
-                outNode = subnet.node(node.outputId());
-                if (outNode != null && !outNode.isStopped()) {
-                    hasOutput = true;
-                }
-            }
-
-            if (hasOutput && outNode != null) {
-                BeltLane nextLane = outNode.lane(laneIdx);
-                float nextRoom = nextLane.isEmpty()
-                        ? Float.MAX_VALUE
-                        : nextLane.peekLast().tailPos(nextLane.itemSpacing());
-                if (nextRoom > 0.0f) {
-                    maxFrontAdvance = lane.speed();
-                } else {
-                    float maxReachPos = 1.0f + nextRoom * (lane.itemSpacing() / nextLane.itemSpacing());
-                    maxFrontAdvance = Math.max(0.0f, Math.min(lane.speed(), maxReachPos - lane.peekFirst().headPos()));
-                }
-            } else if (!lane.isEmpty()) {
-                maxFrontAdvance = Math.max(0.0f, 1.0f - lane.peekFirst().headPos());
+            boolean hasOutput = node.outputId() != null && subnet.node(node.outputId()) != null
+                    && !subnet.node(node.outputId()).isStopped();
+            if (hasOutput) {
+                // Output exists — let the front item smoothly cross the seam.
+                // getRenderWorldPos handles the downstream projection.
+                laneAdvance = lane.speed() * partialTick;
+            } else {
+                // Terminal belt: clamp so the front item never visually overshoots 1.0.
+                float headPos = lane.peekFirst().headPos();
+                laneAdvance = Math.max(0.0f, Math.min(lane.speed() * partialTick, 1.0f - headPos));
             }
         }
 
         float spacing = lane.itemSpacing();
-        float prevTail = Float.MAX_VALUE;
-        boolean isFront = true;
 
         int idx = 0;
         final proto.mechanicalarmory.common.belt.data.ItemGroup[] laneArr = lane.groupArray();
@@ -311,17 +267,7 @@ public class BeltSubnetworkVisual extends AbstractVisual
             CapturedModel model = getOrCaptureModel(group.item());
             if (model == null) continue;
 
-            float advanceForThisGroup;
-            if (isFront) {
-                advanceForThisGroup = Math.min(lane.speed() * partialTick, maxFrontAdvance);
-                isFront = false;
-            } else {
-                float roomToPrev = Math.max(0.0f, prevTail - group.headPos());
-                advanceForThisGroup = Math.min(lane.speed() * partialTick, roomToPrev);
-            }
-
-            float groupRenderHead = group.headPos() + (node.isStopped() ? 0.0f : advanceForThisGroup);
-            prevTail = groupRenderHead - group.count() * spacing;
+            float groupRenderHead = group.headPos() + laneAdvance;
 
             for (int i = 0; i < group.count(); i++) {
                 float renderPos = groupRenderHead - i * spacing;
