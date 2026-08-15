@@ -156,19 +156,8 @@ public final class BeltLane {
                     ? Float.MAX_VALUE
                     : output.groups[output.size - 1].tailPos(outputSpacing);
 
-            if (outputRoom <= 0.001f) {
-                // B's last item may have its tail physically before the junction
-                // (negative B-coordinate).  Clamping A at 1.0 would place it
-                // at the same physical position as part of B's item — overlap.
-                //
-                // Correct clamp: A's head touches B's tail in physical space.
-                //   A_head_phys  = (headPos_A − 1) × (ITEM_SPACING / spacing)
-                //   B_tail_phys  = headPos_B × (ITEM_SPACING / outputSpacing) − ITEM_SPACING
-                // Setting equal and substituting outputRoom = headPos_B − outputSpacing:
-                //   clampPos = 1 + outputRoom × (spacing / outputSpacing)
-                //
-                // For straight→straight: spacing == outputSpacing → clampPos = 1 + outputRoom.
-                // For straight→inner curve: spacing/outputSpacing ≈ 0.55 → clamp is closer to 1.
+            if (outputRoom <= 0.0f) {
+                // Output lane is completely backed up past the junction entrance (tailPos <= 0)
                 float clampPos = 1.0f + outputRoom * (spacing / outputSpacing);
                 front.setHeadPos(Math.min(front.headPos(), clampPos));
                 break;
@@ -181,9 +170,6 @@ public final class BeltLane {
             // For straight→straight this is 1.0; for straight→inner curve ≈ 1.82.
             float excess = front.headPos() - 1.0f;
             float newHead = Math.min(excess * (outputSpacing / spacing), outputRoom);
-            if (newHead <= 0f) {
-                newHead = Math.min(outputSpacing, outputRoom);
-            }
 
             if (front.count() == 1) {
                 pollFirst(); // removes groups[0], shifts down
@@ -302,7 +288,7 @@ public final class BeltLane {
 
     // ── Internal helpers ──────────────────────────────────────────────────────
 
-    private void addLast(ItemGroup g) {
+    public void addLast(ItemGroup g) {
         if (size == groups.length) {
             ItemGroup[] grown = new ItemGroup[groups.length * 2];
             System.arraycopy(groups, 0, grown, 0, size);
@@ -335,8 +321,13 @@ public final class BeltLane {
     public BeltLane deepCopy() {
         BeltLane copy = new BeltLane(speed);
         copy.groups = new ItemGroup[Math.max(INITIAL_CAPACITY, size)];
-        for (int i = 0; i < size; i++) copy.groups[i] = groups[i].copy();
-        copy.size = size;
+        int valid = 0;
+        for (int i = 0; i < size; i++) {
+            if (groups[i] != null) {
+                copy.groups[valid++] = groups[i].copy();
+            }
+        }
+        copy.size = valid;
         return copy;
     }
 
@@ -346,7 +337,9 @@ public final class BeltLane {
         CompoundTag tag = new CompoundTag();
         tag.putFloat("speed", speed);
         ListTag list = new ListTag();
-        for (int i = 0; i < size; i++) list.add(groups[i].save(registries));
+        for (int i = 0; i < size; i++) {
+            if (groups[i] != null) list.add(groups[i].save(registries));
+        }
         tag.put("groups", list);
         return tag;
     }

@@ -24,6 +24,7 @@ import proto.mechanicalarmory.common.entities.MAEntities;
 import proto.mechanicalarmory.common.items.MAItems;
 import proto.mechanicalarmory.common.items.armor.ArmorMaterials;
 import proto.mechanicalarmory.common.items.armor.MyAttachments;
+import proto.mechanicalarmory.common.network.ModNetworking;
 import proto.mechanicalarmory.common.recipes.shredder.ShredderRecipes;
 
 // The value here should match an entry in the META-INF/neoforge.mods.toml file

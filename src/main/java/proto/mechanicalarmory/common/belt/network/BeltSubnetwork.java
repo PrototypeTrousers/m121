@@ -114,7 +114,11 @@ public final class BeltSubnetwork implements Effect {
     public void link(BlockPos fromPos, BlockPos toPos) {
         BeltNode from = nodeAt(fromPos);
         BeltNode to   = nodeAt(toPos);
-        if (from == null || to == null) return;
+        if (from == null || to == null) {
+            proto.mechanicalarmory.MechanicalArmory.LOGGER.warn("[BeltSubnetwork] link failed: fromNode({})={}, toNode({})={}",
+                    fromPos.toShortString(), from != null, toPos.toShortString(), to != null);
+            return;
+        }
 
         from.setOutputId(to.nodeId());
         to.addInput(from.nodeId());
@@ -214,21 +218,20 @@ public final class BeltSubnetwork implements Effect {
         topoOrder = result;
 
         // ── Build layer partition ─────────────────────────────────────────────
-        // Since result is output-first, result[j].outputId() (if present in the
-        // subnetwork) always appears at some index k < j.  We compute depth in
-        // one forward pass using an int[] keyed by topo position, avoiding any
-        // UUID-boxed map for the depth lookup.
         final int n = result.size();
-        final int[] depth = new int[n];
-        // UUID → topo position, built as we go
         final Map<UUID, Integer> topoPos = new HashMap<>(n * 2);
+        for (int i = 0; i < n; i++) {
+            topoPos.put(result.get(i).nodeId(), i);
+        }
+
+        final int[] depth = new int[n];
         int maxDepth = 0;
         for (int i = 0; i < n; i++) {
             BeltNode node = result.get(i);
-            topoPos.put(node.nodeId(), i);
             UUID outId = node.outputId();
             Integer outIdx = (outId != null) ? topoPos.get(outId) : null;
-            int d = (outIdx != null) ? depth[outIdx] + 1 : 0;
+            // Only depend on downstream nodes placed earlier in result (k < i)
+            int d = (outIdx != null && outIdx < i) ? depth[outIdx] + 1 : 0;
             depth[i] = d;
             if (d > maxDepth) maxDepth = d;
         }

@@ -8,18 +8,6 @@ import net.neoforged.neoforge.network.registration.PayloadRegistrar;
 
 import static proto.mechanicalarmory.MechanicalArmory.MODID;
 
-@EventBusSubscriber(modid = MODID, value = Dist.CLIENT)
+// Superseded by ModNetworking.java (registered on MOD event bus)
 public class NetworkRegistry {
-
-    @SubscribeEvent
-    public static void register(RegisterPayloadHandlersEvent event) {
-        PayloadRegistrar registrar = event.registrar("1");
-
-        // Register for Server -> Client communication
-        registrar.playToClient(
-                OctoSuit.RemoveFlywheelEffectPayload.TYPE,
-                OctoSuit.RemoveFlywheelEffectPayload.STREAM_CODEC,
-                OctoSuit.RemoveFlywheelEffectPayload::handle
-        );
-    }
 }

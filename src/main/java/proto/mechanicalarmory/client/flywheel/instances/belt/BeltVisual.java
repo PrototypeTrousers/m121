@@ -152,11 +152,12 @@ public class BeltVisual extends AbstractBlockEntityVisual<BeltEntity>
                     float nextRoom = nextLane.isEmpty()
                             ? Float.MAX_VALUE
                             : nextLane.peekLast().tailPos(nextLane.itemSpacing());
-                    float maxReachPos = nextLane.isEmpty()
-                            ? Float.MAX_VALUE
-                            : 1.0f + nextRoom * (lane.itemSpacing() / nextLane.itemSpacing());
-                    maxFrontAdvance = Math.max(0.0f, maxReachPos - lane.peekFirst().headPos());
-                    maxFrontAdvance = Math.min(maxFrontAdvance, lane.speed());
+                    if (nextRoom > 0.001f) {
+                        maxFrontAdvance = lane.speed();
+                    } else {
+                        float maxReachPos = 1.0f + nextRoom * (lane.itemSpacing() / nextLane.itemSpacing());
+                        maxFrontAdvance = Math.max(0.0f, Math.min(lane.speed(), maxReachPos - lane.peekFirst().headPos()));
+                    }
                 } else {
                     maxFrontAdvance = lane.speed();
                 }
@@ -260,8 +261,9 @@ public class BeltVisual extends AbstractBlockEntityVisual<BeltEntity>
 
             if (nextFacing == facing) {
                 // Straight continuation
-                float wx = nextCx + nextFacing.getStepX() * (excess - 0.5f) + laneOffset * nextFacing.getClockWise().getStepX();
-                float wz = nextCz + nextFacing.getStepZ() * (excess - 0.5f) + laneOffset * nextFacing.getClockWise().getStepZ();
+                float beltT = Math.max(0.0f, excess);
+                float wx = nextCx + nextFacing.getStepX() * (beltT - 0.5f) + laneOffset * nextFacing.getClockWise().getStepX();
+                float wz = nextCz + nextFacing.getStepZ() * (beltT - 0.5f) + laneOffset * nextFacing.getClockWise().getStepZ();
                 return new float[]{wx, cy, wz};
             } else {
                 // Next belt is a curve

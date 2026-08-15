@@ -11,6 +11,8 @@ import net.neoforged.neoforge.network.handling.IPayloadContext;
 import proto.mechanicalarmory.common.belt.data.BeltLane;
 import proto.mechanicalarmory.common.entities.block.BeltEntity;
 
+import java.util.UUID;
+
 /**
  * Sent server → client whenever the lane state diverges from what the client
  * can predict autonomously.
@@ -26,8 +28,8 @@ import proto.mechanicalarmory.common.entities.block.BeltEntity;
  * <p>The handler is identical to {@link BeltInitPayload} — re-seed + catch-up,
  * then set the {@code stopped} flag.
  */
-public record BeltCorrectionPayload(BlockPos pos, BeltLane lane0, BeltLane lane1,
-                                     long serverTick, boolean wrapPoint, boolean hasOutput)
+public record BeltCorrectionPayload(BlockPos pos, UUID nodeId, UUID outputId, BeltLane lane0, BeltLane lane1,
+                                    long serverTick, boolean wrapPoint, boolean hasOutput, boolean stopped)
         implements CustomPacketPayload {
 
     public static final Type<BeltCorrectionPayload> TYPE = new Type<>(
@@ -44,23 +46,30 @@ public record BeltCorrectionPayload(BlockPos pos, BeltLane lane0, BeltLane lane1
 
     private static void encode(RegistryFriendlyByteBuf buf, BeltCorrectionPayload pkt) {
         buf.writeBlockPos(pkt.pos);
+        buf.writeUUID(pkt.nodeId);
+        buf.writeBoolean(pkt.outputId != null);
+        if (pkt.outputId != null) buf.writeUUID(pkt.outputId);
         buf.writeLong(pkt.serverTick);
         HolderLookup.Provider regs = buf.registryAccess();
         buf.writeNbt(pkt.lane0.save(regs));
         buf.writeNbt(pkt.lane1.save(regs));
         buf.writeBoolean(pkt.wrapPoint);
         buf.writeBoolean(pkt.hasOutput);
+        buf.writeBoolean(pkt.stopped);
     }
 
     private static BeltCorrectionPayload decode(RegistryFriendlyByteBuf buf) {
-        BlockPos pos  = buf.readBlockPos();
-        long tick     = buf.readLong();
+        BlockPos pos      = buf.readBlockPos();
+        UUID nodeId       = buf.readUUID();
+        UUID outputId     = buf.readBoolean() ? buf.readUUID() : null;
+        long tick         = buf.readLong();
         HolderLookup.Provider regs = buf.registryAccess();
-        BeltLane l0   = BeltLane.load((CompoundTag) buf.readNbt(), regs);
-        BeltLane l1   = BeltLane.load((CompoundTag) buf.readNbt(), regs);
-        boolean wrap  = buf.readBoolean();
-        boolean hasOut = buf.readBoolean();
-        return new BeltCorrectionPayload(pos, l0, l1, tick, wrap, hasOut);
+        BeltLane l0       = BeltLane.load((CompoundTag) buf.readNbt(), regs);
+        BeltLane l1       = BeltLane.load((CompoundTag) buf.readNbt(), regs);
+        boolean wrap      = buf.readBoolean();
+        boolean hasOut    = buf.readBoolean();
+        boolean stopped   = buf.readBoolean();
+        return new BeltCorrectionPayload(pos, nodeId, outputId, l0, l1, tick, wrap, hasOut, stopped);
     }
 
     // ── Handler (CLIENT) ──────────────────────────────────────────────────────
@@ -74,15 +83,13 @@ public record BeltCorrectionPayload(BlockPos pos, BeltLane lane0, BeltLane lane1
             BeltLane l0 = pkt.lane0();
             BeltLane l1 = pkt.lane1();
 
-            boolean stopped = (l0.speed() == 0f && l1.speed() == 0f);
-
             if (level.getBlockEntity(pkt.pos()) instanceof BeltEntity be) {
-                be.applyClientSeed(l0, l1, pkt.serverTick(), stopped,
+                be.applyClientSeed(l0, l1, pkt.serverTick(), pkt.stopped(),
                         pkt.wrapPoint(), pkt.hasOutput());
             }
 
             proto.mechanicalarmory.client.belt.ClientBeltNetwork.get().updateNode(
-                    pkt.pos(), l0, l1, stopped, pkt.wrapPoint(), pkt.hasOutput());
+                    pkt.pos(), pkt.outputId(), l0, l1, pkt.stopped(), pkt.wrapPoint(), pkt.hasOutput());
         });
     }
 }

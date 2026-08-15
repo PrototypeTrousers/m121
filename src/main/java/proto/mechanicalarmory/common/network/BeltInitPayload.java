@@ -13,6 +13,7 @@ import proto.mechanicalarmory.common.entities.block.BeltEntity;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 
 /**
  * Sent once from the server to a client when a chunk containing belt blocks
@@ -39,10 +40,14 @@ public record BeltInitPayload(List<NodeSnapshot> snapshots, long serverTick)
         HolderLookup.Provider regs = buf.registryAccess();
         for (NodeSnapshot snap : pkt.snapshots) {
             buf.writeBlockPos(snap.pos());
+            buf.writeUUID(snap.nodeId());
+            buf.writeBoolean(snap.outputId() != null);
+            if (snap.outputId() != null) buf.writeUUID(snap.outputId());
             buf.writeNbt(snap.lane0().save(regs));
             buf.writeNbt(snap.lane1().save(regs));
             buf.writeBoolean(snap.wrapPoint());
             buf.writeBoolean(snap.hasOutput());
+            buf.writeBoolean(snap.stopped());
         }
     }
 
@@ -52,12 +57,15 @@ public record BeltInitPayload(List<NodeSnapshot> snapshots, long serverTick)
         HolderLookup.Provider regs = buf.registryAccess();
         List<NodeSnapshot> snaps = new ArrayList<>(count);
         for (int i = 0; i < count; i++) {
-            BlockPos pos    = buf.readBlockPos();
-            BeltLane l0     = BeltLane.load((CompoundTag) buf.readNbt(), regs);
-            BeltLane l1     = BeltLane.load((CompoundTag) buf.readNbt(), regs);
-            boolean wrap    = buf.readBoolean();
-            boolean hasOut  = buf.readBoolean();
-            snaps.add(new NodeSnapshot(pos, l0, l1, wrap, hasOut));
+            BlockPos pos      = buf.readBlockPos();
+            UUID nodeId       = buf.readUUID();
+            UUID outputId     = buf.readBoolean() ? buf.readUUID() : null;
+            BeltLane l0       = BeltLane.load((CompoundTag) buf.readNbt(), regs);
+            BeltLane l1       = BeltLane.load((CompoundTag) buf.readNbt(), regs);
+            boolean wrap      = buf.readBoolean();
+            boolean hasOut    = buf.readBoolean();
+            boolean stopped   = buf.readBoolean();
+            snaps.add(new NodeSnapshot(pos, nodeId, outputId, l0, l1, wrap, hasOut, stopped));
         }
         return new BeltInitPayload(snaps, tick);
     }
@@ -69,23 +77,25 @@ public record BeltInitPayload(List<NodeSnapshot> snapshots, long serverTick)
             var level = net.minecraft.client.Minecraft.getInstance().level;
             if (level == null) return;
             long clientTick = level.getGameTime();
+            proto.mechanicalarmory.MechanicalArmory.LOGGER.info("[BeltInitPayload] Received {} snapshots at serverTick={}",
+                    pkt.snapshots().size(), pkt.serverTick());
             for (NodeSnapshot snap : pkt.snapshots()) {
                 BeltLane l0 = snap.lane0();
                 BeltLane l1 = snap.lane1();
 
                 if (level.getBlockEntity(snap.pos()) instanceof BeltEntity be) {
-                    be.applyClientSeed(l0, l1, pkt.serverTick(), false,
+                    be.applyClientSeed(l0, l1, pkt.serverTick(), snap.stopped(),
                             snap.wrapPoint(), snap.hasOutput());
                 }
 
                 proto.mechanicalarmory.client.belt.ClientBeltNetwork.get().updateNode(
-                        snap.pos(), l0, l1, false, snap.wrapPoint(), snap.hasOutput());
+                        snap.pos(), snap.outputId(), l0, l1, snap.stopped(), snap.wrapPoint(), snap.hasOutput());
             }
         });
     }
 
     // ── Inner type ────────────────────────────────────────────────────────────
 
-    public record NodeSnapshot(BlockPos pos, BeltLane lane0, BeltLane lane1,
-                                boolean wrapPoint, boolean hasOutput) {}
+    public record NodeSnapshot(BlockPos pos, UUID nodeId, UUID outputId, BeltLane lane0, BeltLane lane1,
+                               boolean wrapPoint, boolean hasOutput, boolean stopped) {}
 }

@@ -8,6 +8,7 @@ import net.minecraft.nbt.NbtUtils;
 import net.minecraft.nbt.Tag;
 import org.jetbrains.annotations.Nullable;
 
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -59,6 +60,26 @@ public final class BeltNode {
 
     // ── Construction ──────────────────────────────────────────────────────────
 
+    /**
+     * Deterministic UUID derived from a block position.
+     * Because only one belt can ever occupy a given block, this is a stable,
+     * collision-free identity shared by both server and client without any sync.
+     */
+    public static UUID posToId(BlockPos pos) {
+        ByteBuffer buf = ByteBuffer.allocate(12);
+        buf.putInt(pos.getX());
+        buf.putInt(pos.getY());
+        buf.putInt(pos.getZ());
+        return UUID.nameUUIDFromBytes(buf.array());
+    }
+
+    /** Create a node whose UUID is derived purely from its position. */
+    public BeltNode(BlockPos pos) {
+        this.nodeId = posToId(pos);
+        this.pos    = pos;
+    }
+
+    /** Full constructor kept for deserialization from older NBT. */
     public BeltNode(UUID nodeId, BlockPos pos) {
         this.nodeId = nodeId;
         this.pos = pos;
@@ -111,9 +132,10 @@ public final class BeltNode {
     }
 
     public static BeltNode load(CompoundTag tag, HolderLookup.Provider registries) {
-        UUID id = tag.getUUID("id");
         BlockPos pos = NbtUtils.readBlockPos(tag, "pos").orElse(BlockPos.ZERO);
-        BeltNode node = new BeltNode(id, pos);
+        // Derive the UUID from position; ignore any stored "id" so old and new
+        // saves are handled uniformly and always agree with the client.
+        BeltNode node = new BeltNode(pos);
         BeltLane l0 = BeltLane.load(tag.getCompound("lane0"), registries);
         BeltLane l1 = BeltLane.load(tag.getCompound("lane1"), registries);
         // Replace default lanes

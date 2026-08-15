@@ -1,20 +1,13 @@
 package proto.mechanicalarmory.common.network;
 
-import net.minecraft.core.Direction;
-import net.minecraft.world.level.block.entity.BlockEntity;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
 import net.neoforged.neoforge.network.registration.PayloadRegistrar;
-import proto.mechanicalarmory.common.entities.block.ArmEntity;
-import proto.mechanicalarmory.common.logic.Action;
-import proto.mechanicalarmory.common.logic.ActionTypes;
-import proto.mechanicalarmory.common.network.BeltCorrectionPayload;
-import proto.mechanicalarmory.common.network.BeltInitPayload;
 
 import static proto.mechanicalarmory.MechanicalArmory.MODID;
 
-@EventBusSubscriber(modid = MODID)
+@EventBusSubscriber(modid = MODID, bus = EventBusSubscriber.Bus.MOD)
 public class ModNetworking {
 
     @SubscribeEvent
@@ -46,6 +39,12 @@ public class ModNetworking {
                 BeltCorrectionPayload.TYPE,
                 BeltCorrectionPayload.STREAM_CODEC,
                 BeltCorrectionPayload::handle
+        );
+
+        registrar.playToClient(
+                proto.mechanicalarmory.common.items.armor.OctoSuit.RemoveFlywheelEffectPayload.TYPE,
+                proto.mechanicalarmory.common.items.armor.OctoSuit.RemoveFlywheelEffectPayload.STREAM_CODEC,
+                proto.mechanicalarmory.common.items.armor.OctoSuit.RemoveFlywheelEffectPayload::handle
         );
     }
 }

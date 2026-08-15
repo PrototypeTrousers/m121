@@ -73,8 +73,9 @@ public final class BeltNetworkData extends SavedData {
      * it faces or that faces it, merging subnetworks as needed.
      */
     public void onBeltPlaced(BlockPos pos, Direction facing, ServerLevel level) {
-        UUID nodeId = UUID.randomUUID();
-        BeltNode node = new BeltNode(nodeId, pos);
+        BeltNode node = new BeltNode(pos);
+        boolean powered = level.getBlockState(pos).getValue(proto.mechanicalarmory.common.blocks.BlockBelt.POWERED);
+        node.setStopped(powered);
 
         // Create a fresh subnetwork for this node
         BeltSubnetwork solo = new BeltSubnetwork(UUID.randomUUID());
@@ -180,10 +181,13 @@ public final class BeltNetworkData extends SavedData {
 
             snapshots.add(new BeltInitPayload.NodeSnapshot(
                     bpos,
+                    node.nodeId(),
+                    node.outputId(),
                     node.lane(0).deepCopy(),
                     node.lane(1).deepCopy(),
                     node.isWrapPoint(),
-                    node.outputId() != null
+                    node.outputId() != null,
+                    node.isStopped()
             ));
 
             // Sync the BeltEntity's clientLanes reference (server-side BE)
@@ -229,10 +233,13 @@ public final class BeltNetworkData extends SavedData {
 
             snapshots.add(new BeltInitPayload.NodeSnapshot(
                     bpos,
+                    node.nodeId(),
+                    node.outputId(),
                     node.lane(0).deepCopy(),
                     node.lane(1).deepCopy(),
                     node.isWrapPoint(),
-                    node.outputId() != null
+                    node.outputId() != null,
+                    node.isStopped()
             ));
         }
 
@@ -366,11 +373,14 @@ public final class BeltNetworkData extends SavedData {
         if (node == null) return;
         BeltCorrectionPayload pkt = new BeltCorrectionPayload(
                 pos,
+                node.nodeId(),
+                node.outputId(),
                 node.lane(0).deepCopy(),
                 node.lane(1).deepCopy(),
                 level.getGameTime(),
                 node.isWrapPoint(),
-                node.outputId() != null
+                node.outputId() != null,
+                node.isStopped()
         );
         PacketDistributor.sendToPlayersNear(level, null,
                 pos.getX(), pos.getY(), pos.getZ(), 128, pkt);
@@ -397,6 +407,7 @@ public final class BeltNetworkData extends SavedData {
             for (BeltNode n : sub.allNodes()) {
                 data.posToSubnet.put(n.pos(), sub.subnetId());
             }
+            sub.layerOrder(); // Ensure topo/layer order is pre-built
         }
         // NOTE: lane speeds are persisted in NBT, so they survive a clean
         // save/load cycle without needing a ServerLevel here.  updateCurveSpeeds

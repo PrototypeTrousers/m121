@@ -15,6 +15,8 @@ import proto.mechanicalarmory.common.belt.data.BeltLane;
 import proto.mechanicalarmory.common.belt.data.BeltNode;
 import proto.mechanicalarmory.common.entities.MAEntities;
 
+import java.util.UUID;
+
 /**
  * A thin rendering anchor for a conveyor belt block.
  *
@@ -30,11 +32,7 @@ import proto.mechanicalarmory.common.entities.MAEntities;
  */
 public class BeltEntity extends BlockEntity {
 
-    // ── Shared ────────────────────────────────────────────────────────────────
-
-    /** Server: UUID of the BeltNode in BeltNetworkData. Persisted in NBT. */
-    @Nullable
-    private java.util.UUID nodeId;
+    // nodeId is always BeltNode.posToId(worldPosition) – no need to store it.
 
     // ── Client-only simulation state ──────────────────────────────────────────
 
@@ -80,13 +78,9 @@ public class BeltEntity extends BlockEntity {
             proto.mechanicalarmory.common.belt.data.BeltNode existing =
                     proto.mechanicalarmory.client.belt.ClientBeltNetwork.get().getNode(worldPosition);
             if (existing != null) {
-                // Restore clientLanes from existing simulated network node
                 this.clientLanes[0] = existing.lane(0).deepCopy();
                 this.clientLanes[1] = existing.lane(1).deepCopy();
                 this.clientStopped = existing.isStopped();
-            } else {
-                proto.mechanicalarmory.client.belt.ClientBeltNetwork.get().updateNode(
-                        worldPosition, clientLanes[0], clientLanes[1], clientStopped, clientWrapPoint, clientHasOutput);
             }
         }
     }
@@ -95,7 +89,7 @@ public class BeltEntity extends BlockEntity {
 
     /** Called by BeltNetworkData when the chunk this BE is in loads. */
     public void syncFromNetwork(BeltNode node) {
-        this.nodeId = node.nodeId();
+        // nothing to sync – nodeId is derived from worldPosition
     }
 
     // ── Client sync ───────────────────────────────────────────────────────────
@@ -233,17 +227,17 @@ public class BeltEntity extends BlockEntity {
     public boolean  isClientWrapPoint() { return clientWrapPoint; }
     public boolean  clientHasOutput()   { return clientHasOutput; }
 
-    // ── NBT (server-side: only store nodeId) ─────────────────────────────────
+    // ── NBT ───────────────────────────────────────────────────────────────────
 
     @Override
     protected void saveAdditional(@NotNull CompoundTag tag, HolderLookup.@NotNull Provider registries) {
         super.saveAdditional(tag, registries);
-        if (nodeId != null) tag.putUUID("nodeId", nodeId);
         if (level instanceof net.minecraft.server.level.ServerLevel srv) {
             proto.mechanicalarmory.common.belt.network.BeltNetworkData data =
                     proto.mechanicalarmory.common.belt.network.BeltNetworkData.get(srv);
             BeltNode node = data.nodeAt(worldPosition);
             if (node != null) {
+                if (node.outputId() != null) tag.putUUID("outputId", node.outputId());
                 tag.put("lane0", node.lane(0).save(registries));
                 tag.put("lane1", node.lane(1).save(registries));
                 tag.putBoolean("wrapPoint", node.isWrapPoint());
@@ -257,8 +251,9 @@ public class BeltEntity extends BlockEntity {
     @Override
     protected void loadAdditional(@NotNull CompoundTag tag, HolderLookup.@NotNull Provider registries) {
         super.loadAdditional(tag, registries);
-        if (tag.contains("nodeId")) nodeId = tag.getUUID("nodeId");
-        applySyncTag(tag, registries);
+        if (level != null && level.isClientSide()) {
+            applySyncTag(tag, registries);
+        }
     }
 
     // ── Update packet (vanilla BE sync on chunk load & client join) ─────────
@@ -272,6 +267,7 @@ public class BeltEntity extends BlockEntity {
                     proto.mechanicalarmory.common.belt.network.BeltNetworkData.get(srv);
             BeltNode node = data.nodeAt(worldPosition);
             if (node != null) {
+                if (node.outputId() != null) tag.putUUID("outputId", node.outputId());
                 tag.put("lane0", node.lane(0).save(registries));
                 tag.put("lane1", node.lane(1).save(registries));
                 tag.putBoolean("wrapPoint", node.isWrapPoint());
@@ -290,19 +286,25 @@ public class BeltEntity extends BlockEntity {
     }
 
     private void applySyncTag(CompoundTag tag, HolderLookup.Provider lookupProvider) {
+        if (level != null && !level.isClientSide()) {
+            return; // Never seed client simulation from server thread
+        }
         if (tag.contains("lane0") && tag.contains("lane1")) {
+            long serverTick = tag.getLong("serverTick");
+            if (serverTick < this.clientSeedTick && this.clientSeedTick != 0) {
+                return; // Do not overwrite with older data
+            }
+            // nodeId is now always posToId(worldPosition) – no need to read from tag
+            UUID srvOutputId = tag.hasUUID("outputId") ? tag.getUUID("outputId") : null;
             BeltLane l0 = BeltLane.load(tag.getCompound("lane0"), lookupProvider);
             BeltLane l1 = BeltLane.load(tag.getCompound("lane1"), lookupProvider);
             boolean wrap = tag.getBoolean("wrapPoint");
             boolean hasOut = tag.getBoolean("hasOutput");
             boolean stopped = tag.getBoolean("stopped");
-            long serverTick = tag.getLong("serverTick");
             applyClientSeed(l0, l1, serverTick, stopped, wrap, hasOut);
 
-            if (level != null && level.isClientSide()) {
-                proto.mechanicalarmory.client.belt.ClientBeltNetwork.get().updateNode(
-                        worldPosition, l0, l1, stopped, wrap, hasOut);
-            }
+            proto.mechanicalarmory.client.belt.ClientBeltNetwork.get().updateNode(
+                    worldPosition, srvOutputId, l0, l1, stopped, wrap, hasOut);
         }
     }
 
@@ -321,6 +323,8 @@ public class BeltEntity extends BlockEntity {
         }
     }
 
-    @Nullable
-    public java.util.UUID nodeId() { return nodeId; }
+    /** Always matches the node UUID used by both server and client. */
+    public java.util.UUID nodeId() {
+        return proto.mechanicalarmory.common.belt.data.BeltNode.posToId(worldPosition);
+    }
 }

@@ -152,6 +152,11 @@ public class MechanicalArmoryClient {
                 proto.mechanicalarmory.client.belt.ClientBeltNetwork.get().clear();
             }
         }
+
+        @SubscribeEvent
+        public static void onRegisterClientCommands(net.neoforged.neoforge.client.event.RegisterClientCommandsEvent event) {
+            proto.mechanicalarmory.client.command.BeltStatusCommand.register(event.getDispatcher());
+        }
     }
 
     public static GltfModel loadglTFModel(ModelResourceLocation modelResourceLocation) {
