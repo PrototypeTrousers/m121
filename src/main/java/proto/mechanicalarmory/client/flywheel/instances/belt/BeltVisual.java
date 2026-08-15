@@ -92,11 +92,48 @@ public class BeltVisual extends AbstractBlockEntityVisual<BeltEntity>
         });
     }
 
+    // ── Curve trajectory calculation ─────────────────────────────────────────
+
+    private enum CurveType {
+        STRAIGHT,
+        CURVE_LEFT,
+        CURVE_RIGHT
+    }
+
+    private CurveType getCurveType() {
+        Direction back = facing.getOpposite();
+        Direction left = facing.getCounterClockWise();
+        Direction right = facing.getClockWise();
+
+        boolean hasBack = isBeltFacingInto(pos.relative(back), pos);
+        boolean hasLeft = isBeltFacingInto(pos.relative(left), pos);
+        boolean hasRight = isBeltFacingInto(pos.relative(right), pos);
+
+        if (!hasBack) {
+            if (hasRight && !hasLeft) {
+                return CurveType.CURVE_RIGHT;
+            } else if (hasLeft && !hasRight) {
+                return CurveType.CURVE_LEFT;
+            }
+        }
+        return CurveType.STRAIGHT;
+    }
+
+    private boolean isBeltFacingInto(net.minecraft.core.BlockPos fromPos, net.minecraft.core.BlockPos toPos) {
+        net.minecraft.world.level.block.state.BlockState state = level.getBlockState(fromPos);
+        if (state.getBlock() instanceof BlockBelt) {
+            Direction f = state.getValue(BlockBelt.FACING);
+            return fromPos.relative(f).equals(toPos);
+        }
+        return false;
+    }
+
     // ── Lane rendering ────────────────────────────────────────────────────────
 
     private void renderLane(int laneIdx, float partialTick) {
         BeltLane lane = blockEntity.clientLane(laneIdx);
         List<TransformedInstance> instances = laneInstances.get(laneIdx);
+        CurveType curve = getCurveType();
 
         int idx = 0;
         for (ItemGroup group : lane.groups()) {
@@ -120,15 +157,36 @@ public class BeltVisual extends AbstractBlockEntityVisual<BeltEntity>
 
                 TransformedInstance inst = instances.get(idx++);
 
-                float beltT = renderPos; // 0 = input, 1 = output
+                float cx = visualPos.getX() + 0.5f;
+                float cy = visualPos.getY() + 0.1f;
+                float cz = visualPos.getZ() + 0.5f;
+                float wy = cy;
                 float laneOffset = (laneIdx == 0 ? -0.15f : 0.15f);
-                float wx = visualPos.getX() + 0.5f
-                        + facing.getStepX() * (beltT - 0.5f)
-                        + laneOffset * facing.getClockWise().getStepX();
-                float wy = visualPos.getY() + 0.1f;
-                float wz = visualPos.getZ() + 0.5f
-                        + facing.getStepZ() * (beltT - 0.5f)
-                        + laneOffset * facing.getClockWise().getStepZ();
+
+                float wx, wz;
+                if (curve == CurveType.STRAIGHT) {
+                    float beltT = renderPos;
+                    wx = cx + facing.getStepX() * (beltT - 0.5f) + laneOffset * facing.getClockWise().getStepX();
+                    wz = cz + facing.getStepZ() * (beltT - 0.5f) + laneOffset * facing.getClockWise().getStepZ();
+                } else {
+                    Direction sideDir = (curve == CurveType.CURVE_RIGHT)
+                            ? facing.getClockWise()
+                            : facing.getCounterClockWise();
+
+                    float radius = (curve == CurveType.CURVE_RIGHT)
+                            ? (0.5f - laneOffset)
+                            : (0.5f + laneOffset);
+
+                    double theta = renderPos * (Math.PI / 2.0);
+                    double sinT = Math.sin(theta);
+                    double cosT = Math.cos(theta);
+
+                    float cornerX = cx + 0.5f * facing.getStepX() + 0.5f * sideDir.getStepX();
+                    float cornerZ = cz + 0.5f * facing.getStepZ() + 0.5f * sideDir.getStepZ();
+
+                    wx = (float) (cornerX - radius * (cosT * facing.getStepX() + sinT * sideDir.getStepX()));
+                    wz = (float) (cornerZ - radius * (cosT * facing.getStepZ() + sinT * sideDir.getStepZ()));
+                }
 
                 inst.setTransform(new Matrix4f().translate(wx, wy, wz).scale(0.25f))
                         .light(packedLight)
