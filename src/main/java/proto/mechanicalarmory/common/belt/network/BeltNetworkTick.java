@@ -91,13 +91,24 @@ public final class BeltNetworkTick {
 
         for (int l = 0; l < 2; l++) {
             BeltLane lane = node.lane(l);
+            BeltLane outLane = (hasOutput && output != null) ? output.lane(l) : null;
 
-            // 1. Advance items (clamped to 1.0f if terminal or output is stopped)
-            lane.advance(1.0f, hasOutput ? Float.MAX_VALUE : 1.0f);
+            float maxExitPos = 1.0f;
+            if (outLane != null) {
+                if (outLane.isEmpty()) {
+                    maxExitPos = Float.MAX_VALUE;
+                } else {
+                    float outRoom = outLane.peekLast().tailPos(outLane.itemSpacing());
+                    maxExitPos = 1.0f + outRoom * (lane.itemSpacing() / outLane.itemSpacing());
+                }
+            }
+
+            // 1. Advance items (clamped to maxExitPos)
+            lane.advance(1.0f, maxExitPos);
 
             // 2. Handle output
-            if (hasOutput && output != null) {
-                lane.transferOut(output.lane(l));
+            if (outLane != null) {
+                lane.transferOut(outLane);
             }
         }
     }

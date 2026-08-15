@@ -157,14 +157,30 @@ public final class BeltLane {
                     : output.groups[output.size - 1].tailPos(outputSpacing);
 
             if (outputRoom <= 0.001f) {
-                // Downstream lane is backed up; clamp lead item at 1.0 on this belt
-                front.setHeadPos(1.0f);
+                // B's last item may have its tail physically before the junction
+                // (negative B-coordinate).  Clamping A at 1.0 would place it
+                // at the same physical position as part of B's item — overlap.
+                //
+                // Correct clamp: A's head touches B's tail in physical space.
+                //   A_head_phys  = (headPos_A − 1) × (ITEM_SPACING / spacing)
+                //   B_tail_phys  = headPos_B × (ITEM_SPACING / outputSpacing) − ITEM_SPACING
+                // Setting equal and substituting outputRoom = headPos_B − outputSpacing:
+                //   clampPos = 1 + outputRoom × (spacing / outputSpacing)
+                //
+                // For straight→straight: spacing == outputSpacing → clampPos = 1 + outputRoom.
+                // For straight→inner curve: spacing/outputSpacing ≈ 0.55 → clamp is closer to 1.
+                float clampPos = 1.0f + outputRoom * (spacing / outputSpacing);
+                front.setHeadPos(Math.min(front.headPos(), clampPos));
                 break;
             }
 
-            // Excess distance into the output lane
+            // excess is in source-lane coordinate space.  Convert to output-lane
+            // coordinate space before placing the item.  Both lanes are calibrated
+            // to the same physical throughput speed, so the ratio of their spacings
+            // equals the ratio of their coordinate scales (speed_out / speed_in).
+            // For straight→straight this is 1.0; for straight→inner curve ≈ 1.82.
             float excess = front.headPos() - 1.0f;
-            float newHead = Math.min(excess, outputRoom);
+            float newHead = Math.min(excess * (outputSpacing / spacing), outputRoom);
             if (newHead <= 0f) {
                 newHead = Math.min(outputSpacing, outputRoom);
             }

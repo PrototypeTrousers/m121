@@ -72,8 +72,6 @@ public record BeltInitPayload(List<NodeSnapshot> snapshots, long serverTick)
             for (NodeSnapshot snap : pkt.snapshots()) {
                 BeltLane l0 = snap.lane0();
                 BeltLane l1 = snap.lane1();
-                float catchUp = (clientTick - pkt.serverTick()) / 20.0f;
-                if (catchUp > 0) { l0.advance(catchUp); l1.advance(catchUp); }
 
                 if (level.getBlockEntity(snap.pos()) instanceof BeltEntity be) {
                     be.applyClientSeed(l0, l1, pkt.serverTick(), false,

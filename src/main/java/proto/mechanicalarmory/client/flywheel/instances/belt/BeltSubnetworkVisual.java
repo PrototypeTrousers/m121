@@ -108,10 +108,26 @@ public class BeltSubnetworkVisual extends AbstractVisual
                 BeltNode outNode = hasOutput ? getOutputNode(node) : null;
                 for (int l = 0; l < 2; l++) {
                     BeltLane lane = node.lane(l);
-                    lane.advance(1.0f, hasOutput ? Float.MAX_VALUE : 1.0f);
+                    BeltLane outLane = (hasOutput && outNode != null && !outNode.isStopped()) ? outNode.lane(l) : null;
 
-                    if (hasOutput && outNode != null && !outNode.isStopped()) {
-                        lane.transferOut(outNode.lane(l));
+                    float maxExitPos = 1.0f;
+                    if (hasOutput) {
+                        if (outLane != null) {
+                            if (outLane.isEmpty()) {
+                                maxExitPos = Float.MAX_VALUE;
+                            } else {
+                                float outRoom = outLane.peekLast().tailPos(outLane.itemSpacing());
+                                maxExitPos = 1.0f + outRoom * (lane.itemSpacing() / outLane.itemSpacing());
+                            }
+                        } else {
+                            maxExitPos = Float.MAX_VALUE;
+                        }
+                    }
+
+                    lane.advance(1.0f, maxExitPos);
+
+                    if (outLane != null) {
+                        lane.transferOut(outLane);
                     }
                 }
             }
@@ -264,11 +280,11 @@ public class BeltSubnetworkVisual extends AbstractVisual
                     float nextRoom = nextLane.isEmpty()
                             ? Float.MAX_VALUE
                             : nextLane.peekLast().tailPos(nextLane.itemSpacing());
-                    if (nextRoom > 0.0f) {
-                        maxFrontAdvance = lane.speed();
-                    } else {
-                        maxFrontAdvance = Math.max(0.0f, 1.0f - lane.peekFirst().headPos());
-                    }
+                    float maxReachPos = nextLane.isEmpty()
+                            ? Float.MAX_VALUE
+                            : 1.0f + nextRoom * (lane.itemSpacing() / nextLane.itemSpacing());
+                    maxFrontAdvance = Math.max(0.0f, maxReachPos - lane.peekFirst().headPos());
+                    maxFrontAdvance = Math.min(maxFrontAdvance, lane.speed());
                 } else if (!lane.isEmpty()) {
                     maxFrontAdvance = Math.max(0.0f, 1.0f - lane.peekFirst().headPos());
                 }
@@ -383,7 +399,7 @@ public class BeltSubnetworkVisual extends AbstractVisual
                         ? (0.5f - laneOffset)
                         : (0.5f + laneOffset);
 
-                double theta = Math.min(1.0, excess) * (Math.PI / 2.0);
+                double theta = Math.min(Math.PI / 2.0, excess / nextRadius);
                 double sinT = Math.sin(theta);
                 double cosT = Math.cos(theta);
 

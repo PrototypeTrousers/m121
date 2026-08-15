@@ -158,12 +158,29 @@ public class BeltEntity extends BlockEntity {
             for (int t = 0; t < ticks; t++) {
                 for (int l = 0; l < 2; l++) {
                     BeltLane lane = clientLanes[l];
-                    lane.advance(1.0f, clientHasOutput ? Float.MAX_VALUE : 1.0f);
+                    BlockEntity next = clientHasOutput ? lvl.getBlockEntity(worldPosition.relative(facing)) : null;
+                    BeltEntity outBe = (next instanceof BeltEntity be) ? be : null;
+                    BeltLane outLane = (outBe != null) ? outBe.clientLane(l) : null;
+
+                    float maxExitPos = 1.0f;
+                    if (clientHasOutput) {
+                        if (outLane != null) {
+                            if (outLane.isEmpty()) {
+                                maxExitPos = Float.MAX_VALUE;
+                            } else {
+                                float outRoom = outLane.peekLast().tailPos(outLane.itemSpacing());
+                                maxExitPos = 1.0f + outRoom * (lane.itemSpacing() / outLane.itemSpacing());
+                            }
+                        } else {
+                            maxExitPos = Float.MAX_VALUE;
+                        }
+                    }
+
+                    lane.advance(1.0f, maxExitPos);
 
                     if (clientHasOutput) {
-                        BlockEntity next = lvl.getBlockEntity(worldPosition.relative(facing));
-                        if (next instanceof BeltEntity outBe) {
-                            lane.transferOut(outBe.clientLane(l));
+                        if (outLane != null) {
+                            lane.transferOut(outLane);
                         } else {
                             while (!lane.isEmpty() && lane.peekFirst().headPos() >= 1.0f) {
                                 lane.pollFirst();

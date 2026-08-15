@@ -75,10 +75,6 @@ public record BeltCorrectionPayload(BlockPos pos, BeltLane lane0, BeltLane lane1
             BeltLane l1 = pkt.lane1();
 
             boolean stopped = (l0.speed() == 0f && l1.speed() == 0f);
-            if (!stopped) {
-                float catchUp = (clientTick - pkt.serverTick()) / 20.0f;
-                if (catchUp > 0) { l0.advance(catchUp); l1.advance(catchUp); }
-            }
 
             if (level.getBlockEntity(pkt.pos()) instanceof BeltEntity be) {
                 be.applyClientSeed(l0, l1, pkt.serverTick(), stopped,

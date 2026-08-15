@@ -152,12 +152,11 @@ public class BeltVisual extends AbstractBlockEntityVisual<BeltEntity>
                     float nextRoom = nextLane.isEmpty()
                             ? Float.MAX_VALUE
                             : nextLane.peekLast().tailPos(nextLane.itemSpacing());
-                    if (nextRoom > 0.0f) {
-                        maxFrontAdvance = lane.speed();
-                    } else {
-                        // Downstream belt is backed up
-                        maxFrontAdvance = Math.max(0.0f, 1.0f - lane.peekFirst().headPos());
-                    }
+                    float maxReachPos = nextLane.isEmpty()
+                            ? Float.MAX_VALUE
+                            : 1.0f + nextRoom * (lane.itemSpacing() / nextLane.itemSpacing());
+                    maxFrontAdvance = Math.max(0.0f, maxReachPos - lane.peekFirst().headPos());
+                    maxFrontAdvance = Math.min(maxFrontAdvance, lane.speed());
                 } else {
                     maxFrontAdvance = lane.speed();
                 }
@@ -275,7 +274,7 @@ public class BeltVisual extends AbstractBlockEntityVisual<BeltEntity>
                         ? (0.5f - laneOffset)
                         : (0.5f + laneOffset);
 
-                double theta = Math.min(1.0, excess) * (Math.PI / 2.0);
+                double theta = Math.min(Math.PI / 2.0, excess / nextRadius);
                 double sinT = Math.sin(theta);
                 double cosT = Math.cos(theta);
 
