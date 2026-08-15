@@ -1,6 +1,5 @@
 package proto.mechanicalarmory.common.belt.network;
 
-import net.minecraft.server.level.ServerLevel;
 import proto.mechanicalarmory.common.belt.data.BeltLane;
 import proto.mechanicalarmory.common.belt.data.BeltNode;
 
@@ -9,6 +8,11 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+
+// NOTE: This class deliberately has no ServerLevel access.
+// Lane speeds (curve/straight) are cached on BeltNode by
+// BeltNetworkData.updateCurveSpeeds(), which is called on every
+// topology change (place, remove, link).  The tick is pure data.
 
 /**
  * Executes one simulation tick for a {@link BeltSubnetwork}.
@@ -21,9 +25,9 @@ import java.util.concurrent.Executors;
  * <h3>Thread safety</h3>
  * When processing layer {@code L}, we write to each node's own lanes.  The
  * output of a layer-L node is a layer-(L−1) node that is <em>already
- * finished</em> for this tick, so there are no write–write conflicts.  Workers
- * never touch world state; all block/level access happens before and after the
- * parallel sections on the main server thread.
+ * finished</em> for this tick, so there are no write–write conflicts. Workers never touch world state; speeds are cached on {@link proto.mechanicalarmory.common.belt.data.BeltNode}
+ * by {@link BeltNetworkData#updateCurveSpeeds} and are updated only on topology
+ * changes (place / remove / link), not during the tick.
  */
 public final class BeltNetworkTick {
 
@@ -42,24 +46,17 @@ public final class BeltNetworkTick {
      * Tick all subnetworks in the given {@link BeltNetworkData}.
      * Called once per server level tick from the main thread.
      */
-    public static void tickAll(BeltNetworkData data, ServerLevel level) {
+    public static void tickAll(BeltNetworkData data) {
         for (BeltSubnetwork subnet : data.allSubnetworks()) {
-            tickSubnetwork(subnet, level);
+            tickSubnetwork(subnet);
         }
     }
 
     // ── Per-subnetwork tick ───────────────────────────────────────────────────
 
-    private static void tickSubnetwork(BeltSubnetwork subnet, ServerLevel level) {
+    private static void tickSubnetwork(BeltSubnetwork subnet) {
         List<BeltNode> topo = subnet.topoOrder();
         if (topo.isEmpty()) return;
-
-        // Group topo-ordered nodes into layers.
-        // Since topoOrder already guarantees correct processing order, and nodes
-        // within the same layer share no edges, we can run each layer in parallel.
-        for (BeltNode node : topo) {
-            updateNodeSpeeds(node, level);
-        }
 
         List<List<BeltNode>> layers = buildLayers(topo);
 
@@ -76,44 +73,6 @@ public final class BeltNetworkTick {
                 CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
             }
         }
-    }
-
-    private static void updateNodeSpeeds(BeltNode node, ServerLevel level) {
-        net.minecraft.core.BlockPos pos = node.pos();
-        net.minecraft.world.level.block.state.BlockState state = level.getBlockState(pos);
-        if (!(state.getBlock() instanceof proto.mechanicalarmory.common.blocks.BlockBelt)) return;
-
-        net.minecraft.core.Direction facing = state.getValue(proto.mechanicalarmory.common.blocks.BlockBelt.FACING);
-        net.minecraft.core.Direction back = facing.getOpposite();
-        net.minecraft.core.Direction left = facing.getCounterClockWise();
-        net.minecraft.core.Direction right = facing.getClockWise();
-
-        boolean hasBack = isBeltFacingInto(level, pos.relative(back), pos);
-        boolean hasLeft = isBeltFacingInto(level, pos.relative(left), pos);
-        boolean hasRight = isBeltFacingInto(level, pos.relative(right), pos);
-
-        if (!hasBack) {
-            if (hasRight && !hasLeft) {
-                node.lane(1).setSpeed(BeltLane.SPEED_INNER);
-                node.lane(0).setSpeed(BeltLane.SPEED_OUTER);
-                return;
-            } else if (hasLeft && !hasRight) {
-                node.lane(0).setSpeed(BeltLane.SPEED_INNER);
-                node.lane(1).setSpeed(BeltLane.SPEED_OUTER);
-                return;
-            }
-        }
-        node.lane(0).setSpeed(BeltLane.SPEED_DEFAULT);
-        node.lane(1).setSpeed(BeltLane.SPEED_DEFAULT);
-    }
-
-    private static boolean isBeltFacingInto(ServerLevel level, net.minecraft.core.BlockPos fromPos, net.minecraft.core.BlockPos toPos) {
-        net.minecraft.world.level.block.state.BlockState state = level.getBlockState(fromPos);
-        if (state.getBlock() instanceof proto.mechanicalarmory.common.blocks.BlockBelt) {
-            net.minecraft.core.Direction f = state.getValue(proto.mechanicalarmory.common.blocks.BlockBelt.FACING);
-            return fromPos.relative(f).equals(toPos);
-        }
-        return false;
     }
 
     /**

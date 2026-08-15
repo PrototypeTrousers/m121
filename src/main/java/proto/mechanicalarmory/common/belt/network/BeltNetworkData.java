@@ -62,7 +62,7 @@ public final class BeltNetworkData extends SavedData {
      * Marks dirty so NeoForge persists it when the world saves.
      */
     public void tick(ServerLevel level) {
-        BeltNetworkTick.tickAll(this, level);
+        BeltNetworkTick.tickAll(this);
         setDirty();
     }
 
@@ -398,6 +398,10 @@ public final class BeltNetworkData extends SavedData {
                 data.posToSubnet.put(n.pos(), sub.subnetId());
             }
         }
+        // NOTE: lane speeds are persisted in NBT, so they survive a clean
+        // save/load cycle without needing a ServerLevel here.  updateCurveSpeeds
+        // is called on every topology change at runtime (place / remove / link),
+        // which is the only time speeds ever need to change.
         return data;
     }
 }
