@@ -10,6 +10,7 @@ import net.neoforged.neoforge.registries.DeferredRegister;
 import proto.mechanicalarmory.common.blocks.BushBlockEntity;
 import proto.mechanicalarmory.common.blocks.MABlocks;
 import proto.mechanicalarmory.common.entities.block.ArmEntity;
+import proto.mechanicalarmory.common.entities.block.BeltEntity;
 import proto.mechanicalarmory.common.entities.block.ShredderEntity;
 
 import java.util.function.Supplier;
@@ -53,4 +54,12 @@ public class MAEntities {
             BLOCK_ENTITY_TYPES.register("enhancedcrop",
                     () -> BlockEntityType.Builder.of(BushBlockEntity::new, BuiltInRegistries.BLOCK.stream().filter(
                             block -> block instanceof BushBlock).toList().toArray(new Block[]{})).build(null));
+
+    public static final Supplier<BlockEntityType<BeltEntity>> BELT_ENTITY = BLOCK_ENTITY_TYPES.register(
+            "beltentity",
+            () -> BlockEntityType.Builder.of(
+                            BeltEntity::new,
+                            MABlocks.BELT.get()
+                    ).build(null)
+    );
 }

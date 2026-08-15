@@ -9,6 +9,8 @@ import net.neoforged.neoforge.network.registration.PayloadRegistrar;
 import proto.mechanicalarmory.common.entities.block.ArmEntity;
 import proto.mechanicalarmory.common.logic.Action;
 import proto.mechanicalarmory.common.logic.ActionTypes;
+import proto.mechanicalarmory.common.network.BeltCorrectionPayload;
+import proto.mechanicalarmory.common.network.BeltInitPayload;
 
 import static proto.mechanicalarmory.MechanicalArmory.MODID;
 
@@ -31,6 +33,19 @@ public class ModNetworking {
                 FilterPayload.TYPE,
                 FilterPayload.STREAM_CODEC,
                 FilterPayload::handle
+        );
+
+        // Belt network: server → client
+        registrar.playToClient(
+                BeltInitPayload.TYPE,
+                BeltInitPayload.STREAM_CODEC,
+                BeltInitPayload::handle
+        );
+
+        registrar.playToClient(
+                BeltCorrectionPayload.TYPE,
+                BeltCorrectionPayload.STREAM_CODEC,
+                BeltCorrectionPayload::handle
         );
     }
 }

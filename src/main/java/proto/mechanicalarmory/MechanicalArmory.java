@@ -14,7 +14,9 @@ import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.config.ModConfig;
 import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent;
 import net.neoforged.neoforge.common.NeoForge;
+import net.neoforged.neoforge.event.level.ChunkEvent;
 import net.neoforged.neoforge.event.server.ServerStartingEvent;
+import net.neoforged.neoforge.event.tick.LevelTickEvent;
 import net.neoforged.neoforge.registries.DeferredRegister;
 import org.slf4j.Logger;
 import proto.mechanicalarmory.common.blocks.MABlocks;
@@ -63,6 +65,10 @@ public class MechanicalArmory {
         // Do not add this line if there are no @SubscribeEvent-annotated functions in this class, like onServerStarting() below.
         NeoForge.EVENT_BUS.register(this);
 
+        // Belt network events
+        NeoForge.EVENT_BUS.addListener(this::onLevelTick);
+        NeoForge.EVENT_BUS.addListener(this::onChunkLoad);
+
         // Register our mod's ModConfigSpec so that FML can create and load the config file for us
         modContainer.registerConfig(ModConfig.Type.COMMON, Config.SPEC);
     }
@@ -85,5 +91,21 @@ public class MechanicalArmory {
     public void onServerStarting(ServerStartingEvent event) {
         // Do something when the server starts
         LOGGER.info("HELLO from server starting");
+    }
+
+    /** Tick all belt networks every server level tick. */
+    private void onLevelTick(LevelTickEvent.Post event) {
+        if (event.getLevel() instanceof net.minecraft.server.level.ServerLevel srv) {
+            proto.mechanicalarmory.common.belt.network.BeltNetworkData.get(srv).tick(srv);
+        }
+    }
+
+    /** Notify the belt network that a chunk has loaded so it can sync clients. */
+    private void onChunkLoad(ChunkEvent.Load event) {
+        if (event.getLevel() instanceof net.minecraft.server.level.ServerLevel srv) {
+            proto.mechanicalarmory.common.belt.network.BeltNetworkData
+                    .get(srv)
+                    .onChunkLoaded(event.getChunk().getPos(), srv);
+        }
     }
 }

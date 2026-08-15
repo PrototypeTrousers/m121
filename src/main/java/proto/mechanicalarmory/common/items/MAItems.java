@@ -15,6 +15,7 @@ public class MAItems {
     public static final DeferredRegister.Items ITEMS = DeferredRegister.createItems(MechanicalArmory.MODID);
     public static final DeferredItem<BlockItem> ARM_ITEM = ITEMS.registerSimpleBlockItem("arm", MABlocks.ARM);
     public static final DeferredItem<BlockItem> SHREDDER_ITEM = ITEMS.registerSimpleBlockItem("shredder", MABlocks.SHREDDER);
+    public static final DeferredItem<BlockItem> BELT_ITEM = ITEMS.registerSimpleBlockItem("belt", MABlocks.BELT);
 
     public static final DeferredItem<ArmorItem> MY_CHESTPLATE = ITEMS.registerItem("my_chestplate",
             properties -> new OctoSuit(ArmorMaterials.MY_MATERIAL, ArmorItem.Type.CHESTPLATE, properties));

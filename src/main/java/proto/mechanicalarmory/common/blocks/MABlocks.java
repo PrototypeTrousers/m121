@@ -14,4 +14,6 @@ public class MABlocks {
     public static final DeferredBlock<Block> EXAMPLE_BLOCK = BLOCKS.registerSimpleBlock("example_block", BlockBehaviour.Properties.of().mapColor(MapColor.STONE));
     public static final DeferredBlock<BlockArm> ARM = BLOCKS.registerBlock("arm", BlockArm::new, BlockBehaviour.Properties.of());
     public static final DeferredBlock<BlockShredder> SHREDDER = BLOCKS.registerBlock("shredder", BlockShredder::new, BlockBehaviour.Properties.of());
+    public static final DeferredBlock<BlockBelt> BELT = BLOCKS.registerBlock("belt", BlockBelt::new,
+            BlockBehaviour.Properties.of().mapColor(MapColor.METAL).noOcclusion().strength(1.5f));
 }

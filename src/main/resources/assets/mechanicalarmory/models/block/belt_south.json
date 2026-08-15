@@ -1,0 +1,26 @@
+{
+  "parent": "minecraft:block/block",
+  "textures": {
+    "particle": "mechanicalarmory:block/belt_top",
+    "bottom":   "minecraft:block/iron_block",
+    "top":      "mechanicalarmory:block/belt_top",
+    "north":    "minecraft:block/iron_block",
+    "south":    "minecraft:block/iron_block",
+    "east":     "minecraft:block/iron_block",
+    "west":     "minecraft:block/iron_block"
+  },
+  "elements": [
+    {
+      "from": [0, 0, 0],
+      "to":   [16, 2, 16],
+      "faces": {
+        "down":  { "texture": "#bottom", "cullface": "down" },
+        "up":    { "texture": "#top", "rotation": 180 },
+        "north": { "texture": "#north", "cullface": "north" },
+        "south": { "texture": "#south", "cullface": "south" },
+        "east":  { "texture": "#east",  "cullface": "east"  },
+        "west":  { "texture": "#west",  "cullface": "west"  }
+      }
+    }
+  ]
+}

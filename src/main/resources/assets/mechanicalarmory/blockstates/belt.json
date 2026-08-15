@@ -1,0 +1,12 @@
+{
+  "variants": {
+    "facing=north,powered=false": { "model": "mechanicalarmory:block/belt_north" },
+    "facing=south,powered=false": { "model": "mechanicalarmory:block/belt_south" },
+    "facing=east,powered=false":  { "model": "mechanicalarmory:block/belt_east" },
+    "facing=west,powered=false":  { "model": "mechanicalarmory:block/belt_west" },
+    "facing=north,powered=true":  { "model": "mechanicalarmory:block/belt_north" },
+    "facing=south,powered=true":  { "model": "mechanicalarmory:block/belt_south" },
+    "facing=east,powered=true":   { "model": "mechanicalarmory:block/belt_east" },
+    "facing=west,powered=true":   { "model": "mechanicalarmory:block/belt_west" }
+  }
+}
