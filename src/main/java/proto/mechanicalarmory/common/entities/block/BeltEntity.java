@@ -165,8 +165,8 @@ public class BeltEntity extends BlockEntity {
                         if (next instanceof BeltEntity outBe) {
                             lane.transferOut(outBe.clientLane(l));
                         } else {
-                            while (!lane.groups().isEmpty() && lane.groups().peekFirst().headPos() >= 1.0f) {
-                                lane.groups().pollFirst();
+                            while (!lane.isEmpty() && lane.peekFirst().headPos() >= 1.0f) {
+                                lane.pollFirst();
                             }
                         }
                     }

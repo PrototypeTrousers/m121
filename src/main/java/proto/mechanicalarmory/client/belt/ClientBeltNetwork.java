@@ -87,15 +87,17 @@ public final class ClientBeltNetwork {
         }
 
         // Copy lane contents
-        node.lane(0).groups().clear();
-        for (proto.mechanicalarmory.common.belt.data.ItemGroup g : lane0.groups()) {
+        node.lane(0).clearGroups();
+        for (int i = 0; i < lane0.groupCount(); i++) {
+            proto.mechanicalarmory.common.belt.data.ItemGroup g = lane0.groupArray()[i];
             node.lane(0).insertBack(new proto.mechanicalarmory.common.belt.data.ItemGroup(g.item(), g.count(), g.headPos()));
         }
         float s0 = lane0.speed() > 0.0f ? lane0.speed() : BeltLane.SPEED_DEFAULT;
         node.lane(0).setSpeed(s0);
 
-        node.lane(1).groups().clear();
-        for (proto.mechanicalarmory.common.belt.data.ItemGroup g : lane1.groups()) {
+        node.lane(1).clearGroups();
+        for (int i = 0; i < lane1.groupCount(); i++) {
+            proto.mechanicalarmory.common.belt.data.ItemGroup g = lane1.groupArray()[i];
             node.lane(1).insertBack(new proto.mechanicalarmory.common.belt.data.ItemGroup(g.item(), g.count(), g.headPos()));
         }
         float s1 = lane1.speed() > 0.0f ? lane1.speed() : BeltLane.SPEED_DEFAULT;

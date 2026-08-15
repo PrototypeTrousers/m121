@@ -36,6 +36,14 @@ public final class BeltSubnetwork implements Effect {
      * Rebuilt whenever {@code topoDirty} is true.
      */
     private List<BeltNode> topoOrder = new ArrayList<>();
+
+    /**
+     * Nodes grouped into parallel layers — layer 0 are the terminals/wrap-points,
+     * higher layers feed into them.  Nodes within the same layer share no edges
+     * and can be ticked in parallel.  Rebuilt together with {@link #topoOrder}.
+     */
+    private List<List<BeltNode>> cachedLayers = new ArrayList<>();
+
     private boolean topoDirty = true;
 
     @Nullable
@@ -136,6 +144,17 @@ public final class BeltSubnetwork implements Effect {
         return topoOrder;
     }
 
+    /**
+     * Returns nodes partitioned into parallel layers, cached alongside
+     * {@link #topoOrder()}.  Layer 0 = terminals / wrap-points; nodes in
+     * layer L all have their output in layer L-1 (already finished for this
+     * tick), so within each layer nodes can run concurrently.
+     */
+    public List<List<BeltNode>> layerOrder() {
+        if (topoDirty) rebuildTopo();
+        return cachedLayers;
+    }
+
     private void rebuildTopo() {
         List<BeltNode> result = new ArrayList<>(nodes.size());
         Set<UUID> visited = new HashSet<>();
@@ -193,6 +212,32 @@ public final class BeltSubnetwork implements Effect {
         }
 
         topoOrder = result;
+
+        // ── Build layer partition ─────────────────────────────────────────────
+        // Since result is output-first, result[j].outputId() (if present in the
+        // subnetwork) always appears at some index k < j.  We compute depth in
+        // one forward pass using an int[] keyed by topo position, avoiding any
+        // UUID-boxed map for the depth lookup.
+        final int n = result.size();
+        final int[] depth = new int[n];
+        // UUID → topo position, built as we go
+        final Map<UUID, Integer> topoPos = new HashMap<>(n * 2);
+        int maxDepth = 0;
+        for (int i = 0; i < n; i++) {
+            BeltNode node = result.get(i);
+            topoPos.put(node.nodeId(), i);
+            UUID outId = node.outputId();
+            Integer outIdx = (outId != null) ? topoPos.get(outId) : null;
+            int d = (outIdx != null) ? depth[outIdx] + 1 : 0;
+            depth[i] = d;
+            if (d > maxDepth) maxDepth = d;
+        }
+
+        List<List<BeltNode>> layers = new ArrayList<>(maxDepth + 1);
+        for (int i = 0; i <= maxDepth; i++) layers.add(new ArrayList<>());
+        for (int i = 0; i < n; i++) layers.get(depth[i]).add(result.get(i));
+        cachedLayers = layers;
+
         topoDirty = false;
     }
 

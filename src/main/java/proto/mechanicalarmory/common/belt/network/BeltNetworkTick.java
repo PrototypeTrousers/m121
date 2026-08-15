@@ -55,10 +55,8 @@ public final class BeltNetworkTick {
     // ── Per-subnetwork tick ───────────────────────────────────────────────────
 
     private static void tickSubnetwork(BeltSubnetwork subnet) {
-        List<BeltNode> topo = subnet.topoOrder();
-        if (topo.isEmpty()) return;
-
-        List<List<BeltNode>> layers = buildLayers(topo);
+        List<List<BeltNode>> layers = subnet.layerOrder();
+        if (layers.isEmpty()) return;
 
         for (List<BeltNode> layer : layers) {
             if (layer.size() == 1) {
@@ -75,34 +73,6 @@ public final class BeltNetworkTick {
         }
     }
 
-    /**
-     * Build a list of layers from an already-sorted topo list.
-     * Layer 0 = wrap-points (they have no outputId in the topo graph).
-     * Subsequent layers are determined by walking the outputId chain.
-     */
-    private static List<List<BeltNode>> buildLayers(List<BeltNode> topo) {
-        java.util.Map<java.util.UUID, Integer> depth = new java.util.HashMap<>();
-
-        for (BeltNode node : topo) {
-            int myDepth = 0;
-            java.util.UUID outId = node.outputId();
-            if (outId != null && depth.containsKey(outId)) {
-                myDepth = depth.get(outId) + 1;
-            }
-            depth.put(node.nodeId(), myDepth);
-        }
-
-        int maxDepth = depth.values().stream().mapToInt(Integer::intValue).max().orElse(0);
-        List<List<BeltNode>> layers = new ArrayList<>(maxDepth + 1);
-        for (int i = 0; i <= maxDepth; i++) layers.add(new ArrayList<>());
-
-        for (BeltNode node : topo) {
-            layers.get(depth.getOrDefault(node.nodeId(), 0)).add(node);
-        }
-        return layers;
-    }
-
-    // ── Per-node tick ─────────────────────────────────────────────────────────
 
     /**
      * Advance a single node's lanes and handle transfers.

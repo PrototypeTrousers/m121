@@ -25,8 +25,12 @@ public final class ItemGroup {
     private int count;
     private float headPos;
 
+    /**
+     * @param item  the item stack — the caller must pass an exclusively-owned
+     *              copy; {@code ItemGroup} does not copy it defensively.
+     */
     public ItemGroup(ItemStack item, int count, float headPos) {
-        this.item = item.copy();
+        this.item = item;
         this.count = count;
         this.headPos = headPos;
     }
@@ -52,7 +56,8 @@ public final class ItemGroup {
     public void advanceHead(float delta) { headPos += delta; }
     public void setHeadPos(float pos)    { headPos = pos; }
     public void setCount(int count)      { this.count = count; }
-    public void setItem(ItemStack item)  { this.item = item.copy(); }
+    /** Replaces the item; caller must pass an exclusively-owned copy. */
+    public void setItem(ItemStack item)  { this.item = item; }
 
     /** Returns true if this group is the same item type as {@code other}. */
     public boolean sameType(ItemGroup other) {
@@ -80,9 +85,9 @@ public final class ItemGroup {
         return new ItemGroup(item, count, headPos);
     }
 
-    /** Shallow copy (item is already a copy internally). */
+    /** Returns a copy of this group with an independently-owned ItemStack. */
     public ItemGroup copy() {
-        return new ItemGroup(item, count, headPos);
+        return new ItemGroup(item.copy(), count, headPos);
     }
 
     @Override

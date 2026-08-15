@@ -151,19 +151,19 @@ public class BeltVisual extends AbstractBlockEntityVisual<BeltEntity>
                     BeltLane nextLane = nextBe.clientLane(laneIdx);
                     float nextRoom = nextLane.isEmpty()
                             ? Float.MAX_VALUE
-                            : nextLane.groups().peekLast().tailPos(nextLane.itemSpacing());
+                            : nextLane.peekLast().tailPos(nextLane.itemSpacing());
                     if (nextRoom > 0.0f) {
                         maxFrontAdvance = lane.speed();
                     } else {
                         // Downstream belt is backed up
-                        maxFrontAdvance = Math.max(0.0f, 1.0f - lane.groups().peekFirst().headPos());
+                        maxFrontAdvance = Math.max(0.0f, 1.0f - lane.peekFirst().headPos());
                     }
                 } else {
                     maxFrontAdvance = lane.speed();
                 }
             } else {
                 // Dead end
-                maxFrontAdvance = Math.max(0.0f, 1.0f - lane.groups().peekFirst().headPos());
+                maxFrontAdvance = Math.max(0.0f, 1.0f - lane.peekFirst().headPos());
             }
         }
 
@@ -172,7 +172,10 @@ public class BeltVisual extends AbstractBlockEntityVisual<BeltEntity>
         boolean isFront = true;
 
         int idx = 0;
-        for (ItemGroup group : lane.groups()) {
+        final proto.mechanicalarmory.common.belt.data.ItemGroup[] laneArr = lane.groupArray();
+        final int laneSize = lane.groupCount();
+        for (int gi = 0; gi < laneSize; gi++) {
+            ItemGroup group = laneArr[gi];
             CapturedModel model = getOrCaptureModel(group.item());
             if (model == null) continue;
 
