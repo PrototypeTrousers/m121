@@ -13,6 +13,7 @@ import dev.engine_room.flywheel.lib.instance.InstanceTypes;
 import dev.engine_room.flywheel.lib.instance.TransformedInstance;
 import dev.engine_room.flywheel.lib.task.RunnablePlan;
 import dev.engine_room.flywheel.lib.visual.AbstractVisual;
+import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import it.unimi.dsi.fastutil.longs.LongSet;
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenCustomHashMap;
 import net.minecraft.client.Minecraft;
@@ -24,6 +25,7 @@ import net.minecraft.world.item.ItemDisplayContext;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.state.BlockState;
 import org.joml.Matrix4f;
+import proto.mechanicalarmory.client.belt.ClientBeltNetwork;
 import proto.mechanicalarmory.client.flywheel.CapturedModel;
 import proto.mechanicalarmory.client.flywheel.instances.arm.ItemStackHasher;
 import proto.mechanicalarmory.client.flywheel.instances.capturing.CapturingBufferSource;
@@ -34,7 +36,6 @@ import proto.mechanicalarmory.common.belt.network.BeltSubnetwork;
 import proto.mechanicalarmory.common.blocks.BlockBelt;
 
 import java.util.*;
-import java.util.function.Consumer;
 
 /**
  * Flywheel EffectVisual representing an entire connected conveyor belt subnetwork.
@@ -268,9 +269,16 @@ public class BeltSubnetworkVisual extends AbstractVisual
             boolean hasOutput = node.outputId() != null && subnet.node(node.outputId()) != null
                     && !subnet.node(node.outputId()).isStopped();
             if (hasOutput) {
-                // Output exists — let the front item smoothly cross the seam.
-                // getRenderWorldPos handles the downstream projection.
-                laneAdvance = lane.speed() * partialTick;
+                BeltLane nextLane = subnet.node(node.outputId()).lane(laneIdx);
+                float nextRoom = nextLane.isEmpty()
+                        ? Float.MAX_VALUE
+                        : nextLane.peekLast().tailPos(nextLane.itemSpacing());
+                if (nextRoom > 0.0f) {
+                    laneAdvance = lane.speed() * partialTick;
+                } else {
+                    float maxReachPos = 1.0f + nextRoom * (lane.itemSpacing() / nextLane.itemSpacing());
+                    laneAdvance = Math.max(0.0f, Math.min(lane.speed(), maxReachPos - lane.peekFirst().headPos()));
+                }
             } else {
                 // Terminal belt: clamp so the front item never visually overshoots 1.0.
                 float headPos = lane.peekFirst().headPos();
@@ -297,7 +305,7 @@ public class BeltSubnetworkVisual extends AbstractVisual
         float spacing = lane.itemSpacing();
 
         int idx = 0;
-        final proto.mechanicalarmory.common.belt.data.ItemGroup[] laneArr = lane.groupArray();
+        final ItemGroup[] laneArr = lane.groupArray();
         final int laneSize = lane.groupCount();
         for (int gi = 0; gi < laneSize; gi++) {
             ItemGroup group = laneArr[gi];
@@ -317,7 +325,7 @@ public class BeltSubnetworkVisual extends AbstractVisual
                 }
 
                 TransformedInstance inst = instances.get(idx++);
-                inst.setTransform(new Matrix4f().translate(pos3d[0], pos3d[1], pos3d[2]).scale(0.25f))
+                inst.setTransform(new Matrix4f().translate(pos3d[0], pos3d[1], pos3d[2]).scale(0.5f))
                         .light(packedLight)
                         .setChanged();
             }
@@ -401,8 +409,8 @@ public class BeltSubnetworkVisual extends AbstractVisual
                         : CurveType.CURVE_LEFT;
 
                 float nextRadius = (nextCurve == CurveType.CURVE_RIGHT)
-                        ? (0.5f - destLaneOffset)
-                        : (0.5f + destLaneOffset);
+                        ? (0.5f - laneOffset)
+                        : (0.5f + laneOffset);
 
                 double theta = Math.min(Math.PI / 2.0, excess / nextRadius);
                 double sinT = Math.sin(theta);
@@ -486,7 +494,7 @@ public class BeltSubnetworkVisual extends AbstractVisual
     public void setSectionCollector(SectionCollector collector) {
         this.lightSections = collector;
         if (lightSections != null) {
-            LongSet set = new it.unimi.dsi.fastutil.longs.LongOpenHashSet();
+            LongSet set = new LongOpenHashSet();
             for (BeltNode node : subnet.allNodes()) {
                 set.add(SectionPos.asLong(node.pos()));
             }
@@ -499,7 +507,7 @@ public class BeltSubnetworkVisual extends AbstractVisual
     @Override
     protected void _delete() {
         this.deleted = true;
-        proto.mechanicalarmory.client.belt.ClientBeltNetwork.get().onVisualDeleted(subnet.subnetId());
+        ClientBeltNetwork.get().onVisualDeleted(subnet.subnetId());
         for (List<List<TransformedInstance>> lanes : nodeInstances.values()) {
             for (List<TransformedInstance> list : lanes) {
                 list.forEach(Instance::delete);
