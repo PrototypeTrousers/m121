@@ -197,17 +197,8 @@ public final class BeltNode {
         for (int i = 0; i < inputs.size(); i++) {
             CompoundTag c = inputs.getCompound(i);
             UUID inputId = c.getUUID("v");
-            // Older saves (pre side-loading) have no "lane" field; fall back to
-            // insertion-order assignment via addInput's first-free-lane rule.
-            if (c.contains("lane")) {
-                node.inputLanes.put(inputId, c.getInt("lane"));
-            } else {
-                node.addInput(inputId);
-            }
+            node.inputLanes.put(inputId, c.getInt("lane"));
         }
         return node;
     }
-
-    // Expose lanes array for load workaround
-    BeltLane[] lanesArray() { return lanes; }
 }

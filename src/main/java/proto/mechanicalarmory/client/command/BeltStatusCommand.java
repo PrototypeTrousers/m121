@@ -135,19 +135,6 @@ public final class BeltStatusCommand {
             dumpLane("  ClientNet Lane 1 (Right)", clientNode.lane(1));
         }
 
-        // 4. BeltEntity
-        BlockEntity be = level.getBlockEntity(pos);
-        if (be instanceof BeltEntity beltEntity) {
-            sendChat("§b[Client BE] BeltEntity: stopped=" + beltEntity.isClientStopped()
-                    + ", seedTick=" + beltEntity.clientSeedTick()
-                    + ", hasOutput=" + beltEntity.clientHasOutput()
-                    + ", nodeId=" + short8(beltEntity.nodeId()));
-            dumpLane("  BE Lane 0 (Left)", beltEntity.clientLane(0));
-            dumpLane("  BE Lane 1 (Right)", beltEntity.clientLane(1));
-        } else {
-            sendChat("§7[Client BE] No BeltEntity at position.");
-        }
-
         return 1;
     }
 

@@ -35,7 +35,7 @@ import java.util.*;
  *   <li>Ticked by {@code LevelTickEvent} every server tick.</li>
  *   <li>Belts added/removed via {@link #onBeltPlaced} / {@link #onBeltRemoved}.</li>
  *   <li>Chunk load: {@link #onChunkLoaded} sends {@link BeltInitPayload} to
- *       nearby clients and calls {@link BeltEntity#syncFromNetwork}.</li>
+ *       nearby clients.</li>
  * </ul>
  */
 public final class BeltNetworkData extends SavedData {
@@ -83,10 +83,6 @@ public final class BeltNetworkData extends SavedData {
 
         // Create a fresh subnetwork for this node
         registry.registerSolo(node);
-
-        if (level.getBlockEntity(pos) instanceof BeltEntity be) {
-            be.syncFromNetwork(node);
-        }
 
         // Merge with neighbours and link edges
         relinkNeighbours(pos, facing, level);
@@ -169,13 +165,6 @@ public final class BeltNetworkData extends SavedData {
                     node.outputId() != null,
                     node.isStopped()
             ));
-
-            // Sync the BeltEntity's clientLanes reference (server-side BE)
-            if (level.isLoaded(bpos)) {
-                if (level.getBlockEntity(bpos) instanceof BeltEntity be) {
-                    be.syncFromNetwork(node);
-                }
-            }
         }
 
         if (!snapshots.isEmpty()) {

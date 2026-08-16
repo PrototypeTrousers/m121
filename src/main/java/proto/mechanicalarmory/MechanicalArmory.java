@@ -4,6 +4,7 @@ import com.mojang.logging.LogUtils;
 import com.mojang.serialization.MapCodec;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.item.CreativeModeTab;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
@@ -15,10 +16,12 @@ import net.neoforged.fml.config.ModConfig;
 import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent;
 import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.event.level.ChunkEvent;
+import net.neoforged.neoforge.event.level.ChunkWatchEvent;
 import net.neoforged.neoforge.event.server.ServerStartingEvent;
 import net.neoforged.neoforge.event.tick.LevelTickEvent;
 import net.neoforged.neoforge.registries.DeferredRegister;
 import org.slf4j.Logger;
+import proto.mechanicalarmory.common.belt.network.BeltNetworkData;
 import proto.mechanicalarmory.common.blocks.MABlocks;
 import proto.mechanicalarmory.common.entities.MAEntities;
 import proto.mechanicalarmory.common.items.MAItems;
@@ -96,23 +99,23 @@ public class MechanicalArmory {
 
     /** Tick all belt networks every server level tick. */
     private void onLevelTick(LevelTickEvent.Post event) {
-        if (event.getLevel() instanceof net.minecraft.server.level.ServerLevel srv) {
-            proto.mechanicalarmory.common.belt.network.BeltNetworkData.get(srv).tick(srv);
+        if (event.getLevel() instanceof ServerLevel srv) {
+            BeltNetworkData.get(srv).tick(srv);
         }
     }
 
     /** Notify the belt network that a chunk has loaded so it can sync clients. */
     private void onChunkLoad(ChunkEvent.Load event) {
-        if (event.getLevel() instanceof net.minecraft.server.level.ServerLevel srv) {
-            proto.mechanicalarmory.common.belt.network.BeltNetworkData
+        if (event.getLevel() instanceof ServerLevel srv) {
+            BeltNetworkData
                     .get(srv)
                     .onChunkLoaded(event.getChunk().getPos(), srv);
         }
     }
 
     /** Notify the belt network when a player starts watching a chunk so it can seed client data. */
-    private void onChunkWatch(net.neoforged.neoforge.event.level.ChunkWatchEvent.Watch event) {
-        proto.mechanicalarmory.common.belt.network.BeltNetworkData
+    private void onChunkWatch(ChunkWatchEvent.Watch event) {
+        BeltNetworkData
                 .get(event.getLevel())
                 .sendChunkInitToPlayer(event.getPos(), event.getPlayer());
     }

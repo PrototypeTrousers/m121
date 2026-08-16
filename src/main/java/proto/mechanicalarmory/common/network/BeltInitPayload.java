@@ -1,5 +1,6 @@
 package proto.mechanicalarmory.common.network;
 
+import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
@@ -8,6 +9,8 @@ import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.ResourceLocation;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
+import proto.mechanicalarmory.MechanicalArmory;
+import proto.mechanicalarmory.client.belt.ClientBeltNetwork;
 import proto.mechanicalarmory.common.belt.data.BeltLane;
 import proto.mechanicalarmory.common.entities.block.BeltEntity;
 
@@ -74,21 +77,15 @@ public record BeltInitPayload(List<NodeSnapshot> snapshots, long serverTick)
 
     public static void handle(BeltInitPayload pkt, IPayloadContext ctx) {
         ctx.enqueueWork(() -> {
-            var level = net.minecraft.client.Minecraft.getInstance().level;
+            var level = Minecraft.getInstance().level;
             if (level == null) return;
-            long clientTick = level.getGameTime();
-            proto.mechanicalarmory.MechanicalArmory.LOGGER.info("[BeltInitPayload] Received {} snapshots at serverTick={}",
+            MechanicalArmory.LOGGER.info("[BeltInitPayload] Received {} snapshots at serverTick={}",
                     pkt.snapshots().size(), pkt.serverTick());
             for (NodeSnapshot snap : pkt.snapshots()) {
                 BeltLane l0 = snap.lane0();
                 BeltLane l1 = snap.lane1();
 
-                if (level.getBlockEntity(snap.pos()) instanceof BeltEntity be) {
-                    be.applyClientSeed(l0, l1, pkt.serverTick(), snap.stopped(),
-                            snap.wrapPoint(), snap.hasOutput());
-                }
-
-                proto.mechanicalarmory.client.belt.ClientBeltNetwork.get().updateNode(
+                ClientBeltNetwork.get().updateNode(
                         snap.pos(), snap.outputId(), l0, l1, snap.stopped(), snap.wrapPoint(), snap.hasOutput());
             }
         });

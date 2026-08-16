@@ -8,6 +8,7 @@ import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.ResourceLocation;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
+import proto.mechanicalarmory.client.belt.ClientBeltNetwork;
 import proto.mechanicalarmory.common.belt.data.BeltLane;
 import proto.mechanicalarmory.common.entities.block.BeltEntity;
 
@@ -79,16 +80,11 @@ public record BeltCorrectionPayload(BlockPos pos, UUID nodeId, UUID outputId, Be
             var level = net.minecraft.client.Minecraft.getInstance().level;
             if (level == null) return;
 
-            long clientTick = level.getGameTime();
             BeltLane l0 = pkt.lane0();
             BeltLane l1 = pkt.lane1();
 
-            if (level.getBlockEntity(pkt.pos()) instanceof BeltEntity be) {
-                be.applyClientSeed(l0, l1, pkt.serverTick(), pkt.stopped(),
-                        pkt.wrapPoint(), pkt.hasOutput());
-            }
 
-            proto.mechanicalarmory.client.belt.ClientBeltNetwork.get().updateNode(
+            ClientBeltNetwork.get().updateNode(
                     pkt.pos(), pkt.outputId(), l0, l1, pkt.stopped(), pkt.wrapPoint(), pkt.hasOutput());
         });
     }
