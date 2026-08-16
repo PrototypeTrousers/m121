@@ -7,6 +7,7 @@ import dev.engine_room.flywheel.api.task.Plan;
 import dev.engine_room.flywheel.api.visual.DynamicVisual;
 import dev.engine_room.flywheel.api.visual.EffectVisual;
 import dev.engine_room.flywheel.api.visual.LightUpdatedVisual;
+import dev.engine_room.flywheel.api.visual.TickableVisual;
 import dev.engine_room.flywheel.api.visualization.VisualizationContext;
 import dev.engine_room.flywheel.lib.instance.InstanceTypes;
 import dev.engine_room.flywheel.lib.instance.TransformedInstance;
@@ -44,7 +45,7 @@ import java.util.function.Consumer;
  * conditions or boundary pauses.
  */
 public class BeltSubnetworkVisual extends AbstractVisual
-        implements EffectVisual<BeltSubnetwork>, DynamicVisual, LightUpdatedVisual {
+        implements EffectVisual<BeltSubnetwork>, DynamicVisual, TickableVisual, LightUpdatedVisual {
 
     /** Shared item model cache keyed by ItemStack identity+components. */
     private static final Object2ObjectOpenCustomHashMap<ItemStack, CapturedModel> MODEL_CACHE =
@@ -75,12 +76,15 @@ public class BeltSubnetworkVisual extends AbstractVisual
     public Plan<DynamicVisual.Context> planFrame() {
         return RunnablePlan.of(ctx -> {
             if (deleted) return;
-
-            // 1. Advance simulation once per game tick across the whole subnetwork
-            advanceSimulationIfNeeded();
-
-            // 2. Render all nodes in the subnetwork with sub-tick interpolation
             renderSubnetwork(ctx.partialTick());
+        });
+    }
+
+    @Override
+    public Plan<TickableVisual.Context> planTick() {
+        return RunnablePlan.of(ctx -> {
+            if (deleted) return;
+            advanceSimulationIfNeeded();
         });
     }
 
@@ -101,18 +105,35 @@ public class BeltSubnetworkVisual extends AbstractVisual
             for (BeltNode node : subnet.topoOrder()) {
                 if (node.isStopped()) continue;
 
-                boolean hasOutput = false;
+                // Side-loading (Factorio-style): a node with a single input
+                // keeps lane[l] -> output.lane[l] (left/right preserved on a
+                // straight run). A node that's one of two inputs feeding a
+                // merge collapses both of its lanes onto the single lane it's
+                // assigned to on the output — matching BeltNetworkTick's
+                // authoritative server logic exactly, so client prediction
+                // renders items on the correct lane immediately instead of
+                // only after the next server correction overwrites it.
                 BeltNode outNode = null;
+                int mergedInputLane = -1;
+                boolean isSoleInput = true;
                 if (node.outputId() != null) {
-                    outNode = subnet.node(node.outputId());
-                    if (outNode != null && !outNode.isStopped()) {
-                        hasOutput = true;
+                    BeltNode candidate = subnet.node(node.outputId());
+                    if (candidate != null && !candidate.isStopped()) {
+                        mergedInputLane = candidate.laneForInput(node.nodeId());
+                        if (mergedInputLane >= 0) {
+                            outNode = candidate;
+                            isSoleInput = candidate.inputIds().size() <= 1;
+                        }
+                        // mergedInputLane < 0: topology points here but we're
+                        // not registered on either lane (stale edge mid-relink)
+                        // — treat as no output this tick, same as the server.
                     }
                 }
 
                 for (int l = 0; l < 2; l++) {
                     BeltLane lane = node.lane(l);
-                    BeltLane outLane = (hasOutput && outNode != null) ? outNode.lane(l) : null;
+                    BeltLane outLane = outNode == null ? null
+                            : outNode.lane(isSoleInput ? l : mergedInputLane);
 
                     float maxExitPos = 1.0f;
                     if (outLane != null) {
@@ -257,6 +278,22 @@ public class BeltSubnetworkVisual extends AbstractVisual
             }
         }
 
+        // Which lane of the downstream node this lane actually feeds. For a
+        // plain straight run (sole input) it's the same index; at a merge
+        // point (Factorio-style side-loading — see BeltNode#addInput) both of
+        // this node's lanes may collapse onto a single lane of the output.
+        // Needed so an item crossing the seam mid-merge renders with the
+        // correct left/right offset in the downstream block instead of
+        // keeping its old side for a frame or two.
+        int destLaneIdx = laneIdx;
+        if (node.outputId() != null) {
+            BeltNode outNode = subnet.node(node.outputId());
+            if (outNode != null) {
+                int assigned = outNode.laneForInput(node.nodeId());
+                if (assigned >= 0) destLaneIdx = assigned;
+            }
+        }
+
         float spacing = lane.itemSpacing();
 
         int idx = 0;
@@ -271,7 +308,7 @@ public class BeltSubnetworkVisual extends AbstractVisual
 
             for (int i = 0; i < group.count(); i++) {
                 float renderPos = groupRenderHead - i * spacing;
-                float[] pos3d = getRenderWorldPos(node.pos(), facing, renderPos, laneIdx, curve);
+                float[] pos3d = getRenderWorldPos(node.pos(), facing, renderPos, laneIdx, destLaneIdx, curve);
 
                 if (idx >= instances.size()) {
                     instances.add(instancerProvider()
@@ -291,7 +328,18 @@ public class BeltSubnetworkVisual extends AbstractVisual
         }
     }
 
-    private float[] getRenderWorldPos(BlockPos pos, Direction facing, float renderPos, int laneIdx, CurveType curve) {
+    /**
+     * @param laneIdx     the source lane (this node's own lane) — used for the
+     *                     within-this-block offset.
+     * @param destLaneIdx the lane this item actually lands in on the
+     *                     downstream node — used only once {@code renderPos}
+     *                     has crossed the 1.0 seam and rendering projects
+     *                     into the next block, so a merging item's lateral
+     *                     offset flips to its new side exactly at the seam
+     *                     rather than one tick late.
+     */
+    private float[] getRenderWorldPos(BlockPos pos, Direction facing, float renderPos, int laneIdx,
+                                       int destLaneIdx, CurveType curve) {
         float cx = pos.getX() + 0.5f;
         float cy = pos.getY() + 0.1f;
         float cz = pos.getZ() + 0.5f;
@@ -331,6 +379,11 @@ public class BeltSubnetworkVisual extends AbstractVisual
         BlockPos nextPos = pos.relative(facing);
         BlockState nextState = level.getBlockState(nextPos);
         if (nextState.getBlock() instanceof BlockBelt) {
+            // Use the destination lane's offset here, not the source lane's —
+            // at a merge point the item may be side-loading onto the other
+            // side of the downstream node, and should render on that side as
+            // soon as it crosses the seam.
+            float destLaneOffset = (destLaneIdx == 0 ? -0.15f : 0.15f);
             Direction nextFacing = nextState.getValue(BlockBelt.FACING);
             float nextCx = nextPos.getX() + 0.5f;
             float nextCz = nextPos.getZ() + 0.5f;
@@ -348,8 +401,8 @@ public class BeltSubnetworkVisual extends AbstractVisual
                         : CurveType.CURVE_LEFT;
 
                 float nextRadius = (nextCurve == CurveType.CURVE_RIGHT)
-                        ? (0.5f - laneOffset)
-                        : (0.5f + laneOffset);
+                        ? (0.5f - destLaneOffset)
+                        : (0.5f + destLaneOffset);
 
                 double theta = Math.min(Math.PI / 2.0, excess / nextRadius);
                 double sinT = Math.sin(theta);

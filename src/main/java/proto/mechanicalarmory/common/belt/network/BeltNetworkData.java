@@ -7,6 +7,8 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.saveddata.SavedData;
 import net.neoforged.neoforge.network.PacketDistributor;
@@ -40,11 +42,13 @@ public final class BeltNetworkData extends SavedData {
 
     public static final String KEY = "mechanicalarmory_belt_network";
 
-    /** All connected components, keyed by their UUID. */
-    private final Map<UUID, BeltSubnetwork> subnetworks = new LinkedHashMap<>();
-
-    /** Fast lookup: BlockPos → which subnetwork owns it. */
-    private final Map<BlockPos, UUID> posToSubnet = new HashMap<>();
+    /**
+     * Owns all subnetworks and the BlockPos/UUID lookup maps, plus the
+     * create/merge/link/split mutation rules shared with the client-side
+     * manager. See {@link BeltSubnetworkRegistry} for why this is a shared
+     * class rather than logic duplicated on each side.
+     */
+    private final BeltSubnetworkRegistry registry = new BeltSubnetworkRegistry();
 
     // ── Factory ───────────────────────────────────────────────────────────────
 
@@ -74,14 +78,11 @@ public final class BeltNetworkData extends SavedData {
      */
     public void onBeltPlaced(BlockPos pos, Direction facing, ServerLevel level) {
         BeltNode node = new BeltNode(pos);
-        boolean powered = level.getBlockState(pos).getValue(proto.mechanicalarmory.common.blocks.BlockBelt.POWERED);
+        boolean powered = level.getBlockState(pos).getValue(BlockBelt.POWERED);
         node.setStopped(powered);
 
         // Create a fresh subnetwork for this node
-        BeltSubnetwork solo = new BeltSubnetwork(UUID.randomUUID());
-        solo.addNode(node);
-        subnetworks.put(solo.subnetId(), solo);
-        posToSubnet.put(pos, solo.subnetId());
+        registry.registerSolo(node);
 
         if (level.getBlockEntity(pos) instanceof BeltEntity be) {
             be.syncFromNetwork(node);
@@ -99,40 +100,22 @@ public final class BeltNetworkData extends SavedData {
      * if needed.
      */
     public void onBeltRemoved(BlockPos pos, ServerLevel level) {
-        UUID subnetId = posToSubnet.remove(pos);
-        if (subnetId == null) return;
-        BeltSubnetwork subnet = subnetworks.get(subnetId);
-        if (subnet == null) return;
+        BeltNode node = registry.nodeAt(pos);
+        BeltSubnetwork owning = registry.subnetworkAt(pos);
 
-        BeltNode node = subnet.nodeAt(pos);
         List<BlockPos> affected = new ArrayList<>();
-        if (node != null) {
+        if (node != null && owning != null) {
             if (node.outputId() != null) {
-                BeltNode out = subnet.node(node.outputId());
+                BeltNode out = owning.node(node.outputId());
                 if (out != null) affected.add(out.pos());
             }
             for (UUID inId : node.inputIds()) {
-                BeltNode in = subnet.node(inId);
+                BeltNode in = owning.node(inId);
                 if (in != null) affected.add(in.pos());
             }
-            subnet.removeNode(node.nodeId());
         }
 
-        if (subnet.isEmpty()) {
-            subnetworks.remove(subnetId);
-        } else {
-            // Check if the removal split the subnetwork
-            List<BeltSubnetwork> parts = subnet.splitIfNeeded();
-            if (parts.size() > 1) {
-                subnetworks.remove(subnetId);
-                for (BeltSubnetwork part : parts) {
-                    subnetworks.put(part.subnetId(), part);
-                    for (BeltNode n : part.allNodes()) {
-                        posToSubnet.put(n.pos(), part.subnetId());
-                    }
-                }
-            }
-        }
+        registry.removeNode(pos);
 
         for (BlockPos affPos : affected) {
             updateCurveSpeeds(affPos, level);
@@ -161,7 +144,7 @@ public final class BeltNetworkData extends SavedData {
      * current lane state to nearby clients so they can seed their simulations,
      * and sync the {@link BeltEntity}.
      */
-    public void onChunkLoaded(net.minecraft.world.level.ChunkPos chunkPos, ServerLevel level) {
+    public void onChunkLoaded(ChunkPos chunkPos, ServerLevel level) {
         int minX = chunkPos.getMinBlockX();
         int minZ = chunkPos.getMinBlockZ();
         int maxX = chunkPos.getMaxBlockX();
@@ -169,14 +152,11 @@ public final class BeltNetworkData extends SavedData {
 
         List<BeltInitPayload.NodeSnapshot> snapshots = new ArrayList<>();
 
-        for (Map.Entry<BlockPos, UUID> entry : posToSubnet.entrySet()) {
-            BlockPos bpos = entry.getKey();
+        for (BlockPos bpos : registry.trackedPositions()) {
             if (bpos.getX() < minX || bpos.getX() > maxX) continue;
             if (bpos.getZ() < minZ || bpos.getZ() > maxZ) continue;
 
-            BeltSubnetwork subnet = subnetworks.get(entry.getValue());
-            if (subnet == null) continue;
-            BeltNode node = subnet.nodeAt(bpos);
+            BeltNode node = registry.nodeAt(bpos);
             if (node == null) continue;
 
             snapshots.add(new BeltInitPayload.NodeSnapshot(
@@ -213,7 +193,7 @@ public final class BeltNetworkData extends SavedData {
      * Called when a player starts watching a chunk (ChunkWatchEvent.Watch).
      * Sends the current state of all belts in the chunk directly to that player.
      */
-    public void sendChunkInitToPlayer(net.minecraft.world.level.ChunkPos chunkPos, net.minecraft.server.level.ServerPlayer player) {
+    public void sendChunkInitToPlayer(ChunkPos chunkPos, ServerPlayer player) {
         int minX = chunkPos.getMinBlockX();
         int minZ = chunkPos.getMinBlockZ();
         int maxX = chunkPos.getMaxBlockX();
@@ -221,14 +201,11 @@ public final class BeltNetworkData extends SavedData {
 
         List<BeltInitPayload.NodeSnapshot> snapshots = new ArrayList<>();
 
-        for (Map.Entry<BlockPos, UUID> entry : posToSubnet.entrySet()) {
-            BlockPos bpos = entry.getKey();
+        for (BlockPos bpos : registry.trackedPositions()) {
             if (bpos.getX() < minX || bpos.getX() > maxX) continue;
             if (bpos.getZ() < minZ || bpos.getZ() > maxZ) continue;
 
-            BeltSubnetwork subnet = subnetworks.get(entry.getValue());
-            if (subnet == null) continue;
-            BeltNode node = subnet.nodeAt(bpos);
+            BeltNode node = registry.nodeAt(bpos);
             if (node == null) continue;
 
             snapshots.add(new BeltInitPayload.NodeSnapshot(
@@ -253,14 +230,9 @@ public final class BeltNetworkData extends SavedData {
     // ── Accessors ─────────────────────────────────────────────────────────────
 
     @Nullable
-    public BeltNode nodeAt(BlockPos pos) {
-        UUID subnetId = posToSubnet.get(pos);
-        if (subnetId == null) return null;
-        BeltSubnetwork subnet = subnetworks.get(subnetId);
-        return subnet == null ? null : subnet.nodeAt(pos);
-    }
+    public BeltNode nodeAt(BlockPos pos) { return registry.nodeAt(pos); }
 
-    public Collection<BeltSubnetwork> allSubnetworks() { return subnetworks.values(); }
+    public Collection<BeltSubnetwork> allSubnetworks() { return registry.allSubnetworks(); }
 
     // ── Internal helpers ──────────────────────────────────────────────────────
 
@@ -293,26 +265,17 @@ public final class BeltNetworkData extends SavedData {
     /**
      * Merge the subnetwork owning {@code toPos} into the one owning {@code fromPos},
      * then link the edge fromPos→toPos and notify clients.
+     *
+     * <p>The actual graph mutation is delegated to {@link BeltSubnetworkRegistry},
+     * shared with the client-side manager; this method just adds the
+     * server-specific side effects (curve-speed recompute, correction packets).
+     * If the link is refused (the target node's two merge lanes — see
+     * {@link BeltNode#addInput} — are both already occupied by other inputs,
+     * i.e. a third belt trying to merge into an already-full junction), no
+     * edge is created but the subnetwork merge (if any) still stands.
      */
     private void mergeAndLink(BlockPos fromPos, BlockPos toPos, ServerLevel level) {
-        UUID fromSubId = posToSubnet.get(fromPos);
-        UUID toSubId = posToSubnet.get(toPos);
-        if (fromSubId == null || toSubId == null) return;
-
-        BeltSubnetwork fromSub = subnetworks.get(fromSubId);
-        BeltSubnetwork toSub = subnetworks.get(toSubId);
-        if (fromSub == null || toSub == null) return;
-
-        // Merge toSub into fromSub if they are distinct subnetworks
-        if (!fromSubId.equals(toSubId)) {
-            for (BeltNode n : toSub.allNodes()) {
-                fromSub.addNode(n);
-                posToSubnet.put(n.pos(), fromSub.subnetId());
-            }
-            subnetworks.remove(toSubId);
-        }
-
-        fromSub.link(fromPos, toPos);
+        registry.mergeAndLink(fromPos, toPos);
 
         updateCurveSpeeds(fromPos, level);
         updateCurveSpeeds(toPos, level);
@@ -361,12 +324,6 @@ public final class BeltNetworkData extends SavedData {
         return false;
     }
 
-    @Nullable
-    private BeltSubnetwork subnetworkAt(BlockPos pos) {
-        UUID id = posToSubnet.get(pos);
-        return id == null ? null : subnetworks.get(id);
-    }
-
     /** Send a full lane correction to all nearby clients for one belt position. */
     public void sendCorrection(BlockPos pos, ServerLevel level) {
         BeltNode node = nodeAt(pos);
@@ -391,7 +348,7 @@ public final class BeltNetworkData extends SavedData {
     @Override
     public @NotNull CompoundTag save(@NotNull CompoundTag tag, HolderLookup.@NotNull Provider registries) {
         ListTag subnetList = new ListTag();
-        for (BeltSubnetwork sub : subnetworks.values()) {
+        for (BeltSubnetwork sub : registry.allSubnetworks()) {
             subnetList.add(sub.save(registries));
         }
         tag.put("subnetworks", subnetList);
@@ -403,10 +360,7 @@ public final class BeltNetworkData extends SavedData {
         ListTag subnetList = tag.getList("subnetworks", Tag.TAG_COMPOUND);
         for (int i = 0; i < subnetList.size(); i++) {
             BeltSubnetwork sub = BeltSubnetwork.load(subnetList.getCompound(i), registries);
-            data.subnetworks.put(sub.subnetId(), sub);
-            for (BeltNode n : sub.allNodes()) {
-                data.posToSubnet.put(n.pos(), sub.subnetId());
-            }
+            data.registry.adoptSubnetwork(sub);
             sub.layerOrder(); // Ensure topo/layer order is pre-built
         }
         // NOTE: lane speeds are persisted in NBT, so they survive a clean

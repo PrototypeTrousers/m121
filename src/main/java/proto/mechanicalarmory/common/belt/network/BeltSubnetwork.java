@@ -1,15 +1,20 @@
 package proto.mechanicalarmory.common.belt.network;
 
 import dev.engine_room.flywheel.api.visual.Effect;
+import dev.engine_room.flywheel.api.visual.EffectVisual;
 import dev.engine_room.flywheel.api.visual.Visual;
 import dev.engine_room.flywheel.api.visualization.VisualizationContext;
+import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
+import net.minecraft.world.level.Level;
 import org.jetbrains.annotations.Nullable;
+import proto.mechanicalarmory.MechanicalArmory;
+import proto.mechanicalarmory.client.flywheel.instances.belt.BeltSubnetworkVisual;
 import proto.mechanicalarmory.common.belt.data.BeltNode;
 
 import java.util.*;
@@ -47,7 +52,7 @@ public final class BeltSubnetwork implements Effect {
     private boolean topoDirty = true;
 
     @Nullable
-    private net.minecraft.world.level.Level level;
+    private Level level;
 
     public BeltSubnetwork(UUID subnetId) {
         this.subnetId = subnetId;
@@ -55,19 +60,19 @@ public final class BeltSubnetwork implements Effect {
 
     public UUID subnetId() { return subnetId; }
 
-    public void setLevel(@Nullable net.minecraft.world.level.Level level) {
+    public void setLevel(@Nullable Level level) {
         this.level = level;
     }
 
     @Override
-    public net.minecraft.world.level.Level level() {
+    public Level level() {
         if (level != null) return level;
-        return net.minecraft.client.Minecraft.getInstance().level;
+        return Minecraft.getInstance().level;
     }
 
     @Override
-    public dev.engine_room.flywheel.api.visual.EffectVisual<?> visualize(VisualizationContext ctx, float partialTick) {
-        return new proto.mechanicalarmory.client.flywheel.instances.belt.BeltSubnetworkVisual(ctx, this, partialTick);
+    public EffectVisual<?> visualize(VisualizationContext ctx, float partialTick) {
+        return new BeltSubnetworkVisual(ctx, this, partialTick);
     }
 
     // ── Node management ───────────────────────────────────────────────────────
@@ -110,19 +115,37 @@ public final class BeltSubnetwork implements Effect {
 
     /**
      * Connect {@code fromPos} → {@code toPos}.
+     *
+     * <p>Side-loading (Factorio-style): {@code to} has exactly two lanes, and
+     * each upstream node is assigned exclusively to one of them via
+     * {@link BeltNode#addInput}. If a third belt tries to merge into a node
+     * that already has both lanes claimed, the link is refused — that spot is
+     * full. This exclusivity is also what makes same-layer parallel ticking
+     * safe: two inputs merging at a node write to disjoint lanes.
+     *
+     * @return true if the link was created, false if refused (missing nodes
+     *         or both of {@code to}'s lanes already occupied by other inputs)
      */
-    public void link(BlockPos fromPos, BlockPos toPos) {
+    public boolean link(BlockPos fromPos, BlockPos toPos) {
         BeltNode from = nodeAt(fromPos);
         BeltNode to   = nodeAt(toPos);
         if (from == null || to == null) {
-            proto.mechanicalarmory.MechanicalArmory.LOGGER.warn("[BeltSubnetwork] link failed: fromNode({})={}, toNode({})={}",
+            MechanicalArmory.LOGGER.warn("[BeltSubnetwork] link failed: fromNode({})={}, toNode({})={}",
                     fromPos.toShortString(), from != null, toPos.toShortString(), to != null);
-            return;
+            return false;
+        }
+
+        int lane = to.addInput(from.nodeId());
+        if (lane < 0) {
+            MechanicalArmory.LOGGER.warn(
+                    "[BeltSubnetwork] link refused: {} -> {} has both merge lanes occupied",
+                    fromPos.toShortString(), toPos.toShortString());
+            return false;
         }
 
         from.setOutputId(to.nodeId());
-        to.addInput(from.nodeId());
         topoDirty = true;
+        return true;
     }
 
     public void unlink(BlockPos fromPos) {

@@ -1,5 +1,6 @@
 package proto.mechanicalarmory.common.belt.data;
 
+import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.item.ItemStack;
 import net.neoforged.neoforge.items.ItemStackHandler;
@@ -66,7 +67,7 @@ public final class ItemGroup {
 
     // ── NBT ───────────────────────────────────────────────────────────────────
 
-    public CompoundTag save(net.minecraft.core.HolderLookup.Provider registries) {
+    public CompoundTag save(HolderLookup.Provider registries) {
         CompoundTag tag = new CompoundTag();
         ItemStackHandler tmp = new ItemStackHandler(1);
         tmp.setStackInSlot(0, item);
@@ -76,7 +77,7 @@ public final class ItemGroup {
         return tag;
     }
 
-    public static ItemGroup load(CompoundTag tag, net.minecraft.core.HolderLookup.Provider registries) {
+    public static ItemGroup load(CompoundTag tag, HolderLookup.Provider registries) {
         ItemStackHandler tmp = new ItemStackHandler(1);
         tmp.deserializeNBT(registries, tag.getCompound("item"));
         ItemStack item = tmp.getStackInSlot(0);

@@ -6,6 +6,7 @@ import net.minecraft.core.Direction;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.ItemInteractionResult;
+import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.context.BlockPlaceContext;
@@ -16,6 +17,7 @@ import net.minecraft.world.level.block.EntityBlock;
 import net.minecraft.world.level.block.HorizontalDirectionalBlock;
 import net.minecraft.world.level.block.RenderShape;
 import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.level.block.entity.BlockEntityTicker;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.StateDefinition;
@@ -30,6 +32,8 @@ import net.neoforged.neoforge.registries.DeferredHolder;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import proto.mechanicalarmory.MechanicalArmory;
+import proto.mechanicalarmory.client.belt.ClientBeltNetwork;
+import proto.mechanicalarmory.common.belt.data.BeltNode;
 import proto.mechanicalarmory.common.belt.network.BeltNetworkData;
 import proto.mechanicalarmory.common.entities.block.BeltEntity;
 
@@ -86,8 +90,8 @@ public class BlockBelt extends Block implements EntityBlock {
 
     @Override
     public void setPlacedBy(@NotNull Level level, @NotNull BlockPos pos, @NotNull BlockState state,
-                             @Nullable net.minecraft.world.entity.LivingEntity placer,
-                             @NotNull net.minecraft.world.item.ItemStack stack) {
+                             @Nullable LivingEntity placer,
+                             @NotNull ItemStack stack) {
         if (!level.isClientSide && level instanceof ServerLevel srv) {
             Direction facing = state.getValue(FACING);
             BeltNetworkData.get(srv).onBeltPlaced(pos, facing, srv);
@@ -101,7 +105,7 @@ public class BlockBelt extends Block implements EntityBlock {
             if (!level.isClientSide && level instanceof ServerLevel srv) {
                 BeltNetworkData.get(srv).onBeltRemoved(pos, srv);
             } else if (level.isClientSide) {
-                proto.mechanicalarmory.client.belt.ClientBeltNetwork.get().removeNode(pos);
+                ClientBeltNetwork.get().removeNode(pos);
             }
         }
         super.onRemove(state, level, pos, newState, movedByPiston);
@@ -138,7 +142,7 @@ public class BlockBelt extends Block implements EntityBlock {
         if (!(level instanceof ServerLevel srv)) return ItemInteractionResult.PASS_TO_DEFAULT_BLOCK_INTERACTION;
 
         BeltNetworkData data = BeltNetworkData.get(srv);
-        proto.mechanicalarmory.common.belt.data.BeltNode node = data.nodeAt(pos);
+        BeltNode node = data.nodeAt(pos);
         if (node == null || node.isStopped()) return ItemInteractionResult.PASS_TO_DEFAULT_BLOCK_INTERACTION;
 
         // Determine which lane (0=left, 1=right) based on where the player clicked.
@@ -176,7 +180,7 @@ public class BlockBelt extends Block implements EntityBlock {
     }
 
     @Override
-    public @Nullable <T extends BlockEntity> net.minecraft.world.level.block.entity.BlockEntityTicker<T>
+    public @Nullable <T extends BlockEntity> BlockEntityTicker<T>
     getTicker(@NotNull Level level, @NotNull BlockState state, @NotNull BlockEntityType<T> type) {
         // BeltEntity has no server-side ticker; return null.
         return null;

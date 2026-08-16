@@ -22,7 +22,6 @@ import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.event.lifecycle.FMLClientSetupEvent;
 import net.neoforged.neoforge.client.event.EntityRenderersEvent;
 import net.neoforged.neoforge.client.event.ModelEvent;
-import net.neoforged.neoforge.client.event.RegisterMenuScreensEvent;
 import net.neoforged.neoforge.client.event.RenderFrameEvent;
 import net.neoforged.neoforge.client.extensions.common.IClientItemExtensions;
 import net.neoforged.neoforge.client.extensions.common.RegisterClientExtensionsEvent;
@@ -144,7 +143,7 @@ public class MechanicalArmoryClient {
         proto.mechanicalarmory.client.belt.ClientBeltNetwork.get().syncToFlywheel();
     }
 
-    @EventBusSubscriber(modid = MechanicalArmory.MODID, bus = EventBusSubscriber.Bus.GAME, value = Dist.CLIENT)
+    @EventBusSubscriber(modid = MechanicalArmory.MODID, value = Dist.CLIENT)
     public static class GameEvents {
         @SubscribeEvent
         public static void onLevelUnload(net.neoforged.neoforge.event.level.LevelEvent.Unload event) {

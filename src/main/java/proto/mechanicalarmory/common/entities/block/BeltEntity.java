@@ -1,18 +1,24 @@
 package proto.mechanicalarmory.common.entities.block;
 
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.Connection;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.game.ClientGamePacketListener;
 import net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import proto.mechanicalarmory.client.belt.ClientBeltNetwork;
 import proto.mechanicalarmory.common.belt.data.BeltLane;
 import proto.mechanicalarmory.common.belt.data.BeltNode;
+import proto.mechanicalarmory.common.belt.network.BeltNetworkData;
+import proto.mechanicalarmory.common.blocks.BlockBelt;
 import proto.mechanicalarmory.common.entities.MAEntities;
 
 import java.util.UUID;
@@ -21,7 +27,7 @@ import java.util.UUID;
  * A thin rendering anchor for a conveyor belt block.
  *
  * <p>This block entity holds <em>no authoritative item data</em>.  All item
- * state lives in {@link proto.mechanicalarmory.common.belt.network.BeltNetworkData}.
+ * state lives in {@link BeltNetworkData}.
  *
  * <p>On the server side it stores only the {@code nodeId} used to look up the
  * corresponding {@link BeltNode}.
@@ -75,8 +81,8 @@ public class BeltEntity extends BlockEntity {
     public void onLoad() {
         super.onLoad();
         if (level != null && level.isClientSide()) {
-            proto.mechanicalarmory.common.belt.data.BeltNode existing =
-                    proto.mechanicalarmory.client.belt.ClientBeltNetwork.get().getNode(worldPosition);
+            BeltNode existing =
+                    ClientBeltNetwork.get().getNode(worldPosition);
             if (existing != null) {
                 this.clientLanes[0] = existing.lane(0).deepCopy();
                 this.clientLanes[1] = existing.lane(1).deepCopy();
@@ -117,7 +123,7 @@ public class BeltEntity extends BlockEntity {
      * Advance the client-side simulation when the game tick advances.
      * Evaluates downstream belts first so space is freed up before upstream transfers.
      */
-    public void advanceClientSimulation(net.minecraft.world.level.Level lvl, net.minecraft.core.Direction facing) {
+    public void advanceClientSimulation(Level lvl, Direction facing) {
         long gameTime = lvl.getGameTime();
         if (clientLastTickedGameTime == 0) {
             clientLastTickedGameTime = gameTime;
@@ -137,12 +143,12 @@ public class BeltEntity extends BlockEntity {
 
             // Ensure downstream belt ticks first so space is freed up
             if (clientHasOutput) {
-                net.minecraft.core.BlockPos nextPos = worldPosition.relative(facing);
+                BlockPos nextPos = worldPosition.relative(facing);
                 BlockEntity next = lvl.getBlockEntity(nextPos);
                 if (next instanceof BeltEntity outBe) {
-                    net.minecraft.world.level.block.state.BlockState outState = lvl.getBlockState(nextPos);
-                    if (outState.getBlock() instanceof proto.mechanicalarmory.common.blocks.BlockBelt) {
-                        net.minecraft.core.Direction outFacing = outState.getValue(proto.mechanicalarmory.common.blocks.BlockBelt.FACING);
+                    BlockState outState = lvl.getBlockState(nextPos);
+                    if (outState.getBlock() instanceof BlockBelt) {
+                        Direction outFacing = outState.getValue(BlockBelt.FACING);
                         outBe.advanceClientSimulation(lvl, outFacing);
                     }
                 }
@@ -188,10 +194,10 @@ public class BeltEntity extends BlockEntity {
         }
     }
 
-    private void updateClientCurveSpeeds(net.minecraft.world.level.Level lvl, net.minecraft.core.Direction facing) {
-        net.minecraft.core.Direction back = facing.getOpposite();
-        net.minecraft.core.Direction left = facing.getCounterClockWise();
-        net.minecraft.core.Direction right = facing.getClockWise();
+    private void updateClientCurveSpeeds(Level lvl, Direction facing) {
+        Direction back = facing.getOpposite();
+        Direction left = facing.getCounterClockWise();
+        Direction right = facing.getClockWise();
 
         boolean hasBack = isBeltFacingInto(lvl, worldPosition.relative(back), worldPosition);
         boolean hasLeft = isBeltFacingInto(lvl, worldPosition.relative(left), worldPosition);
@@ -212,10 +218,10 @@ public class BeltEntity extends BlockEntity {
         clientLanes[1].setSpeed(BeltLane.SPEED_DEFAULT);
     }
 
-    private static boolean isBeltFacingInto(net.minecraft.world.level.Level lvl, BlockPos fromPos, BlockPos toPos) {
-        net.minecraft.world.level.block.state.BlockState state = lvl.getBlockState(fromPos);
-        if (state.getBlock() instanceof proto.mechanicalarmory.common.blocks.BlockBelt) {
-            net.minecraft.core.Direction f = state.getValue(proto.mechanicalarmory.common.blocks.BlockBelt.FACING);
+    private static boolean isBeltFacingInto(Level lvl, BlockPos fromPos, BlockPos toPos) {
+        BlockState state = lvl.getBlockState(fromPos);
+        if (state.getBlock() instanceof BlockBelt) {
+            Direction f = state.getValue(BlockBelt.FACING);
             return fromPos.relative(f).equals(toPos);
         }
         return false;
@@ -232,9 +238,9 @@ public class BeltEntity extends BlockEntity {
     @Override
     protected void saveAdditional(@NotNull CompoundTag tag, HolderLookup.@NotNull Provider registries) {
         super.saveAdditional(tag, registries);
-        if (level instanceof net.minecraft.server.level.ServerLevel srv) {
-            proto.mechanicalarmory.common.belt.network.BeltNetworkData data =
-                    proto.mechanicalarmory.common.belt.network.BeltNetworkData.get(srv);
+        if (level instanceof ServerLevel srv) {
+            BeltNetworkData data =
+                    BeltNetworkData.get(srv);
             BeltNode node = data.nodeAt(worldPosition);
             if (node != null) {
                 if (node.outputId() != null) tag.putUUID("outputId", node.outputId());
@@ -262,9 +268,9 @@ public class BeltEntity extends BlockEntity {
     public @NotNull CompoundTag getUpdateTag(HolderLookup.@NotNull Provider registries) {
         CompoundTag tag = new CompoundTag();
         saveAdditional(tag, registries);
-        if (level instanceof net.minecraft.server.level.ServerLevel srv) {
-            proto.mechanicalarmory.common.belt.network.BeltNetworkData data =
-                    proto.mechanicalarmory.common.belt.network.BeltNetworkData.get(srv);
+        if (level instanceof ServerLevel srv) {
+            BeltNetworkData data =
+                    BeltNetworkData.get(srv);
             BeltNode node = data.nodeAt(worldPosition);
             if (node != null) {
                 if (node.outputId() != null) tag.putUUID("outputId", node.outputId());
@@ -303,7 +309,7 @@ public class BeltEntity extends BlockEntity {
             boolean stopped = tag.getBoolean("stopped");
             applyClientSeed(l0, l1, serverTick, stopped, wrap, hasOut);
 
-            proto.mechanicalarmory.client.belt.ClientBeltNetwork.get().updateNode(
+            ClientBeltNetwork.get().updateNode(
                     worldPosition, srvOutputId, l0, l1, stopped, wrap, hasOut);
         }
     }
@@ -324,7 +330,7 @@ public class BeltEntity extends BlockEntity {
     }
 
     /** Always matches the node UUID used by both server and client. */
-    public java.util.UUID nodeId() {
-        return proto.mechanicalarmory.common.belt.data.BeltNode.posToId(worldPosition);
+    public UUID nodeId() {
+        return BeltNode.posToId(worldPosition);
     }
 }

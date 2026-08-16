@@ -6,9 +6,12 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.state.BlockState;
+import proto.mechanicalarmory.MechanicalArmory;
 import proto.mechanicalarmory.common.belt.data.BeltLane;
 import proto.mechanicalarmory.common.belt.data.BeltNode;
+import proto.mechanicalarmory.common.belt.data.ItemGroup;
 import proto.mechanicalarmory.common.belt.network.BeltSubnetwork;
+import proto.mechanicalarmory.common.belt.network.BeltSubnetworkRegistry;
 import proto.mechanicalarmory.common.blocks.BlockBelt;
 
 import javax.annotation.Nullable;
@@ -20,6 +23,14 @@ import java.util.*;
  * <p>Tracks all active {@link BeltSubnetwork}s on the client and registers them
  * with Flywheel's {@link VisualizationManager#effects()} so they are rendered
  * by {@link proto.mechanicalarmory.client.flywheel.instances.belt.BeltSubnetworkVisual}.
+ *
+ * <p>All graph bookkeeping (BlockPos/UUID maps, create/merge/link/split rules)
+ * is delegated to {@link BeltSubnetworkRegistry}, the same class the
+ * server-side {@code BeltNetworkData} uses — those rules were previously
+ * reimplemented independently on each side and had to be kept in sync by
+ * hand. This class now only owns what's genuinely client-specific: reading
+ * neighbour block state to decide *when* to (re)link, and telling Flywheel
+ * about subnetwork add/update/remove.
  */
 public final class ClientBeltNetwork {
 
@@ -29,47 +40,43 @@ public final class ClientBeltNetwork {
         return INSTANCE;
     }
 
-    private final Map<UUID, BeltSubnetwork> subnetworks = new HashMap<>();
-    private final Map<BlockPos, UUID> posToSubnet = new HashMap<>();
+    private final BeltSubnetworkRegistry registry = new BeltSubnetworkRegistry();
     private final Set<UUID> registeredWithFlywheel = new HashSet<>();
+    private VisualizationManager lastVm = null;
 
     private ClientBeltNetwork() {}
 
-    @Nullable
-    public synchronized BeltNode getNode(BlockPos pos) {
-        UUID subId = posToSubnet.get(pos);
-        if (subId == null) return null;
-        BeltSubnetwork subnet = subnetworks.get(subId);
-        return subnet == null ? null : subnet.nodeAt(pos);
-    }
+    // ── Lookups ───────────────────────────────────────────────────────────────
 
     @Nullable
-    public synchronized UUID subnetworkIdForPos(BlockPos pos) {
-        return posToSubnet.get(pos);
-    }
+    public synchronized BeltNode getNode(BlockPos pos) { return registry.nodeAt(pos); }
+
+    @Nullable
+    public synchronized UUID subnetworkIdForPos(BlockPos pos) { return registry.subnetIdAt(pos); }
 
     /** Look up a node by its UUID within a specific subnet (used by diagnostics). */
     @Nullable
     public synchronized BeltNode getNodeById(@Nullable UUID subnetId, @Nullable UUID nodeId) {
-        if (subnetId == null || nodeId == null) return null;
-        BeltSubnetwork subnet = subnetworks.get(subnetId);
+        if (nodeId == null) return null;
+        BeltSubnetwork subnet = registry.subnetwork(subnetId);
         return subnet == null ? null : subnet.node(nodeId);
     }
 
     /** How many nodes are registered in a given subnet (used by diagnostics). */
     public synchronized int subnetNodeCount(@Nullable UUID subnetId) {
-        if (subnetId == null) return 0;
-        BeltSubnetwork subnet = subnetworks.get(subnetId);
+        BeltSubnetwork subnet = registry.subnetwork(subnetId);
         return subnet == null ? 0 : subnet.allNodes().size();
     }
 
-    public synchronized int totalSubnetCount() { return subnetworks.size(); }
+    public synchronized int totalSubnetCount() { return registry.allSubnetworks().size(); }
 
     public synchronized int totalNodeCount() {
         int total = 0;
-        for (BeltSubnetwork s : subnetworks.values()) total += s.allNodes().size();
+        for (BeltSubnetwork s : registry.allSubnetworks()) total += s.allNodes().size();
         return total;
     }
+
+    // ── Updates from the server ──────────────────────────────────────────────
 
     /**
      * Called when a BeltInitPayload or BeltCorrectionPayload arrives from the server,
@@ -87,31 +94,9 @@ public final class ClientBeltNetwork {
             facing = state.getValue(BlockBelt.FACING);
         }
 
-        UUID existingSubId = posToSubnet.get(pos);
-        BeltSubnetwork subnet;
-        BeltNode node;
-
-        if (existingSubId == null) {
-            UUID subId = UUID.randomUUID();
-            subnet = new BeltSubnetwork(subId);
-            subnet.setLevel(level);
-            node = new BeltNode(pos); // UUID always == BeltNode.posToId(pos)
-            subnet.addNode(node);
-            subnetworks.put(subId, subnet);
-            posToSubnet.put(pos, subId);
-        } else {
-            subnet = subnetworks.get(existingSubId);
-            if (subnet == null) {
-                subnet = new BeltSubnetwork(existingSubId);
-                subnet.setLevel(level);
-                subnetworks.put(existingSubId, subnet);
-            }
-            node = subnet.nodeAt(pos);
-            if (node == null) {
-                node = new BeltNode(pos);
-                subnet.addNode(node);
-            }
-        }
+        BeltNode node = registry.getOrCreateNode(pos);
+        BeltSubnetwork subnet = registry.subnetworkAt(pos);
+        if (subnet != null) subnet.setLevel(level);
 
         // serverOutputId is now just BeltNode.posToId(outPos) – keep it for
         // the case where outPos hasn't loaded yet and relink can't merge.
@@ -120,25 +105,8 @@ public final class ClientBeltNetwork {
         }
 
         // Copy lane contents from the server snapshot
-        node.lane(0).clearGroups();
-        for (int i = 0; i < lane0.groupCount(); i++) {
-            proto.mechanicalarmory.common.belt.data.ItemGroup g = lane0.groupArray()[i];
-            if (g != null) {
-                node.lane(0).addLast(new proto.mechanicalarmory.common.belt.data.ItemGroup(g.item(), g.count(), g.headPos()));
-            }
-        }
-        float s0 = lane0.speed() > 0.0f ? lane0.speed() : BeltLane.SPEED_DEFAULT;
-        node.lane(0).setSpeed(s0);
-
-        node.lane(1).clearGroups();
-        for (int i = 0; i < lane1.groupCount(); i++) {
-            proto.mechanicalarmory.common.belt.data.ItemGroup g = lane1.groupArray()[i];
-            if (g != null) {
-                node.lane(1).addLast(new proto.mechanicalarmory.common.belt.data.ItemGroup(g.item(), g.count(), g.headPos()));
-            }
-        }
-        float s1 = lane1.speed() > 0.0f ? lane1.speed() : BeltLane.SPEED_DEFAULT;
-        node.lane(1).setSpeed(s1);
+        copyLane(lane0, node.lane(0));
+        copyLane(lane1, node.lane(1));
 
         node.setStopped(stopped);
 
@@ -155,7 +123,19 @@ public final class ClientBeltNetwork {
         updateNode(pos, null, lane0, lane1, stopped, wrapPoint, hasOutput);
     }
 
-    private VisualizationManager lastVm = null;
+    private static void copyLane(BeltLane source, BeltLane dest) {
+        dest.clearGroups();
+        for (int i = 0; i < source.groupCount(); i++) {
+            ItemGroup g = source.groupArray()[i];
+            if (g != null) {
+                dest.addLast(new ItemGroup(g.item(), g.count(), g.headPos()));
+            }
+        }
+        float speed = source.speed() > 0.0f ? source.speed() : BeltLane.SPEED_DEFAULT;
+        dest.setSpeed(speed);
+    }
+
+    // ── Flywheel sync ────────────────────────────────────────────────────────
 
     public synchronized void onVisualDeleted(UUID subnetId) {
         registeredWithFlywheel.remove(subnetId);
@@ -179,7 +159,7 @@ public final class ClientBeltNetwork {
         // couldn't be resolved during updateNode() due to chunk loading order.
         reconcileLinks(level);
 
-        for (BeltSubnetwork subnet : subnetworks.values()) {
+        for (BeltSubnetwork subnet : registry.allSubnetworks()) {
             if (!registeredWithFlywheel.contains(subnet.subnetId())) {
                 subnet.setLevel(level);
                 vm.effects().queueAdd(subnet);
@@ -190,23 +170,27 @@ public final class ClientBeltNetwork {
         }
     }
 
+    /** Tell Flywheel to stop rendering a subnetwork that was absorbed into another. */
+    private void unregisterFromFlywheel(UUID subnetId, BeltSubnetwork subnet, Level level) {
+        if (registeredWithFlywheel.remove(subnetId)) {
+            VisualizationManager vm = VisualizationManager.get(level);
+            if (vm != null) vm.effects().queueRemove(subnet);
+        }
+    }
+
     /**
      * Scans every registered node. If a node's {@code outputId} is not resolved
      * inside its own subnet, but the target position IS registered in another
      * subnet, the two subnets are merged and properly linked.
      *
      * <p>This corrects chunk-boundary timing issues where the upstream belt loaded
-     * before its downstream neighbor was registered in {@link #posToSubnet}.
+     * before its downstream neighbor was registered.
      */
     private void reconcileLinks(Level level) {
-        // Snapshot the entry set to avoid ConcurrentModificationException
-        // (mergeAndLink can modify posToSubnet while we iterate).
-        List<BlockPos> positions = new ArrayList<>(posToSubnet.keySet());
-
-        for (BlockPos pos : positions) {
-            UUID subId = posToSubnet.get(pos);
-            if (subId == null) continue;
-            BeltSubnetwork sub = subnetworks.get(subId);
+        // Snapshot to avoid ConcurrentModificationException (mergeAndLink can
+        // mutate the registry's position map while we iterate).
+        for (BlockPos pos : registry.trackedPositions()) {
+            BeltSubnetwork sub = registry.subnetworkAt(pos);
             if (sub == null) continue;
             BeltNode node = sub.nodeAt(pos);
             if (node == null || node.outputId() == null) continue;
@@ -217,18 +201,19 @@ public final class ClientBeltNetwork {
             // The outputId isn't in our subnet. Derive the downstream position
             // from the block world and check if it's registered somewhere.
             BlockState state = level.getBlockState(pos);
-            if (!(state.getBlock() instanceof proto.mechanicalarmory.common.blocks.BlockBelt)) continue;
-            Direction facing = state.getValue(proto.mechanicalarmory.common.blocks.BlockBelt.FACING);
+            if (!(state.getBlock() instanceof BlockBelt)) continue;
+            Direction facing = state.getValue(BlockBelt.FACING);
             BlockPos outPos = pos.relative(facing);
 
-            if (posToSubnet.containsKey(outPos)) {
-                // Downstream is registered – merge the two subnets together.
-                proto.mechanicalarmory.MechanicalArmory.LOGGER.info(
+            if (registry.isTracked(outPos)) {
+                MechanicalArmory.LOGGER.info(
                         "[ClientBeltNetwork] reconcile: merging {} -> {}", pos.toShortString(), outPos.toShortString());
                 mergeAndLink(pos, outPos, level);
             }
         }
     }
+
+    // ── Relink / merge ───────────────────────────────────────────────────────
 
     /**
      * @param hasOutput true when the server confirmed this node has a downstream belt.
@@ -236,10 +221,7 @@ public final class ClientBeltNetwork {
      *                  because the block may still be loading on the client.
      */
     private void relink(BlockPos pos, Direction facing, Level level, boolean hasOutput) {
-        UUID subId = posToSubnet.get(pos);
-        if (subId == null) return;
-        BeltSubnetwork subnet = subnetworks.get(subId);
-        if (subnet == null) return;
+        if (!registry.isTracked(pos)) return;
 
         BlockPos outPos = pos.relative(facing);
         BlockState outState = level.getBlockState(outPos);
@@ -248,7 +230,7 @@ public final class ClientBeltNetwork {
             mergeAndLink(pos, outPos, level);
         } else if (!hasOutput) {
             // Server says no output and no belt block found – truly unlinked.
-            subnet.unlink(pos);
+            registry.unlink(pos);
         }
         // else: server says hasOutput but the block isn't visible yet; keep existing outputId.
 
@@ -264,128 +246,80 @@ public final class ClientBeltNetwork {
         }
     }
 
-    /** Overload used when block-break / explicit neighbour update relinks without a server hint. */
-    private void relink(BlockPos pos, Direction facing, Level level) {
-        relink(pos, facing, level, false);
-    }
-
-    private BeltNode getOrCreateNode(BlockPos pos, Level level) {
-        UUID subId = posToSubnet.get(pos);
-        if (subId != null) {
-            BeltSubnetwork sub = subnetworks.get(subId);
-            if (sub != null) {
-                BeltNode n = sub.nodeAt(pos);
-                if (n != null) return n;
-            }
-        }
-        UUID newSubId = UUID.randomUUID();
-        BeltSubnetwork subnet = new BeltSubnetwork(newSubId);
-        subnet.setLevel(level);
-        BeltNode node = new BeltNode(pos); // always posToId(pos)
-        subnet.addNode(node);
-        subnetworks.put(newSubId, subnet);
-        posToSubnet.put(pos, newSubId);
-        return node;
-    }
-
+    /**
+     * Merge the subnetwork owning {@code toPos} into the one owning
+     * {@code fromPos}, then link the edge and notify Flywheel if a
+     * subnetwork was absorbed. Side-loading (Factorio-style) is enforced by
+     * the registry: if {@code toPos}'s two merge lanes are already both
+     * occupied by other inputs, the link is refused and a warning is logged
+     * — see {@link BeltNode#addInput}.
+     */
     private void mergeAndLink(BlockPos fromPos, BlockPos toPos, Level level) {
-        BeltNode fromNode = getOrCreateNode(fromPos, level);
-        BeltNode toNode = getOrCreateNode(toPos, level);
+        registry.getOrCreateNode(fromPos);
+        BeltNode toNode = registry.getOrCreateNode(toPos);
+        BeltSubnetwork toSubBefore = registry.subnetworkAt(toPos);
 
-        UUID fromSubId = posToSubnet.get(fromPos);
-        UUID toSubId = posToSubnet.get(toPos);
-        if (fromSubId == null || toSubId == null) return;
-
-        BeltSubnetwork fromSub = subnetworks.get(fromSubId);
-        BeltSubnetwork toSub = subnetworks.get(toSubId);
-        if (fromSub == null || toSub == null) return;
-
-        if (!fromSubId.equals(toSubId)) {
-            // Merge toSub into fromSub
-            for (BeltNode n : toSub.allNodes()) {
-                fromSub.addNode(n);
-                posToSubnet.put(n.pos(), fromSub.subnetId());
-            }
-            subnetworks.remove(toSubId);
-            if (registeredWithFlywheel.remove(toSubId)) {
-                VisualizationManager vm = VisualizationManager.get(level);
-                if (vm != null) {
-                    vm.effects().queueRemove(toSub);
-                }
-            }
+        BeltSubnetworkRegistry.MergeResult result = registry.mergeAndLink(fromPos, toPos);
+        if (result.removedSubnetId() != null && toSubBefore != null) {
+            unregisterFromFlywheel(result.removedSubnetId(), toSubBefore, level);
         }
 
-        fromSub.link(fromPos, toPos);
-        proto.mechanicalarmory.MechanicalArmory.LOGGER.info("[ClientBeltNetwork] Linked {} -> {}, from.outId={}, to.inCount={}",
-                fromPos.toShortString(), toPos.toShortString(),
-                fromNode.outputId() != null ? fromNode.outputId().toString().substring(0, 8) : "null",
+        BeltNode fromNode = registry.nodeAt(fromPos);
+        MechanicalArmory.LOGGER.info(
+                "[ClientBeltNetwork] Linked {} -> {} ({}), from.outId={}, to.inCount={}",
+                fromPos.toShortString(), toPos.toShortString(), result.linked() ? "ok" : "refused",
+                fromNode != null && fromNode.outputId() != null
+                        ? fromNode.outputId().toString().substring(0, 8) : "null",
                 toNode.inputIds().size());
     }
+
+    // ── Removal ───────────────────────────────────────────────────────────────
 
     /**
      * Remove a node when its block is broken or chunk unloaded.
      */
     public synchronized void removeNode(BlockPos pos) {
-        UUID subnetId = posToSubnet.remove(pos);
-        if (subnetId == null) return;
-
-        BeltSubnetwork subnet = subnetworks.get(subnetId);
-        if (subnet == null) return;
-
-        BeltNode node = subnet.nodeAt(pos);
-        if (node != null) {
-            subnet.removeNode(node.nodeId());
-        }
-
         Level level = Minecraft.getInstance().level;
+
+        // Unlink any neighbor belts that were facing into the removed pos
         if (level != null) {
-            // Unlink any neighbor belts that were facing into the removed pos
             for (Direction d : Direction.Plane.HORIZONTAL) {
                 BlockPos neighborPos = pos.relative(d);
-                UUID neighborSubId = posToSubnet.get(neighborPos);
-                if (neighborSubId != null) {
-                    BeltSubnetwork nSub = subnetworks.get(neighborSubId);
-                    if (nSub != null) {
-                        BlockState nState = level.getBlockState(neighborPos);
-                        if (nState.getBlock() instanceof BlockBelt) {
-                            Direction nFacing = nState.getValue(BlockBelt.FACING);
-                            if (neighborPos.relative(nFacing).equals(pos)) {
-                                nSub.unlink(neighborPos);
-                            }
-                        }
+                if (!registry.isTracked(neighborPos)) continue;
+                BlockState nState = level.getBlockState(neighborPos);
+                if (nState.getBlock() instanceof BlockBelt) {
+                    Direction nFacing = nState.getValue(BlockBelt.FACING);
+                    if (neighborPos.relative(nFacing).equals(pos)) {
+                        registry.unlink(neighborPos);
                     }
                 }
             }
         }
 
-        if (subnet.isEmpty()) {
-            subnetworks.remove(subnetId);
-            if (registeredWithFlywheel.remove(subnetId) && level != null) {
-                VisualizationManager vm = VisualizationManager.get(level);
-                if (vm != null) {
-                    vm.effects().queueRemove(subnet);
-                }
+        BeltSubnetworkRegistry.RemovalResult result = registry.removeNode(pos);
+        if (result == null) return;
+
+        if (result.emptied()) {
+            // Subnetwork had only this node — it's gone. Tell Flywheel to stop
+            // rendering it (mirrors the pre-refactor behaviour of calling
+            // queueRemove on the now-empty subnetwork object).
+            if (level != null && result.emptiedSubnetwork() != null) {
+                unregisterFromFlywheel(result.originalSubnetId(), result.emptiedSubnetwork(), level);
+            } else {
+                registeredWithFlywheel.remove(result.originalSubnetId());
             }
-        } else {
-            List<BeltSubnetwork> parts = subnet.splitIfNeeded();
-            if (parts.size() > 1) {
-                subnetworks.remove(subnetId);
-                if (registeredWithFlywheel.remove(subnetId) && level != null) {
-                    VisualizationManager vm = VisualizationManager.get(level);
-                    if (vm != null) {
-                        vm.effects().queueRemove(subnet);
-                    }
-                }
-                for (BeltSubnetwork part : parts) {
-                    part.setLevel(level);
-                    subnetworks.put(part.subnetId(), part);
-                    for (BeltNode n : part.allNodes()) {
-                        posToSubnet.put(n.pos(), part.subnetId());
-                    }
-                }
-            }
-            syncToFlywheel();
+        } else if (result.split()) {
+            // Original id is stale; syncToFlywheel() below re-registers the
+            // newly-adopted parts under their own fresh ids.
+            registeredWithFlywheel.remove(result.originalSubnetId());
         }
+
+        if (level == null) return;
+
+        for (BeltSubnetwork part : result.newParts()) {
+            part.setLevel(level);
+        }
+        syncToFlywheel();
     }
 
     /**
@@ -397,7 +331,7 @@ public final class ClientBeltNetwork {
             VisualizationManager vm = VisualizationManager.get(level);
             if (vm != null) {
                 for (UUID subId : registeredWithFlywheel) {
-                    BeltSubnetwork s = subnetworks.get(subId);
+                    BeltSubnetwork s = registry.subnetwork(subId);
                     if (s != null) {
                         vm.effects().queueRemove(s);
                     }
@@ -405,9 +339,6 @@ public final class ClientBeltNetwork {
             }
         }
         registeredWithFlywheel.clear();
-        subnetworks.clear();
-        posToSubnet.clear();
+        registry.clear();
     }
 }
-
-

@@ -10,7 +10,9 @@ import org.jetbrains.annotations.Nullable;
 
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 /**
@@ -42,10 +44,18 @@ public final class BeltNode {
     private UUID outputId;
 
     /**
-     * Input neighbour UUIDs.  Up to 2 inputs (one per merge side).
-     * Belt lane assignment: inputIds.get(0) feeds lane 0, .get(1) feeds lane 1.
+     * Input neighbour UUIDs, keyed to the lane they feed. Up to 2 inputs — one
+     * per side, Factorio-style side-loading: each upstream belt is assigned
+     * exclusively to lane 0 (left) or lane 1 (right) of this node and only
+     * ever reads/writes that lane. A lane with no assigned input is simply
+     * never fed by a merge (it can still receive items directly if this node
+     * itself is an input side of a straight belt, i.e. lane parity from the
+     * belt's own two lanes).
+     *
+     * <p>Insertion order is preserved for iteration but is no longer load-bearing
+     * for lane assignment — see {@link #laneForInput(UUID)}.
      */
-    private final List<UUID> inputIds = new ArrayList<>(2);
+    private final Map<UUID, Integer> inputLanes = new LinkedHashMap<>(2);
 
     /**
      * True when this node is the wrap-point of a loop.  Its "output" back into
@@ -93,7 +103,22 @@ public final class BeltNode {
     public BeltLane[] lanes()    { return lanes; }
 
     @Nullable public UUID outputId() { return outputId; }
-    public List<UUID>    inputIds()  { return inputIds; }
+
+    /** Snapshot of currently-connected input UUIDs (order not meaningful). */
+    public List<UUID> inputIds() { return new ArrayList<>(inputLanes.keySet()); }
+
+    /**
+     * Which lane (0 or 1) the given input UUID is side-loaded onto, or -1 if
+     * {@code inputId} is not a registered input of this node.
+     */
+    public int laneForInput(UUID inputId) {
+        return inputLanes.getOrDefault(inputId, -1);
+    }
+
+    /** True if the given lane already has an input assigned to it. */
+    public boolean laneOccupied(int lane) {
+        return inputLanes.containsValue(lane);
+    }
 
     public boolean isWrapPoint() { return isWrapPoint; }
     public boolean isStopped()   { return stopped; }
@@ -102,12 +127,33 @@ public final class BeltNode {
     public void setWrapPoint(boolean wp)       { isWrapPoint = wp; }
     public void setStopped(boolean s)          { stopped = s; }
 
-    public void addInput(UUID id) {
-        if (!inputIds.contains(id) && inputIds.size() < 2) {
-            inputIds.add(id);
+    /**
+     * Register {@code id} as an input of this node, side-loaded onto the first
+     * free lane (0 then 1). Factorio-style merging: each input is exclusively
+     * assigned to one lane and only that lane's contents are ever visible to
+     * or written by that upstream node during a tick — this is what keeps
+     * concurrent ticking of same-layer nodes race-free at merge points.
+     *
+     * @return the lane index (0 or 1) the input was assigned to, or -1 if this
+     *         node already has an input on {@code id} (idempotent, existing
+     *         lane returned) or if both lanes are already occupied by other
+     *         inputs (merge point full — caller should not create the edge).
+     */
+    public int addInput(UUID id) {
+        Integer existing = inputLanes.get(id);
+        if (existing != null) return existing;
+        if (!laneOccupied(0)) {
+            inputLanes.put(id, 0);
+            return 0;
         }
+        if (!laneOccupied(1)) {
+            inputLanes.put(id, 1);
+            return 1;
+        }
+        return -1; // both lanes taken
     }
-    public void removeInput(UUID id) { inputIds.remove(id); }
+
+    public void removeInput(UUID id) { inputLanes.remove(id); }
 
     // ── NBT ───────────────────────────────────────────────────────────────────
 
@@ -122,9 +168,10 @@ public final class BeltNode {
         tag.putBoolean("stopped", stopped);
 
         ListTag inputs = new ListTag();
-        for (UUID id : inputIds) {
+        for (Map.Entry<UUID, Integer> e : inputLanes.entrySet()) {
             CompoundTag c = new CompoundTag();
-            c.putUUID("v", id);
+            c.putUUID("v", e.getKey());
+            c.putInt("lane", e.getValue());
             inputs.add(c);
         }
         tag.put("inputs", inputs);
@@ -148,7 +195,15 @@ public final class BeltNode {
 
         ListTag inputs = tag.getList("inputs", Tag.TAG_COMPOUND);
         for (int i = 0; i < inputs.size(); i++) {
-            node.inputIds.add(inputs.getCompound(i).getUUID("v"));
+            CompoundTag c = inputs.getCompound(i);
+            UUID inputId = c.getUUID("v");
+            // Older saves (pre side-loading) have no "lane" field; fall back to
+            // insertion-order assignment via addInput's first-free-lane rule.
+            if (c.contains("lane")) {
+                node.inputLanes.put(inputId, c.getInt("lane"));
+            } else {
+                node.addInput(inputId);
+            }
         }
         return node;
     }
