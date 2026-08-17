@@ -114,7 +114,7 @@ public class MechanicalArmory {
     }
 
     /** Notify the belt network when a player starts watching a chunk so it can seed client data. */
-    private void onChunkWatch(ChunkWatchEvent.Watch event) {
+    private void onChunkWatch(ChunkWatchEvent.Sent event) {
         BeltNetworkData
                 .get(event.getLevel())
                 .sendChunkInitToPlayer(event.getPos(), event.getPlayer());
