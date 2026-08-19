@@ -208,7 +208,7 @@ public final class BeltSubnetworkRegistry {
 
         BeltNode node = subnet.nodeAt(pos);
         if (node != null) {
-            subnet.removeNode(node.nodeId());
+            subnet.removeNode(node.pos());
         }
 
         if (subnet.isEmpty()) {

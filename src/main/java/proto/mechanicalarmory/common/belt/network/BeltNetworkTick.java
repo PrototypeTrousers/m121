@@ -99,13 +99,13 @@ public final class BeltNetworkTick {
         BeltNode output = null;
         int mergedInputLane = -1;   // this node's assigned lane on `output`, if it is one of >1 inputs
         boolean isSoleInput = true; // true when `node` is output's only input (no side-loading collapse)
-        if (node.outputId() != null) {
-            BeltNode candidate = subnet.node(node.outputId());
+        if (node.outputPos() != null) {
+            BeltNode candidate = subnet.node(node.outputPos());
             if (candidate != null && !candidate.isStopped()) {
-                mergedInputLane = candidate.laneForInput(node.nodeId());
+                mergedInputLane = candidate.laneForInput(node.pos());
                 if (mergedInputLane >= 0) {
                     output = candidate;
-                    isSoleInput = candidate.inputIds().size() <= 1;
+                    isSoleInput = candidate.inputPositions().size() <= 1;
                 }
                 // mergedInputLane < 0 means the topology says we point at this
                 // node but we're not registered on either of its lanes (stale

@@ -30,11 +30,8 @@ public final class BeltSubnetwork implements Effect {
 
     private final UUID subnetId;
 
-    /** All nodes keyed by their UUID. */
-    private final Map<UUID, BeltNode> nodes = new LinkedHashMap<>();
-
-    /** Fast lookup: BlockPos → node UUID. */
-    private final Map<BlockPos, UUID> posIndex = new HashMap<>();
+    /** All nodes keyed by their BlockPos. */
+    private final Map<BlockPos, BeltNode> nodes = new LinkedHashMap<>();
 
     /**
      * Nodes in topo order (layer-0 first = output-first).
@@ -78,19 +75,17 @@ public final class BeltSubnetwork implements Effect {
     // ── Node management ───────────────────────────────────────────────────────
 
     public void addNode(BeltNode node) {
-        nodes.put(node.nodeId(), node);
-        posIndex.put(node.pos(), node.nodeId());
+        nodes.put(node.pos(), node);
         topoDirty = true;
     }
 
-    public void removeNode(UUID id) {
-        BeltNode node = nodes.remove(id);
+    public void removeNode(BlockPos pos) {
+        BeltNode node = nodes.remove(pos);
         if (node != null) {
-            posIndex.remove(node.pos());
             // Unlink from neighbours
             for (BeltNode n : nodes.values()) {
-                n.removeInput(id);
-                if (id.equals(n.outputId())) n.setOutputId(null);
+                n.removeInput(pos);
+                if (pos.equals(n.outputPos())) n.setOutputPos(null);
             }
         }
         topoDirty = true;
@@ -98,18 +93,18 @@ public final class BeltSubnetwork implements Effect {
 
     @Nullable
     public BeltNode nodeAt(BlockPos pos) {
-        UUID id = posIndex.get(pos);
-        return id == null ? null : nodes.get(id);
+        return nodes.get(pos);
     }
 
+    /** Alias for {@link #nodeAt} — look up a node by its BlockPos. */
     @Nullable
-    public BeltNode node(UUID id) { return nodes.get(id); }
+    public BeltNode node(BlockPos pos) { return nodes.get(pos); }
 
     public Collection<BeltNode> allNodes() { return nodes.values(); }
 
     public boolean isEmpty() { return nodes.isEmpty(); }
 
-    public boolean containsPos(BlockPos pos) { return posIndex.containsKey(pos); }
+    public boolean containsPos(BlockPos pos) { return nodes.containsKey(pos); }
 
     // ── Edge linking ──────────────────────────────────────────────────────────
 
@@ -127,15 +122,15 @@ public final class BeltSubnetwork implements Effect {
      *         or both of {@code to}'s lanes already occupied by other inputs)
      */
     public boolean link(BlockPos fromPos, BlockPos toPos) {
-        BeltNode from = nodeAt(fromPos);
-        BeltNode to   = nodeAt(toPos);
+        BeltNode from = nodes.get(fromPos);
+        BeltNode to   = nodes.get(toPos);
         if (from == null || to == null) {
             MechanicalArmory.LOGGER.warn("[BeltSubnetwork] link failed: fromNode({})={}, toNode({})={}",
                     fromPos.toShortString(), from != null, toPos.toShortString(), to != null);
             return false;
         }
 
-        int lane = to.addInput(from.nodeId());
+        int lane = to.addInput(fromPos);
         if (lane < 0) {
             MechanicalArmory.LOGGER.warn(
                     "[BeltSubnetwork] link refused: {} -> {} has both merge lanes occupied",
@@ -143,19 +138,19 @@ public final class BeltSubnetwork implements Effect {
             return false;
         }
 
-        from.setOutputId(to.nodeId());
+        from.setOutputPos(toPos);
         topoDirty = true;
         return true;
     }
 
     public void unlink(BlockPos fromPos) {
-        BeltNode from = nodeAt(fromPos);
+        BeltNode from = nodes.get(fromPos);
         if (from == null) return;
-        UUID outId = from.outputId();
-        from.setOutputId(null);
-        if (outId != null) {
-            BeltNode out = nodes.get(outId);
-            if (out != null) out.removeInput(from.nodeId());
+        BlockPos outPos = from.outputPos();
+        from.setOutputPos(null);
+        if (outPos != null) {
+            BeltNode out = nodes.get(outPos);
+            if (out != null) out.removeInput(fromPos);
         }
         topoDirty = true;
     }
@@ -184,21 +179,21 @@ public final class BeltSubnetwork implements Effect {
 
     private void rebuildTopo() {
         List<BeltNode> result = new ArrayList<>(nodes.size());
-        Set<UUID> visited = new HashSet<>();
+        Set<BlockPos> visited = new HashSet<>();
 
         // In output-first sorting, a node is ready when its downstream output has been placed.
-        Map<UUID, Integer> outDegree = new HashMap<>();
+        Map<BlockPos, Integer> outDegree = new HashMap<>();
         for (BeltNode n : nodes.values()) {
-            if (n.outputId() != null && nodes.containsKey(n.outputId())) {
-                outDegree.put(n.nodeId(), 1);
+            if (n.outputPos() != null && nodes.containsKey(n.outputPos())) {
+                outDegree.put(n.pos(), 1);
             } else {
-                outDegree.put(n.nodeId(), 0);
+                outDegree.put(n.pos(), 0);
             }
         }
 
-        Queue<UUID> queue = new ArrayDeque<>();
+        Queue<BlockPos> queue = new ArrayDeque<>();
         // 1. Initial drains / terminals (outDegree == 0)
-        for (Map.Entry<UUID, Integer> e : outDegree.entrySet()) {
+        for (Map.Entry<BlockPos, Integer> e : outDegree.entrySet()) {
             if (e.getValue() == 0) {
                 queue.add(e.getKey());
             }
@@ -208,10 +203,10 @@ public final class BeltSubnetwork implements Effect {
             if (queue.isEmpty()) {
                 // Graph contains a cycle among unvisited nodes.
                 // Pick an unvisited node to break the cycle.
-                UUID cycleBreak = null;
-                for (UUID id : nodes.keySet()) {
-                    if (!visited.contains(id)) {
-                        cycleBreak = id;
+                BlockPos cycleBreak = null;
+                for (BlockPos pos : nodes.keySet()) {
+                    if (!visited.contains(pos)) {
+                        cycleBreak = pos;
                         break;
                     }
                 }
@@ -220,18 +215,18 @@ public final class BeltSubnetwork implements Effect {
             }
 
             while (!queue.isEmpty()) {
-                UUID id = queue.poll();
-                if (!visited.add(id)) continue;
-                BeltNode node = nodes.get(id);
+                BlockPos pos = queue.poll();
+                if (!visited.add(pos)) continue;
+                BeltNode node = nodes.get(pos);
                 if (node == null) continue;
                 result.add(node);
 
                 // Notify inputs that this output node has been placed
-                for (UUID inputId : node.inputIds()) {
-                    if (!visited.contains(inputId)) {
-                        int remaining = outDegree.merge(inputId, -1, Integer::sum);
+                for (BlockPos inputPos : node.inputPositions()) {
+                    if (!visited.contains(inputPos)) {
+                        int remaining = outDegree.merge(inputPos, -1, Integer::sum);
                         if (remaining <= 0) {
-                            queue.add(inputId);
+                            queue.add(inputPos);
                         }
                     }
                 }
@@ -242,17 +237,17 @@ public final class BeltSubnetwork implements Effect {
 
         // ── Build layer partition ─────────────────────────────────────────────
         final int n = result.size();
-        final Map<UUID, Integer> topoPos = new HashMap<>(n * 2);
+        final Map<BlockPos, Integer> topoPos = new HashMap<>(n * 2);
         for (int i = 0; i < n; i++) {
-            topoPos.put(result.get(i).nodeId(), i);
+            topoPos.put(result.get(i).pos(), i);
         }
 
         final int[] depth = new int[n];
         int maxDepth = 0;
         for (int i = 0; i < n; i++) {
             BeltNode node = result.get(i);
-            UUID outId = node.outputId();
-            Integer outIdx = (outId != null) ? topoPos.get(outId) : null;
+            BlockPos outPos = node.outputPos();
+            Integer outIdx = (outPos != null) ? topoPos.get(outPos) : null;
             // Only depend on downstream nodes placed earlier in result (k < i)
             int d = (outIdx != null && outIdx < i) ? depth[outIdx] + 1 : 0;
             depth[i] = d;
@@ -277,23 +272,23 @@ public final class BeltSubnetwork implements Effect {
     public List<BeltSubnetwork> splitIfNeeded() {
         if (nodes.isEmpty()) return List.of();
 
-        List<List<UUID>> components = new ArrayList<>();
-        Set<UUID> unvisited = new HashSet<>(nodes.keySet());
+        List<List<BlockPos>> components = new ArrayList<>();
+        Set<BlockPos> unvisited = new HashSet<>(nodes.keySet());
 
         while (!unvisited.isEmpty()) {
-            UUID start = unvisited.iterator().next();
-            List<UUID> component = new ArrayList<>();
-            Deque<UUID> queue = new ArrayDeque<>();
+            BlockPos start = unvisited.iterator().next();
+            List<BlockPos> component = new ArrayList<>();
+            Deque<BlockPos> queue = new ArrayDeque<>();
             queue.push(start);
             while (!queue.isEmpty()) {
-                UUID id = queue.pop();
-                if (!unvisited.remove(id)) continue;
-                component.add(id);
-                BeltNode n = nodes.get(id);
+                BlockPos pos = queue.pop();
+                if (!unvisited.remove(pos)) continue;
+                component.add(pos);
+                BeltNode n = nodes.get(pos);
                 if (n == null) continue;
-                if (n.outputId() != null && unvisited.contains(n.outputId()))
-                    queue.push(n.outputId());
-                for (UUID inp : n.inputIds())
+                if (n.outputPos() != null && unvisited.contains(n.outputPos()))
+                    queue.push(n.outputPos());
+                for (BlockPos inp : n.inputPositions())
                     if (unvisited.contains(inp)) queue.push(inp);
             }
             components.add(component);
@@ -302,10 +297,10 @@ public final class BeltSubnetwork implements Effect {
         if (components.size() == 1) return List.of(this); // still one piece
 
         List<BeltSubnetwork> result = new ArrayList<>();
-        for (List<UUID> component : components) {
+        for (List<BlockPos> component : components) {
             BeltSubnetwork sub = new BeltSubnetwork(UUID.randomUUID());
-            for (UUID id : component) {
-                BeltNode n = nodes.get(id);
+            for (BlockPos pos : component) {
+                BeltNode n = nodes.get(pos);
                 if (n != null) sub.addNode(n);
             }
             result.add(sub);

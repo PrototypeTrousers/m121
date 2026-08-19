@@ -10,7 +10,6 @@ import net.minecraft.resources.ResourceLocation;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 import proto.mechanicalarmory.client.belt.ClientBeltNetwork;
 import proto.mechanicalarmory.common.belt.data.BeltLane;
-import proto.mechanicalarmory.common.entities.block.BeltEntity;
 
 import java.util.UUID;
 
@@ -29,7 +28,7 @@ import java.util.UUID;
  * <p>The handler is identical to {@link BeltInitPayload} — re-seed + catch-up,
  * then set the {@code stopped} flag.
  */
-public record BeltCorrectionPayload(BlockPos pos, UUID nodeId, UUID outputId, BeltLane lane0, BeltLane lane1,
+public record BeltCorrectionPayload(BlockPos pos, BlockPos outputPos, BeltLane lane0, BeltLane lane1,
                                     long serverTick, boolean wrapPoint, boolean hasOutput, boolean stopped)
         implements CustomPacketPayload {
 
@@ -47,9 +46,8 @@ public record BeltCorrectionPayload(BlockPos pos, UUID nodeId, UUID outputId, Be
 
     private static void encode(RegistryFriendlyByteBuf buf, BeltCorrectionPayload pkt) {
         buf.writeBlockPos(pkt.pos);
-        buf.writeUUID(pkt.nodeId);
-        buf.writeBoolean(pkt.outputId != null);
-        if (pkt.outputId != null) buf.writeUUID(pkt.outputId);
+        buf.writeBoolean(pkt.outputPos != null);
+        if (pkt.outputPos != null) buf.writeBlockPos(pkt.outputPos);
         buf.writeLong(pkt.serverTick);
         HolderLookup.Provider regs = buf.registryAccess();
         buf.writeNbt(pkt.lane0.save(regs));
@@ -61,8 +59,7 @@ public record BeltCorrectionPayload(BlockPos pos, UUID nodeId, UUID outputId, Be
 
     private static BeltCorrectionPayload decode(RegistryFriendlyByteBuf buf) {
         BlockPos pos      = buf.readBlockPos();
-        UUID nodeId       = buf.readUUID();
-        UUID outputId     = buf.readBoolean() ? buf.readUUID() : null;
+        BlockPos outputPos     = buf.readBoolean() ? buf.readBlockPos() : null;
         long tick         = buf.readLong();
         HolderLookup.Provider regs = buf.registryAccess();
         BeltLane l0       = BeltLane.load((CompoundTag) buf.readNbt(), regs);
@@ -70,7 +67,7 @@ public record BeltCorrectionPayload(BlockPos pos, UUID nodeId, UUID outputId, Be
         boolean wrap      = buf.readBoolean();
         boolean hasOut    = buf.readBoolean();
         boolean stopped   = buf.readBoolean();
-        return new BeltCorrectionPayload(pos, nodeId, outputId, l0, l1, tick, wrap, hasOut, stopped);
+        return new BeltCorrectionPayload(pos, outputPos, l0, l1, tick, wrap, hasOut, stopped);
     }
 
     // ── Handler (CLIENT) ──────────────────────────────────────────────────────
@@ -85,7 +82,7 @@ public record BeltCorrectionPayload(BlockPos pos, UUID nodeId, UUID outputId, Be
 
 
             ClientBeltNetwork.get().updateNode(
-                    pkt.pos(), pkt.outputId(), l0, l1, pkt.stopped(), pkt.wrapPoint(), pkt.hasOutput());
+                    pkt.pos(), pkt.outputPos(), l0, l1, pkt.stopped(), pkt.wrapPoint(), pkt.hasOutput());
         });
     }
 }

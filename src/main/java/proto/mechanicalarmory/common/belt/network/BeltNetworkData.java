@@ -17,7 +17,6 @@ import org.jetbrains.annotations.Nullable;
 import proto.mechanicalarmory.common.belt.data.BeltLane;
 import proto.mechanicalarmory.common.belt.data.BeltNode;
 import proto.mechanicalarmory.common.blocks.BlockBelt;
-import proto.mechanicalarmory.common.entities.block.BeltEntity;
 import proto.mechanicalarmory.common.network.BeltCorrectionPayload;
 import proto.mechanicalarmory.common.network.BeltInitPayload;
 
@@ -25,10 +24,7 @@ import java.util.*;
 
 /**
  * {@link SavedData} that owns the entire belt network for a level.
- *
- * <p>All item positions live here.  {@link BeltEntity} is a thin rendering
- * anchor — it holds no authoritative item data.
- *
+
  * <h3>Lifecycle</h3>
  * <ul>
  *   <li>Retrieved via {@link #get(ServerLevel)} — created lazily.</li>
@@ -101,12 +97,12 @@ public final class BeltNetworkData extends SavedData {
 
         List<BlockPos> affected = new ArrayList<>();
         if (node != null && owning != null) {
-            if (node.outputId() != null) {
-                BeltNode out = owning.node(node.outputId());
+            if (node.outputPos() != null) {
+                BeltNode out = owning.node(node.outputPos());
                 if (out != null) affected.add(out.pos());
             }
-            for (UUID inId : node.inputIds()) {
-                BeltNode in = owning.node(inId);
+            for (BlockPos inPos : node.inputPositions()) {
+                BeltNode in = owning.node(inPos);
                 if (in != null) affected.add(in.pos());
             }
         }
@@ -137,8 +133,7 @@ public final class BeltNetworkData extends SavedData {
 
     /**
      * Called when a chunk loads.  For every belt in that chunk, send the
-     * current lane state to nearby clients so they can seed their simulations,
-     * and sync the {@link BeltEntity}.
+     * current lane state to nearby clients so they can seed their simulations
      */
     public void onChunkLoaded(ChunkPos chunkPos, ServerLevel level) {
         int minX = chunkPos.getMinBlockX();
@@ -157,12 +152,11 @@ public final class BeltNetworkData extends SavedData {
 
             snapshots.add(new BeltInitPayload.NodeSnapshot(
                     bpos,
-                    node.nodeId(),
-                    node.outputId(),
+                    node.outputPos(),
                     node.lane(0).deepCopy(),
                     node.lane(1).deepCopy(),
                     node.isWrapPoint(),
-                    node.outputId() != null,
+                    node.outputPos() != null,
                     node.isStopped()
             ));
         }
@@ -199,12 +193,11 @@ public final class BeltNetworkData extends SavedData {
 
             snapshots.add(new BeltInitPayload.NodeSnapshot(
                     bpos,
-                    node.nodeId(),
-                    node.outputId(),
+                    node.outputPos(),
                     node.lane(0).deepCopy(),
                     node.lane(1).deepCopy(),
                     node.isWrapPoint(),
-                    node.outputId() != null,
+                    node.outputPos() != null,
                     node.isStopped()
             ));
         }
@@ -319,13 +312,12 @@ public final class BeltNetworkData extends SavedData {
         if (node == null) return;
         BeltCorrectionPayload pkt = new BeltCorrectionPayload(
                 pos,
-                node.nodeId(),
-                node.outputId(),
+                node.outputPos(),
                 node.lane(0).deepCopy(),
                 node.lane(1).deepCopy(),
                 level.getGameTime(),
                 node.isWrapPoint(),
-                node.outputId() != null,
+                node.outputPos() != null,
                 node.isStopped()
         );
         PacketDistributor.sendToPlayersNear(level, null,

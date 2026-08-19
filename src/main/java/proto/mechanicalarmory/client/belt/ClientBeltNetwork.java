@@ -46,43 +46,13 @@ public final class ClientBeltNetwork {
 
     private ClientBeltNetwork() {}
 
-    // ── Lookups ───────────────────────────────────────────────────────────────
-
-    @Nullable
-    public synchronized BeltNode getNode(BlockPos pos) { return registry.nodeAt(pos); }
-
-    @Nullable
-    public synchronized UUID subnetworkIdForPos(BlockPos pos) { return registry.subnetIdAt(pos); }
-
-    /** Look up a node by its UUID within a specific subnet (used by diagnostics). */
-    @Nullable
-    public synchronized BeltNode getNodeById(@Nullable UUID subnetId, @Nullable UUID nodeId) {
-        if (nodeId == null) return null;
-        BeltSubnetwork subnet = registry.subnetwork(subnetId);
-        return subnet == null ? null : subnet.node(nodeId);
-    }
-
-    /** How many nodes are registered in a given subnet (used by diagnostics). */
-    public synchronized int subnetNodeCount(@Nullable UUID subnetId) {
-        BeltSubnetwork subnet = registry.subnetwork(subnetId);
-        return subnet == null ? 0 : subnet.allNodes().size();
-    }
-
-    public synchronized int totalSubnetCount() { return registry.allSubnetworks().size(); }
-
-    public synchronized int totalNodeCount() {
-        int total = 0;
-        for (BeltSubnetwork s : registry.allSubnetworks()) total += s.allNodes().size();
-        return total;
-    }
-
     // ── Updates from the server ──────────────────────────────────────────────
 
     /**
      * Called when a BeltInitPayload or BeltCorrectionPayload arrives from the server,
      * or when chunk NBT data is loaded.
      */
-    public synchronized void updateNode(BlockPos pos, @Nullable UUID serverOutputId,
+    public synchronized void updateNode(BlockPos pos, @Nullable BlockPos serverOutputPos,
                                         BeltLane lane0, BeltLane lane1,
                                         boolean stopped, boolean wrapPoint, boolean hasOutput) {
         Level level = Minecraft.getInstance().level;
@@ -100,8 +70,8 @@ public final class ClientBeltNetwork {
 
         // serverOutputId is now just BeltNode.posToId(outPos) – keep it for
         // the case where outPos hasn't loaded yet and relink can't merge.
-        if (serverOutputId != null) {
-            node.setOutputId(serverOutputId);
+        if (serverOutputPos != null) {
+            node.setOutputPos(serverOutputPos);
         }
 
         // Copy lane contents from the server snapshot
@@ -193,10 +163,10 @@ public final class ClientBeltNetwork {
             BeltSubnetwork sub = registry.subnetworkAt(pos);
             if (sub == null) continue;
             BeltNode node = sub.nodeAt(pos);
-            if (node == null || node.outputId() == null) continue;
+            if (node == null || node.outputPos() == null) continue;
 
             // Already resolved in this subnet → nothing to do.
-            if (sub.node(node.outputId()) != null) continue;
+            if (sub.node(node.outputPos()) != null) continue;
 
             // The outputId isn't in our subnet. Derive the downstream position
             // from the block world and check if it's registered somewhere.
@@ -268,9 +238,9 @@ public final class ClientBeltNetwork {
         MechanicalArmory.LOGGER.info(
                 "[ClientBeltNetwork] Linked {} -> {} ({}), from.outId={}, to.inCount={}",
                 fromPos.toShortString(), toPos.toShortString(), result.linked() ? "ok" : "refused",
-                fromNode != null && fromNode.outputId() != null
-                        ? fromNode.outputId().toString().substring(0, 8) : "null",
-                toNode.inputIds().size());
+                fromNode != null && fromNode.outputPos() != null
+                        ? fromNode.outputPos().toString().substring(0, 8) : "null",
+                toNode.inputPositions().size());
     }
 
     // ── Removal ───────────────────────────────────────────────────────────────

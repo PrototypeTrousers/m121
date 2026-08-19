@@ -55,7 +55,7 @@ public class BeltSubnetworkVisual extends AbstractVisual
     private final BeltSubnetwork subnet;
 
     /** Active Flywheel instances: Node UUID -> [Lane 0 instances, Lane 1 instances]. */
-    private final Map<UUID, List<List<TransformedInstance>>> nodeInstances = new HashMap<>();
+    private final Map<BlockPos, List<List<TransformedInstance>>> nodeInstances = new HashMap<>();
 
     /** Last game time simulation was advanced. */
     private long lastTickedGameTime = 0;
@@ -117,13 +117,13 @@ public class BeltSubnetworkVisual extends AbstractVisual
                 BeltNode outNode = null;
                 int mergedInputLane = -1;
                 boolean isSoleInput = true;
-                if (node.outputId() != null) {
-                    BeltNode candidate = subnet.node(node.outputId());
+                if (node.outputPos() != null) {
+                    BeltNode candidate = subnet.node(node.outputPos());
                     if (candidate != null && !candidate.isStopped()) {
-                        mergedInputLane = candidate.laneForInput(node.nodeId());
+                        mergedInputLane = candidate.laneForInput(node.pos());
                         if (mergedInputLane >= 0) {
                             outNode = candidate;
-                            isSoleInput = candidate.inputIds().size() <= 1;
+                            isSoleInput = candidate.inputPositions().size() <= 1;
                         }
                         // mergedInputLane < 0: topology points here but we're
                         // not registered on either lane (stale edge mid-relink)
@@ -199,17 +199,17 @@ public class BeltSubnetworkVisual extends AbstractVisual
     // ── Rendering ─────────────────────────────────────────────────────────────
 
     private void renderSubnetwork(float partialTick) {
-        Set<UUID> liveNodeIds = new HashSet<>();
+        Set<BlockPos> liveNodeIds = new HashSet<>();
 
         for (BeltNode node : subnet.allNodes()) {
-            liveNodeIds.add(node.nodeId());
+            liveNodeIds.add(node.pos());
             renderNode(node, partialTick);
         }
 
         // Clean up removed nodes
-        Iterator<Map.Entry<UUID, List<List<TransformedInstance>>>> it = nodeInstances.entrySet().iterator();
+        Iterator<Map.Entry<BlockPos, List<List<TransformedInstance>>>> it = nodeInstances.entrySet().iterator();
         while (it.hasNext()) {
-            Map.Entry<UUID, List<List<TransformedInstance>>> entry = it.next();
+            Map.Entry<BlockPos, List<List<TransformedInstance>>> entry = it.next();
             if (!liveNodeIds.contains(entry.getKey())) {
                 for (List<TransformedInstance> laneList : entry.getValue()) {
                     for (TransformedInstance inst : laneList) inst.delete();
@@ -224,7 +224,7 @@ public class BeltSubnetworkVisual extends AbstractVisual
         BlockPos pos = node.pos();
         BlockState state = level.getBlockState(pos);
         if (!(state.getBlock() instanceof BlockBelt)) {
-            List<List<TransformedInstance>> lanes = nodeInstances.remove(node.nodeId());
+            List<List<TransformedInstance>> lanes = nodeInstances.remove(node.pos());
             if (lanes != null) {
                 for (List<TransformedInstance> list : lanes) {
                     list.forEach(Instance::delete);
@@ -239,7 +239,7 @@ public class BeltSubnetworkVisual extends AbstractVisual
         CurveType curve = getCurveType(pos, facing);
         int packedLight = LevelRenderer.getLightColor(level, pos);
 
-        List<List<TransformedInstance>> lanes = nodeInstances.computeIfAbsent(node.nodeId(), k -> {
+        List<List<TransformedInstance>> lanes = nodeInstances.computeIfAbsent(node.pos(), k -> {
             List<List<TransformedInstance>> list = new ArrayList<>(2);
             list.add(new ArrayList<>());
             list.add(new ArrayList<>());
@@ -266,10 +266,10 @@ public class BeltSubnetworkVisual extends AbstractVisual
         // (opening and closing gaps cancel out over one partial tick).
         float laneAdvance = 0.0f;
         if (!node.isStopped()) {
-            boolean hasOutput = node.outputId() != null && subnet.node(node.outputId()) != null
-                    && !subnet.node(node.outputId()).isStopped();
+            boolean hasOutput = node.outputPos() != null && subnet.node(node.outputPos()) != null
+                    && !subnet.node(node.outputPos()).isStopped();
             if (hasOutput) {
-                BeltLane nextLane = subnet.node(node.outputId()).lane(laneIdx);
+                BeltLane nextLane = subnet.node(node.outputPos()).lane(laneIdx);
                 float nextRoom = nextLane.isEmpty()
                         ? Float.MAX_VALUE
                         : nextLane.peekLast().tailPos(nextLane.itemSpacing());
@@ -294,10 +294,10 @@ public class BeltSubnetworkVisual extends AbstractVisual
         // correct left/right offset in the downstream block instead of
         // keeping its old side for a frame or two.
         int destLaneIdx = laneIdx;
-        if (node.outputId() != null) {
-            BeltNode outNode = subnet.node(node.outputId());
+        if (node.outputPos() != null) {
+            BeltNode outNode = subnet.node(node.outputPos());
             if (outNode != null) {
-                int assigned = outNode.laneForInput(node.nodeId());
+                int assigned = outNode.laneForInput(node.pos());
                 if (assigned >= 0) destLaneIdx = assigned;
             }
         }
@@ -478,7 +478,7 @@ public class BeltSubnetworkVisual extends AbstractVisual
     @Override
     public void updateLight(float partialTick) {
         if (level == null) return;
-        for (Map.Entry<UUID, List<List<TransformedInstance>>> entry : nodeInstances.entrySet()) {
+        for (Map.Entry<BlockPos, List<List<TransformedInstance>>> entry : nodeInstances.entrySet()) {
             BeltNode node = subnet.node(entry.getKey());
             if (node == null) continue;
             int light = LevelRenderer.getLightColor(level, node.pos());

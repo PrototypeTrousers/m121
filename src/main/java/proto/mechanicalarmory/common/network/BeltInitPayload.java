@@ -12,7 +12,6 @@ import net.neoforged.neoforge.network.handling.IPayloadContext;
 import proto.mechanicalarmory.MechanicalArmory;
 import proto.mechanicalarmory.client.belt.ClientBeltNetwork;
 import proto.mechanicalarmory.common.belt.data.BeltLane;
-import proto.mechanicalarmory.common.entities.block.BeltEntity;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -43,9 +42,8 @@ public record BeltInitPayload(List<NodeSnapshot> snapshots, long serverTick)
         HolderLookup.Provider regs = buf.registryAccess();
         for (NodeSnapshot snap : pkt.snapshots) {
             buf.writeBlockPos(snap.pos());
-            buf.writeUUID(snap.nodeId());
             buf.writeBoolean(snap.outputId() != null);
-            if (snap.outputId() != null) buf.writeUUID(snap.outputId());
+            if (snap.outputId() != null) buf.writeBlockPos(snap.outputId());
             buf.writeNbt(snap.lane0().save(regs));
             buf.writeNbt(snap.lane1().save(regs));
             buf.writeBoolean(snap.wrapPoint());
@@ -61,14 +59,13 @@ public record BeltInitPayload(List<NodeSnapshot> snapshots, long serverTick)
         List<NodeSnapshot> snaps = new ArrayList<>(count);
         for (int i = 0; i < count; i++) {
             BlockPos pos      = buf.readBlockPos();
-            UUID nodeId       = buf.readUUID();
-            UUID outputId     = buf.readBoolean() ? buf.readUUID() : null;
+            BlockPos outputPos     = buf.readBoolean() ? buf.readBlockPos() : null;
             BeltLane l0       = BeltLane.load((CompoundTag) buf.readNbt(), regs);
             BeltLane l1       = BeltLane.load((CompoundTag) buf.readNbt(), regs);
             boolean wrap      = buf.readBoolean();
             boolean hasOut    = buf.readBoolean();
             boolean stopped   = buf.readBoolean();
-            snaps.add(new NodeSnapshot(pos, nodeId, outputId, l0, l1, wrap, hasOut, stopped));
+            snaps.add(new NodeSnapshot(pos, outputPos, l0, l1, wrap, hasOut, stopped));
         }
         return new BeltInitPayload(snaps, tick);
     }
@@ -93,6 +90,6 @@ public record BeltInitPayload(List<NodeSnapshot> snapshots, long serverTick)
 
     // ── Inner type ────────────────────────────────────────────────────────────
 
-    public record NodeSnapshot(BlockPos pos, UUID nodeId, UUID outputId, BeltLane lane0, BeltLane lane1,
+    public record NodeSnapshot(BlockPos pos, BlockPos outputId, BeltLane lane0, BeltLane lane1,
                                boolean wrapPoint, boolean hasOutput, boolean stopped) {}
 }
