@@ -53,16 +53,6 @@ public final class BeltNode {
      * for lane assignment — see {@link #laneForInput(BlockPos)}.
      */
     private final Map<BlockPos, Integer> inputLanes = new LinkedHashMap<>(2);
-
-    /**
-     * True when this node is the wrap-point of a loop.  Its "output" back into
-     * the loop is handled by {@link BeltLane#applyWrap()} instead of a real
-     * transfer, so it has no {@code outputPos}.  It is treated as topological
-     * layer 0 (processed first in the tick).
-     */
-    private boolean isWrapPoint;
-
-    /** Whether the belt is stopped (e.g. powered by redstone). */
     private boolean stopped;
 
     // ── Construction ──────────────────────────────────────────────────────────
@@ -95,11 +85,9 @@ public final class BeltNode {
         return inputLanes.containsValue(lane);
     }
 
-    public boolean isWrapPoint() { return isWrapPoint; }
     public boolean isStopped()   { return stopped; }
 
     public void setOutputPos(@Nullable BlockPos pos) { outputPos = pos; }
-    public void setWrapPoint(boolean wp)             { isWrapPoint = wp; }
     public void setStopped(boolean s)                { stopped = s; }
 
     /**
@@ -138,7 +126,6 @@ public final class BeltNode {
         tag.put("lane0", lanes[0].save(registries));
         tag.put("lane1", lanes[1].save(registries));
         if (outputPos != null) tag.put("outputPos", NbtUtils.writeBlockPos(outputPos));
-        tag.putBoolean("wrapPoint", isWrapPoint);
         tag.putBoolean("stopped", stopped);
 
         ListTag inputs = new ListTag();
@@ -164,7 +151,6 @@ public final class BeltNode {
         if (tag.contains("outputPos")) {
             node.outputPos = NbtUtils.readBlockPos(tag, "outputPos").orElse(null);
         }
-        node.isWrapPoint = tag.getBoolean("wrapPoint");
         node.stopped = tag.getBoolean("stopped");
 
         ListTag inputs = tag.getList("inputs", Tag.TAG_COMPOUND);

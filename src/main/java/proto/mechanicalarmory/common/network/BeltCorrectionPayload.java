@@ -82,7 +82,7 @@ public record BeltCorrectionPayload(BlockPos pos, BlockPos outputPos, BeltLane l
 
 
             ClientBeltNetwork.get().updateNode(
-                    pkt.pos(), pkt.outputPos(), l0, l1, pkt.stopped(), pkt.wrapPoint(), pkt.hasOutput());
+                    pkt.pos(), pkt.outputPos(), l0, l1, pkt.stopped(), pkt.hasOutput());
         });
     }
 }

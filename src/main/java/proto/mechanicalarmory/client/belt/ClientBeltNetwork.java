@@ -54,7 +54,7 @@ public final class ClientBeltNetwork {
      */
     public synchronized void updateNode(BlockPos pos, @Nullable BlockPos serverOutputPos,
                                         BeltLane lane0, BeltLane lane1,
-                                        boolean stopped, boolean wrapPoint, boolean hasOutput) {
+                                        boolean stopped, boolean hasOutput) {
         Level level = Minecraft.getInstance().level;
         if (level == null) return;
 
@@ -89,8 +89,8 @@ public final class ClientBeltNetwork {
     }
 
     public synchronized void updateNode(BlockPos pos, BeltLane lane0, BeltLane lane1,
-                                        boolean stopped, boolean wrapPoint, boolean hasOutput) {
-        updateNode(pos, null, lane0, lane1, stopped, wrapPoint, hasOutput);
+                                        boolean stopped, boolean hasOutput) {
+        updateNode(pos, null, lane0, lane1, stopped, hasOutput);
     }
 
     private static void copyLane(BeltLane source, BeltLane dest) {

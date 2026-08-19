@@ -46,7 +46,6 @@ public record BeltInitPayload(List<NodeSnapshot> snapshots, long serverTick)
             if (snap.outputId() != null) buf.writeBlockPos(snap.outputId());
             buf.writeNbt(snap.lane0().save(regs));
             buf.writeNbt(snap.lane1().save(regs));
-            buf.writeBoolean(snap.wrapPoint());
             buf.writeBoolean(snap.hasOutput());
             buf.writeBoolean(snap.stopped());
         }
@@ -62,10 +61,9 @@ public record BeltInitPayload(List<NodeSnapshot> snapshots, long serverTick)
             BlockPos outputPos     = buf.readBoolean() ? buf.readBlockPos() : null;
             BeltLane l0       = BeltLane.load((CompoundTag) buf.readNbt(), regs);
             BeltLane l1       = BeltLane.load((CompoundTag) buf.readNbt(), regs);
-            boolean wrap      = buf.readBoolean();
             boolean hasOut    = buf.readBoolean();
             boolean stopped   = buf.readBoolean();
-            snaps.add(new NodeSnapshot(pos, outputPos, l0, l1, wrap, hasOut, stopped));
+            snaps.add(new NodeSnapshot(pos, outputPos, l0, l1, hasOut, stopped));
         }
         return new BeltInitPayload(snaps, tick);
     }
@@ -83,7 +81,7 @@ public record BeltInitPayload(List<NodeSnapshot> snapshots, long serverTick)
                 BeltLane l1 = snap.lane1();
 
                 ClientBeltNetwork.get().updateNode(
-                        snap.pos(), snap.outputId(), l0, l1, snap.stopped(), snap.wrapPoint(), snap.hasOutput());
+                        snap.pos(), snap.outputId(), l0, l1, snap.stopped(), snap.hasOutput());
             }
         });
     }
@@ -91,5 +89,5 @@ public record BeltInitPayload(List<NodeSnapshot> snapshots, long serverTick)
     // ── Inner type ────────────────────────────────────────────────────────────
 
     public record NodeSnapshot(BlockPos pos, BlockPos outputId, BeltLane lane0, BeltLane lane1,
-                               boolean wrapPoint, boolean hasOutput, boolean stopped) {}
+                               boolean hasOutput, boolean stopped) {}
 }
