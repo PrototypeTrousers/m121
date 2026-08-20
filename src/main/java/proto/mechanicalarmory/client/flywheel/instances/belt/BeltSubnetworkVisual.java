@@ -150,29 +150,6 @@ public class BeltSubnetworkVisual extends AbstractVisual
             return;
         }
 
-        // Compute smooth advance delta for this lane
-        float laneAdvance = 0.0f;
-        if (!node.isStopped()) {
-            boolean hasOutput = node.outputPos() != null && subnet.node(node.outputPos()) != null
-                    && !subnet.node(node.outputPos()).isStopped();
-            if (hasOutput) {
-                BeltLane nextLane = subnet.node(node.outputPos()).lane(laneIdx);
-                float nextRoom = nextLane.isEmpty()
-                        ? Float.MAX_VALUE
-                        : nextLane.peekLast().tailPos(nextLane.spacing());
-                if (nextRoom > 0.0f) {
-                    laneAdvance = lane.speed() * partialTick;
-                } else {
-                    float maxReachPos = 1.0f + nextRoom * (lane.spacing() / nextLane.spacing());
-                    laneAdvance = Math.max(0.0f, Math.min(lane.speed(), maxReachPos - lane.peekFirst().headPos()));
-                }
-            } else {
-                // Terminal belt: clamp so the front item never visually overshoots 1.0.
-                float headPos = lane.peekFirst().headPos();
-                laneAdvance = Math.max(0.0f, Math.min(lane.speed() * partialTick, 1.0f - headPos));
-            }
-        }
-
         int destLaneIdx = laneIdx;
         if (node.outputPos() != null) {
             BeltNode outNode = subnet.node(node.outputPos());
@@ -181,17 +158,49 @@ public class BeltSubnetworkVisual extends AbstractVisual
             }
         }
 
+        // Compute smooth advance delta for this lane (clamped to physical room ahead)
+        float laneAdvance = 0.0f;
+        if (!node.isStopped()) {
+            float maxExitPos = 1.0f;
+            boolean hasOutput = node.outputPos() != null && subnet.node(node.outputPos()) != null
+                    && !subnet.node(node.outputPos()).isStopped();
+            if (hasOutput) {
+                BeltNode outNode = subnet.node(node.outputPos());
+                BeltLane outLane = outNode.lane(destLaneIdx);
+                if (outLane.isEmpty()) {
+                    maxExitPos = Float.MAX_VALUE;
+                } else {
+                    float outRoom = outLane.peekLast().tailPos(outLane.spacing());
+                    maxExitPos = 1.0f + outRoom * (lane.spacing() / outLane.spacing());
+                }
+            }
+
+            float frontHead = lane.peekFirst().headPos();
+            float maxAvailableDelta = Math.max(0.0f, maxExitPos - frontHead);
+            float actualSpeed = Math.min(lane.speed(), maxAvailableDelta);
+            laneAdvance = actualSpeed * partialTick;
+        }
+
         float spacing = lane.spacing();
         int idx = 0;
         final ItemGroup[] laneArr = lane.groupArray();
         final int laneSize = lane.groupCount();
 
+        float prevTail = Float.MAX_VALUE;
         for (int gi = 0; gi < laneSize; gi++) {
             ItemGroup group = laneArr[gi];
             CapturedModel model = BeltItemModelCapture.getOrCaptureModel(group.item(), level, deleted);
             if (model == null) continue;
 
-            float groupRenderHead = group.headPos() + laneAdvance;
+            float groupAdvance;
+            if (gi == 0) {
+                groupAdvance = laneAdvance;
+            } else {
+                float roomToPrev = Math.max(0.0f, prevTail - group.headPos());
+                groupAdvance = Math.min(laneAdvance, roomToPrev);
+            }
+            float groupRenderHead = group.headPos() + groupAdvance;
+            prevTail = groupRenderHead - group.count() * spacing;
 
             for (int i = 0; i < group.count(); i++) {
                 float renderPos = groupRenderHead - i * spacing;

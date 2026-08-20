@@ -18,24 +18,36 @@ public final class BeltSimulation {
     private BeltSimulation() {}
 
     /**
-     * Executes one simulation tick for an entire subnetwork in topological order (downstream first).
+     * Executes one simulation tick for an entire subnetwork:
+     * Phase 1: Advance all nodes in topological order (downstream first) to open space.
+     * Phase 2: Transfer boundary items (headPos >= 1.0) into downstream lanes.
+     *
+     * This two-phase separation prevents cycle wrap-around back-edges from double-advancing
+     * transferred items within the same tick.
      */
     public static void tickSubnetwork(BeltSubnetwork subnet) {
         List<List<BeltNode>> layers = subnet.layerOrder();
         if (layers.isEmpty()) return;
 
-        // Downstream layers (Layer 0) execute first, clearing space for upstream layers.
+        // Phase 1: Advance items on all active nodes
         for (List<BeltNode> layer : layers) {
             for (BeltNode node : layer) {
-                tickNode(node, subnet);
+                advanceNode(node, subnet);
+            }
+        }
+
+        // Phase 2: Transfer items across seams
+        for (List<BeltNode> layer : layers) {
+            for (BeltNode node : layer) {
+                transferNode(node, subnet);
             }
         }
     }
 
     /**
-     * Advance a single node's lanes and handle transfers to downstream neighbors.
+     * Advance a single node's lanes (clamped to room in output lane).
      */
-    public static void tickNode(BeltNode node, BeltSubnetwork subnet) {
+    public static void advanceNode(BeltNode node, BeltSubnetwork subnet) {
         if (node.isStopped()) return;
 
         BeltNode outNode = null;
@@ -65,10 +77,24 @@ public final class BeltSimulation {
                 }
             }
 
-            // 1. Advance items (clamped to maxExitPos)
+            // Advance items (clamped to maxExitPos)
             lane.advance(1.0f, maxExitPos);
+        }
+    }
 
-            // 2. Transfer into output lane if room is available
+    /**
+     * Transfer boundary items from this node into downstream lanes.
+     */
+    public static void transferNode(BeltNode node, BeltSubnetwork subnet) {
+        if (node.isStopped() || node.outputPos() == null) return;
+
+        BeltNode outNode = subnet.node(node.outputPos());
+        if (outNode == null || outNode.isStopped()) return;
+
+        for (int l = 0; l < 2; l++) {
+            BeltLane lane = node.lane(l);
+            int destLaneIdx = getDestinationLane(node, outNode, l);
+            BeltLane outLane = outNode.lane(destLaneIdx);
             if (outLane != null) {
                 lane.transferOut(outLane);
             }

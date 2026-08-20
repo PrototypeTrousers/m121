@@ -31,6 +31,7 @@ import proto.mechanicalarmory.MechanicalArmory;
 import proto.mechanicalarmory.client.belt.ClientBeltNetwork;
 import proto.mechanicalarmory.common.belt.data.BeltNode;
 import proto.mechanicalarmory.common.belt.network.BeltNetworkData;
+import proto.mechanicalarmory.common.network.BeltDeltaPayload;
 
 public class BlockBelt extends Block {
 
@@ -162,7 +163,7 @@ public class BlockBelt extends Block {
         if (inserted) {
             if (!player.isCreative()) heldStack.shrink(1);
             data.setDirty();
-            data.sendCorrection(pos, srv);
+            data.sendDelta(pos, lane, toInsert, 0.0f, BeltDeltaPayload.ACTION_INSERT, srv);
             return ItemInteractionResult.SUCCESS;
         }
         return ItemInteractionResult.PASS_TO_DEFAULT_BLOCK_INTERACTION;

@@ -9,6 +9,7 @@ import proto.mechanicalarmory.common.belt.data.BeltLane;
 import proto.mechanicalarmory.common.belt.data.BeltNode;
 import proto.mechanicalarmory.common.belt.data.ItemGroup;
 import proto.mechanicalarmory.common.belt.network.BeltNetworkData;
+import proto.mechanicalarmory.common.network.BeltDeltaPayload;
 
 import javax.annotation.Nullable;
 
@@ -86,7 +87,7 @@ public final class BeltItemHandler implements IItemHandler {
             if (inserted) {
                 BeltNetworkData data = BeltNetworkData.get(level);
                 data.setDirty();
-                data.sendCorrection(pos, level);
+                data.sendDelta(pos, laneIdx, toInsert, 0.0f, BeltDeltaPayload.ACTION_INSERT, level);
                 return stack.copyWithCount(stack.getCount() - 1);
             }
             return stack;
@@ -118,7 +119,7 @@ public final class BeltItemHandler implements IItemHandler {
         if (!extracted.isEmpty()) {
             BeltNetworkData data = BeltNetworkData.get(level);
             data.setDirty();
-            data.sendCorrection(pos, level);
+            data.sendDelta(pos, laneIdx, extracted, 1.0f, BeltDeltaPayload.ACTION_EXTRACT, level);
         }
         return extracted;
     }

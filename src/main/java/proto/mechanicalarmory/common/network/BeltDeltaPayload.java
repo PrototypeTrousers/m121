@@ -63,7 +63,7 @@ public record BeltDeltaPayload(BlockPos pos, int lane, ItemStack item, float hea
 
             BeltLane lane = node.lane(pkt.lane() == 1 ? 1 : 0);
             if (pkt.action() == ACTION_INSERT) {
-                lane.insertBack(ItemGroup.obtain(pkt.item(), 1, pkt.headPos()));
+                lane.insertItem(pkt.item());
             } else if (pkt.action() == ACTION_EXTRACT) {
                 lane.extractNearest(pkt.headPos());
             }
