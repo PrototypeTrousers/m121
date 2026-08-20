@@ -60,8 +60,8 @@ public final class BeltSimulation {
                 if (outLane.isEmpty()) {
                     maxExitPos = Float.MAX_VALUE;
                 } else {
-                    float outRoom = outLane.peekLast().tailPos(outLane.itemSpacing());
-                    maxExitPos = 1.0f + outRoom * (lane.itemSpacing() / outLane.itemSpacing());
+                    float outRoom = outLane.peekLast().tailPos(outLane.spacing());
+                    maxExitPos = 1.0f + outRoom * (lane.spacing() / outLane.spacing());
                 }
             }
 

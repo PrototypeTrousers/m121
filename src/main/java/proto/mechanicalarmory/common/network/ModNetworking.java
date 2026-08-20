@@ -42,6 +42,12 @@ public class ModNetworking {
         );
 
         registrar.playToClient(
+                BeltDeltaPayload.TYPE,
+                BeltDeltaPayload.STREAM_CODEC,
+                BeltDeltaPayload::handle
+        );
+
+        registrar.playToClient(
                 proto.mechanicalarmory.common.items.armor.OctoSuit.RemoveFlywheelEffectPayload.TYPE,
                 proto.mechanicalarmory.common.items.armor.OctoSuit.RemoveFlywheelEffectPayload.STREAM_CODEC,
                 proto.mechanicalarmory.common.items.armor.OctoSuit.RemoveFlywheelEffectPayload::handle

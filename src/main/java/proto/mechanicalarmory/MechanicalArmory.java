@@ -48,6 +48,7 @@ public class MechanicalArmory {
     public MechanicalArmory(IEventBus modEventBus, ModContainer modContainer) {
         // Register the commonSetup method for modloading
         modEventBus.addListener(this::commonSetup);
+        modEventBus.addListener(this::registerCapabilities);
 
         // Register the Deferred Register to the mod event bus so blocks get registered
         MABlocks.BLOCKS.register(modEventBus);
@@ -75,6 +76,20 @@ public class MechanicalArmory {
 
         // Register our mod's ModConfigSpec so that FML can create and load the config file for us
         modContainer.registerConfig(ModConfig.Type.COMMON, Config.SPEC);
+    }
+
+    private void registerCapabilities(net.neoforged.neoforge.capabilities.RegisterCapabilitiesEvent event) {
+        event.registerBlock(
+                net.neoforged.neoforge.capabilities.Capabilities.ItemHandler.BLOCK,
+                (level, pos, state, be, side) -> {
+                    if (level instanceof ServerLevel srv) {
+                        net.minecraft.core.Direction facing = state.getValue(proto.mechanicalarmory.common.blocks.BlockBelt.FACING);
+                        return new proto.mechanicalarmory.common.belt.capability.BeltItemHandler(srv, pos, facing, side);
+                    }
+                    return null;
+                },
+                MABlocks.BELT.get()
+        );
     }
 
     private void commonSetup(FMLCommonSetupEvent event) {

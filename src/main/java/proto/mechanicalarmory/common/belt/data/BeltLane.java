@@ -73,8 +73,7 @@ public final class BeltLane {
         return speed <= 0 ? ITEM_SPACING : (speed / SPEED_DEFAULT) * ITEM_SPACING;
     }
 
-    /** @deprecated prefer the cached {@link #spacing} field directly within this class. */
-    public float itemSpacing() { return spacing; }
+    public float spacing() { return spacing; }
 
     // ── Simulation ────────────────────────────────────────────────────────────
 
@@ -116,6 +115,7 @@ public final class BeltLane {
             if (cur.tailPos(spacing) - next.headPos() <= GAP_MERGE_THRESHOLD
                     && cur.sameType(next)) {
                 cur.setCount(cur.count() + next.count());
+                ItemGroup.release(next);
                 groups[r] = null; // release reference
             } else {
                 groups[w++] = cur;
@@ -129,11 +129,6 @@ public final class BeltLane {
             groups[i] = null;
         }
         size = w;
-    }
-
-    /** Backward-compatible overload — advances with no exit cap. */
-    public void advance(float dt) {
-        advance(dt, Float.MAX_VALUE);
     }
 
     /**
@@ -182,7 +177,7 @@ public final class BeltLane {
                 front.setCount(front.count() - 1);
                 front.advanceHead(-spacing);
 
-                output.insertBack(new ItemGroup(front.item(), 1, newHead));
+                output.insertBack(ItemGroup.obtain(front.item(), 1, newHead));
             }
             transferred = true;
         }
@@ -202,6 +197,7 @@ public final class BeltLane {
             }
             if (lastTail - incoming.headPos() <= GAP_MERGE_THRESHOLD && incoming.sameType(last)) {
                 last.setCount(last.count() + incoming.count());
+                ItemGroup.release(incoming);
                 return;
             }
         }
@@ -220,7 +216,7 @@ public final class BeltLane {
         if (maxAvailableHead <= 0.0f && size > 0) {
             return false; // lane is full / backed up to input
         }
-        insertBack(new ItemGroup(item, 1, Math.min(spacing, maxAvailableHead)));
+        insertBack(ItemGroup.obtain(item, 1, Math.min(spacing, maxAvailableHead)));
         return true;
     }
 
@@ -279,10 +275,15 @@ public final class BeltLane {
     public ItemGroup[] groupArray() { return groups; }
 
     /**
-     * Clears all groups from this lane.
+     * Clears all groups from this lane and releases them to the pool.
      */
     public void clearGroups() {
-        for (int i = 0; i < size; i++) groups[i] = null;
+        for (int i = 0; i < size; i++) {
+            if (groups[i] != null) {
+                ItemGroup.release(groups[i]);
+                groups[i] = null;
+            }
+        }
         size = 0;
     }
 
@@ -307,12 +308,14 @@ public final class BeltLane {
         return front;
     }
 
-    /** Removes the group at {@code idx}, shifting the tail down. */
+    /** Removes the group at {@code idx}, shifting the tail down and releasing it to pool. */
     private void removeAt(int idx) {
+        final ItemGroup removed = groups[idx];
         final int tail = size - 1;
         if (idx < tail) System.arraycopy(groups, idx + 1, groups, idx, tail - idx);
         groups[tail] = null;
         size--;
+        ItemGroup.release(removed);
     }
 
     // ── Snapshot (for client sync) ────────────────────────────────────────────
@@ -329,6 +332,28 @@ public final class BeltLane {
         }
         copy.size = valid;
         return copy;
+    }
+
+    // ── Network ByteBuf Codec ─────────────────────────────────────────────────
+
+    public void encode(net.minecraft.network.RegistryFriendlyByteBuf buf) {
+        buf.writeFloat(speed);
+        buf.writeVarInt(size);
+        for (int i = 0; i < size; i++) {
+            if (groups[i] != null) {
+                groups[i].encode(buf);
+            }
+        }
+    }
+
+    public static BeltLane decode(net.minecraft.network.RegistryFriendlyByteBuf buf) {
+        float spd = buf.readFloat();
+        int count = buf.readVarInt();
+        BeltLane lane = new BeltLane(spd);
+        for (int i = 0; i < count; i++) {
+            lane.addLast(ItemGroup.decode(buf));
+        }
+        return lane;
     }
 
     // ── NBT ───────────────────────────────────────────────────────────────────

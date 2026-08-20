@@ -2,22 +2,11 @@ package proto.mechanicalarmory.common.belt.data;
 
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.world.item.ItemStack;
-import net.neoforged.neoforge.items.ItemStackHandler;
 
 /**
  * A contiguous run of identical items on a belt lane.
- *
- * <p>The lane coordinate space is [0.0, 1.0] where 0 is the belt's input end
- * and 1 is its output end. {@code headPos} is the position of the <em>leading
- * edge</em> of this group; the trailing edge is at
- * {@code headPos - count * BeltLane.ITEM_SPACING}.
- *
- * <p>{@code headPos} may legally exceed [0, 1]:
- * <ul>
- *   <li>Negative – the group is entering from behind the input (wrap case).</li>
- *   <li>&gt;1.0  – the group is exiting past the output (wrap / transfer case).</li>
- * </ul>
  */
 public final class ItemGroup {
 
@@ -31,6 +20,22 @@ public final class ItemGroup {
      *              copy; {@code ItemGroup} does not copy it defensively.
      */
     public ItemGroup(ItemStack item, int count, float headPos) {
+        this.item = item;
+        this.count = count;
+        this.headPos = headPos;
+    }
+
+    // ── Object Pooling ────────────────────────────────────────────────────────
+
+    public static ItemGroup obtain(ItemStack item, int count, float headPos) {
+        return ItemGroupPool.obtain(item, count, headPos);
+    }
+
+    public static void release(ItemGroup group) {
+        ItemGroupPool.release(group);
+    }
+
+    public void set(ItemStack item, int count, float headPos) {
         this.item = item;
         this.count = count;
         this.headPos = headPos;
@@ -65,6 +70,21 @@ public final class ItemGroup {
         return ItemStack.isSameItemSameComponents(this.item, other.item);
     }
 
+    // ── Network ByteBuf Codec ─────────────────────────────────────────────────
+
+    public void encode(RegistryFriendlyByteBuf buf) {
+        ItemStack.OPTIONAL_STREAM_CODEC.encode(buf, item);
+        buf.writeVarInt(count);
+        buf.writeFloat(headPos);
+    }
+
+    public static ItemGroup decode(RegistryFriendlyByteBuf buf) {
+        ItemStack item = ItemStack.OPTIONAL_STREAM_CODEC.decode(buf);
+        int count = buf.readVarInt();
+        float headPos = buf.readFloat();
+        return obtain(item, count, headPos);
+    }
+
     // ── NBT ───────────────────────────────────────────────────────────────────
 
     public CompoundTag save(HolderLookup.Provider registries) {
@@ -79,12 +99,12 @@ public final class ItemGroup {
         ItemStack item = ItemStack.parseOptional(registries, tag.getCompound("item"));
         int count = tag.getInt("count");
         float headPos = tag.getFloat("headPos");
-        return new ItemGroup(item, count, headPos);
+        return obtain(item, count, headPos);
     }
 
     /** Returns a copy of this group with an independently-owned ItemStack. */
     public ItemGroup copy() {
-        return new ItemGroup(item.copy(), count, headPos);
+        return obtain(item.copy(), count, headPos);
     }
 
     @Override

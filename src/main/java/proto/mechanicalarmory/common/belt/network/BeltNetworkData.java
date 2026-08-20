@@ -18,6 +18,7 @@ import proto.mechanicalarmory.common.belt.data.BeltLane;
 import proto.mechanicalarmory.common.belt.data.BeltNode;
 import proto.mechanicalarmory.common.blocks.BlockBelt;
 import proto.mechanicalarmory.common.network.BeltCorrectionPayload;
+import proto.mechanicalarmory.common.network.BeltDeltaPayload;
 import proto.mechanicalarmory.common.network.BeltInitPayload;
 
 import java.util.*;
@@ -177,36 +178,7 @@ public final class BeltNetworkData extends SavedData {
      * Sends the current state of all belts in the chunk directly to that player.
      */
     public void sendChunkInitToPlayer(ChunkPos chunkPos, ServerPlayer player) {
-        int minX = chunkPos.getMinBlockX();
-        int minZ = chunkPos.getMinBlockZ();
-        int maxX = chunkPos.getMaxBlockX();
-        int maxZ = chunkPos.getMaxBlockZ();
-
-        List<BeltInitPayload.NodeSnapshot> snapshots = new ArrayList<>();
-
-        for (BlockPos bpos : registry.trackedPositions()) {
-            if (bpos.getX() < minX || bpos.getX() > maxX) continue;
-            if (bpos.getZ() < minZ || bpos.getZ() > maxZ) continue;
-
-            BeltNode node = registry.nodeAt(bpos);
-            if (node == null) continue;
-
-            snapshots.add(new BeltInitPayload.NodeSnapshot(
-                    bpos,
-                    node.facing(),
-                    node.outputPos(),
-                    node.lane(0).deepCopy(),
-                    node.lane(1).deepCopy(),
-                    node.outputPos() != null,
-                    node.isStopped()
-            ));
-        }
-
-        if (!snapshots.isEmpty()) {
-            long tick = player.serverLevel().getGameTime();
-            BeltInitPayload pkt = new BeltInitPayload(snapshots, tick);
-            PacketDistributor.sendToPlayer(player, pkt);
-        }
+        BeltNetworkSync.sendChunkInitToPlayer(chunkPos, registry, player, player.serverLevel());
     }
 
     // ── Accessors ─────────────────────────────────────────────────────────────
@@ -309,19 +281,14 @@ public final class BeltNetworkData extends SavedData {
     /** Send a full lane correction to all nearby clients for one belt position. */
     public void sendCorrection(BlockPos pos, ServerLevel level) {
         BeltNode node = nodeAt(pos);
-        if (node == null) return;
-        BeltCorrectionPayload pkt = new BeltCorrectionPayload(
-                pos,
-                node.facing(),
-                node.outputPos(),
-                node.lane(0).deepCopy(),
-                node.lane(1).deepCopy(),
-                level.getGameTime(),
-                node.outputPos() != null,
-                node.isStopped()
-        );
-        PacketDistributor.sendToPlayersNear(level, null,
-                pos.getX(), pos.getY(), pos.getZ(), 128, pkt);
+        if (node != null) {
+            BeltNetworkSync.sendCorrection(node, level);
+        }
+    }
+
+    /** Send a lightweight single-item delta to all nearby clients. */
+    public void sendDelta(BlockPos pos, int lane, net.minecraft.world.item.ItemStack item, float headPos, byte action, ServerLevel level) {
+        BeltNetworkSync.sendDelta(pos, lane, item, headPos, action, level);
     }
 
     // ── SavedData ─────────────────────────────────────────────────────────────

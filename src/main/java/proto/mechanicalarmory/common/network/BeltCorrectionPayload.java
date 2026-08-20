@@ -49,9 +49,8 @@ public record BeltCorrectionPayload(BlockPos pos, Direction facing, BlockPos out
         buf.writeBoolean(pkt.outputPos != null);
         if (pkt.outputPos != null) buf.writeBlockPos(pkt.outputPos);
         buf.writeLong(pkt.serverTick);
-        HolderLookup.Provider regs = buf.registryAccess();
-        buf.writeNbt(pkt.lane0.save(regs));
-        buf.writeNbt(pkt.lane1.save(regs));
+        pkt.lane0.encode(buf);
+        pkt.lane1.encode(buf);
         buf.writeBoolean(pkt.hasOutput);
         buf.writeBoolean(pkt.stopped);
     }
@@ -62,9 +61,8 @@ public record BeltCorrectionPayload(BlockPos pos, Direction facing, BlockPos out
         if (facing.getAxis().isVertical()) facing = Direction.NORTH;
         BlockPos outputPos = buf.readBoolean() ? buf.readBlockPos() : null;
         long tick         = buf.readLong();
-        HolderLookup.Provider regs = buf.registryAccess();
-        BeltLane l0       = BeltLane.load((CompoundTag) buf.readNbt(), regs);
-        BeltLane l1       = BeltLane.load((CompoundTag) buf.readNbt(), regs);
+        BeltLane l0       = BeltLane.decode(buf);
+        BeltLane l1       = BeltLane.decode(buf);
         boolean hasOut    = buf.readBoolean();
         boolean stopped   = buf.readBoolean();
         return new BeltCorrectionPayload(pos, facing, outputPos, l0, l1, tick, hasOut, stopped);

@@ -44,6 +44,10 @@ public final class ClientBeltNetwork {
     private final Set<UUID> registeredWithFlywheel = new HashSet<>();
     private VisualizationManager lastVm = null;
 
+    public BeltSubnetworkRegistry registry() {
+        return registry;
+    }
+
     private ClientBeltNetwork() {}
 
     // ── Updates from the server ──────────────────────────────────────────────
@@ -85,17 +89,6 @@ public final class ClientBeltNetwork {
 
         // Sync with Flywheel
         syncToFlywheel();
-    }
-
-    public void updateNode(BlockPos pos, @Nullable BlockPos serverOutputPos,
-                           BeltLane lane0, BeltLane lane1,
-                           boolean stopped, boolean hasOutput) {
-        updateNode(pos, null, serverOutputPos, lane0, lane1, stopped, hasOutput);
-    }
-
-    public void updateNode(BlockPos pos, BeltLane lane0, BeltLane lane1,
-                           boolean stopped, boolean hasOutput) {
-        updateNode(pos, null, null, lane0, lane1, stopped, hasOutput);
     }
 
     private static void copyLane(BeltLane source, BeltLane dest) {

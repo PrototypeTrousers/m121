@@ -39,14 +39,13 @@ public record BeltInitPayload(List<NodeSnapshot> snapshots, long serverTick)
     private static void encode(RegistryFriendlyByteBuf buf, BeltInitPayload pkt) {
         buf.writeLong(pkt.serverTick);
         buf.writeVarInt(pkt.snapshots.size());
-        HolderLookup.Provider regs = buf.registryAccess();
         for (NodeSnapshot snap : pkt.snapshots) {
             buf.writeBlockPos(snap.pos());
             buf.writeByte(snap.facing().get3DDataValue());
             buf.writeBoolean(snap.outputId() != null);
             if (snap.outputId() != null) buf.writeBlockPos(snap.outputId());
-            buf.writeNbt(snap.lane0().save(regs));
-            buf.writeNbt(snap.lane1().save(regs));
+            snap.lane0().encode(buf);
+            snap.lane1().encode(buf);
             buf.writeBoolean(snap.hasOutput());
             buf.writeBoolean(snap.stopped());
         }
@@ -55,15 +54,14 @@ public record BeltInitPayload(List<NodeSnapshot> snapshots, long serverTick)
     private static BeltInitPayload decode(RegistryFriendlyByteBuf buf) {
         long tick = buf.readLong();
         int count = buf.readVarInt();
-        HolderLookup.Provider regs = buf.registryAccess();
         List<NodeSnapshot> snaps = new ArrayList<>(count);
         for (int i = 0; i < count; i++) {
             BlockPos pos      = buf.readBlockPos();
             Direction facing  = Direction.from3DDataValue(buf.readByte());
             if (facing.getAxis().isVertical()) facing = Direction.NORTH;
             BlockPos outputPos = buf.readBoolean() ? buf.readBlockPos() : null;
-            BeltLane l0       = BeltLane.load((CompoundTag) buf.readNbt(), regs);
-            BeltLane l1       = BeltLane.load((CompoundTag) buf.readNbt(), regs);
+            BeltLane l0       = BeltLane.decode(buf);
+            BeltLane l1       = BeltLane.decode(buf);
             boolean hasOut    = buf.readBoolean();
             boolean stopped   = buf.readBoolean();
             snaps.add(new NodeSnapshot(pos, facing, outputPos, l0, l1, hasOut, stopped));

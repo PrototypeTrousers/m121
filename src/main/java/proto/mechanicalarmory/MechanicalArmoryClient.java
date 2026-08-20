@@ -118,6 +118,7 @@ public class MechanicalArmoryClient {
 
     @SubscribeEvent
     public static void onModifyBakingResult(ModelEvent.ModifyBakingResult event) {
+        proto.mechanicalarmory.client.flywheel.instances.belt.BeltSubnetworkVisual.clearModelCache();
         // We replace whatever Minecraft thinks is there with our custom class
         event.getModels().put(ModelResourceLocation.inventory(armItemModel.id()), new MyCustomItemBakedModel());
         event.getModels().put(ModelResourceLocation.inventory(chestplateItemModel.id()), new MyCustomItemBakedModel());

@@ -4,6 +4,10 @@ import dev.engine_room.flywheel.api.visual.Effect;
 import dev.engine_room.flywheel.api.visual.EffectVisual;
 import dev.engine_room.flywheel.api.visual.Visual;
 import dev.engine_room.flywheel.api.visualization.VisualizationContext;
+import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
+import it.unimi.dsi.fastutil.objects.ObjectArrayFIFOQueue;
+import it.unimi.dsi.fastutil.objects.ObjectArrayList;
+import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -171,11 +175,12 @@ public final class BeltSubnetwork implements Effect {
     }
 
     private void rebuildTopo() {
-        List<BeltNode> result = new ArrayList<>(nodes.size());
-        Set<BlockPos> visited = new HashSet<>();
+        ObjectArrayList<BeltNode> result = new ObjectArrayList<>(nodes.size());
+        ObjectOpenHashSet<BlockPos> visited = new ObjectOpenHashSet<>(nodes.size());
 
         // In output-first sorting, a node is ready when its downstream output has been placed.
-        Map<BlockPos, Integer> outDegree = new HashMap<>();
+        Object2IntOpenHashMap<BlockPos> outDegree = new Object2IntOpenHashMap<>(nodes.size());
+        outDegree.defaultReturnValue(0);
         for (BeltNode n : nodes.values()) {
             if (n.outputPos() != null && nodes.containsKey(n.outputPos())) {
                 outDegree.put(n.pos(), 1);
@@ -184,11 +189,11 @@ public final class BeltSubnetwork implements Effect {
             }
         }
 
-        Queue<BlockPos> queue = new ArrayDeque<>();
+        ObjectArrayFIFOQueue<BlockPos> queue = new ObjectArrayFIFOQueue<>(nodes.size());
         // 1. Initial drains / terminals (outDegree == 0)
-        for (Map.Entry<BlockPos, Integer> e : outDegree.entrySet()) {
-            if (e.getValue() == 0) {
-                queue.add(e.getKey());
+        for (Object2IntOpenHashMap.Entry<BlockPos> e : outDegree.object2IntEntrySet()) {
+            if (e.getIntValue() == 0) {
+                queue.enqueue(e.getKey());
             }
         }
 
@@ -204,11 +209,11 @@ public final class BeltSubnetwork implements Effect {
                     }
                 }
                 if (cycleBreak == null) break;
-                queue.add(cycleBreak);
+                queue.enqueue(cycleBreak);
             }
 
             while (!queue.isEmpty()) {
-                BlockPos pos = queue.poll();
+                BlockPos pos = queue.dequeue();
                 if (!visited.add(pos)) continue;
                 BeltNode node = nodes.get(pos);
                 if (node == null) continue;
@@ -217,9 +222,9 @@ public final class BeltSubnetwork implements Effect {
                 // Notify inputs that this output node has been placed
                 for (BlockPos inputPos : node.inputPositions()) {
                     if (!visited.contains(inputPos)) {
-                        int remaining = outDegree.merge(inputPos, -1, Integer::sum);
+                        int remaining = outDegree.addTo(inputPos, -1);
                         if (remaining <= 0) {
-                            queue.add(inputPos);
+                            queue.enqueue(inputPos);
                         }
                     }
                 }
@@ -230,7 +235,8 @@ public final class BeltSubnetwork implements Effect {
 
         // ── Build layer partition ─────────────────────────────────────────────
         final int n = result.size();
-        final Map<BlockPos, Integer> topoPos = new HashMap<>(n * 2);
+        final Object2IntOpenHashMap<BlockPos> topoPos = new Object2IntOpenHashMap<>(n * 2);
+        topoPos.defaultReturnValue(-1);
         for (int i = 0; i < n; i++) {
             topoPos.put(result.get(i).pos(), i);
         }
@@ -240,15 +246,15 @@ public final class BeltSubnetwork implements Effect {
         for (int i = 0; i < n; i++) {
             BeltNode node = result.get(i);
             BlockPos outPos = node.outputPos();
-            Integer outIdx = (outPos != null) ? topoPos.get(outPos) : null;
+            int outIdx = (outPos != null) ? topoPos.getInt(outPos) : -1;
             // Only depend on downstream nodes placed earlier in result (k < i)
-            int d = (outIdx != null && outIdx < i) ? depth[outIdx] + 1 : 0;
+            int d = (outIdx >= 0 && outIdx < i) ? depth[outIdx] + 1 : 0;
             depth[i] = d;
             if (d > maxDepth) maxDepth = d;
         }
 
-        List<List<BeltNode>> layers = new ArrayList<>(maxDepth + 1);
-        for (int i = 0; i <= maxDepth; i++) layers.add(new ArrayList<>());
+        List<List<BeltNode>> layers = new ObjectArrayList<>(maxDepth + 1);
+        for (int i = 0; i <= maxDepth; i++) layers.add(new ObjectArrayList<>());
         for (int i = 0; i < n; i++) layers.get(depth[i]).add(result.get(i));
         cachedLayers = layers;
 
@@ -265,31 +271,31 @@ public final class BeltSubnetwork implements Effect {
     public List<BeltSubnetwork> splitIfNeeded() {
         if (nodes.isEmpty()) return List.of();
 
-        List<List<BlockPos>> components = new ArrayList<>();
-        Set<BlockPos> unvisited = new HashSet<>(nodes.keySet());
+        List<List<BlockPos>> components = new ObjectArrayList<>();
+        ObjectOpenHashSet<BlockPos> unvisited = new ObjectOpenHashSet<>(nodes.keySet());
 
         while (!unvisited.isEmpty()) {
             BlockPos start = unvisited.iterator().next();
-            List<BlockPos> component = new ArrayList<>();
-            Deque<BlockPos> queue = new ArrayDeque<>();
-            queue.push(start);
+            List<BlockPos> component = new ObjectArrayList<>();
+            ObjectArrayFIFOQueue<BlockPos> queue = new ObjectArrayFIFOQueue<>();
+            queue.enqueue(start);
             while (!queue.isEmpty()) {
-                BlockPos pos = queue.pop();
+                BlockPos pos = queue.dequeue();
                 if (!unvisited.remove(pos)) continue;
                 component.add(pos);
                 BeltNode n = nodes.get(pos);
                 if (n == null) continue;
                 if (n.outputPos() != null && unvisited.contains(n.outputPos()))
-                    queue.push(n.outputPos());
+                    queue.enqueue(n.outputPos());
                 for (BlockPos inp : n.inputPositions())
-                    if (unvisited.contains(inp)) queue.push(inp);
+                    if (unvisited.contains(inp)) queue.enqueue(inp);
             }
             components.add(component);
         }
 
         if (components.size() == 1) return List.of(this); // still one piece
 
-        List<BeltSubnetwork> result = new ArrayList<>();
+        List<BeltSubnetwork> result = new ObjectArrayList<>(components.size());
         for (List<BlockPos> component : components) {
             BeltSubnetwork sub = new BeltSubnetwork(UUID.randomUUID());
             for (BlockPos pos : component) {
