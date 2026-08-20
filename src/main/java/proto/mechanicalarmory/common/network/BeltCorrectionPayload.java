@@ -1,6 +1,7 @@
 package proto.mechanicalarmory.common.network;
 
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.RegistryFriendlyByteBuf;
@@ -10,8 +11,6 @@ import net.minecraft.resources.ResourceLocation;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 import proto.mechanicalarmory.client.belt.ClientBeltNetwork;
 import proto.mechanicalarmory.common.belt.data.BeltLane;
-
-import java.util.UUID;
 
 /**
  * Sent server → client whenever the lane state diverges from what the client
@@ -28,8 +27,8 @@ import java.util.UUID;
  * <p>The handler is identical to {@link BeltInitPayload} — re-seed + catch-up,
  * then set the {@code stopped} flag.
  */
-public record BeltCorrectionPayload(BlockPos pos, BlockPos outputPos, BeltLane lane0, BeltLane lane1,
-                                    long serverTick, boolean wrapPoint, boolean hasOutput, boolean stopped)
+public record BeltCorrectionPayload(BlockPos pos, Direction facing, BlockPos outputPos, BeltLane lane0, BeltLane lane1,
+                                    long serverTick, boolean hasOutput, boolean stopped)
         implements CustomPacketPayload {
 
     public static final Type<BeltCorrectionPayload> TYPE = new Type<>(
@@ -46,28 +45,29 @@ public record BeltCorrectionPayload(BlockPos pos, BlockPos outputPos, BeltLane l
 
     private static void encode(RegistryFriendlyByteBuf buf, BeltCorrectionPayload pkt) {
         buf.writeBlockPos(pkt.pos);
+        buf.writeByte(pkt.facing.get3DDataValue());
         buf.writeBoolean(pkt.outputPos != null);
         if (pkt.outputPos != null) buf.writeBlockPos(pkt.outputPos);
         buf.writeLong(pkt.serverTick);
         HolderLookup.Provider regs = buf.registryAccess();
         buf.writeNbt(pkt.lane0.save(regs));
         buf.writeNbt(pkt.lane1.save(regs));
-        buf.writeBoolean(pkt.wrapPoint);
         buf.writeBoolean(pkt.hasOutput);
         buf.writeBoolean(pkt.stopped);
     }
 
     private static BeltCorrectionPayload decode(RegistryFriendlyByteBuf buf) {
         BlockPos pos      = buf.readBlockPos();
-        BlockPos outputPos     = buf.readBoolean() ? buf.readBlockPos() : null;
+        Direction facing  = Direction.from3DDataValue(buf.readByte());
+        if (facing.getAxis().isVertical()) facing = Direction.NORTH;
+        BlockPos outputPos = buf.readBoolean() ? buf.readBlockPos() : null;
         long tick         = buf.readLong();
         HolderLookup.Provider regs = buf.registryAccess();
         BeltLane l0       = BeltLane.load((CompoundTag) buf.readNbt(), regs);
         BeltLane l1       = BeltLane.load((CompoundTag) buf.readNbt(), regs);
-        boolean wrap      = buf.readBoolean();
         boolean hasOut    = buf.readBoolean();
         boolean stopped   = buf.readBoolean();
-        return new BeltCorrectionPayload(pos, outputPos, l0, l1, tick, wrap, hasOut, stopped);
+        return new BeltCorrectionPayload(pos, facing, outputPos, l0, l1, tick, hasOut, stopped);
     }
 
     // ── Handler (CLIENT) ──────────────────────────────────────────────────────
@@ -80,9 +80,8 @@ public record BeltCorrectionPayload(BlockPos pos, BlockPos outputPos, BeltLane l
             BeltLane l0 = pkt.lane0();
             BeltLane l1 = pkt.lane1();
 
-
             ClientBeltNetwork.get().updateNode(
-                    pkt.pos(), pkt.outputPos(), l0, l1, pkt.stopped(), pkt.hasOutput());
+                    pkt.pos(), pkt.facing(), pkt.outputPos(), l0, l1, pkt.stopped(), pkt.hasOutput());
         });
     }
 }

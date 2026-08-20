@@ -69,18 +69,14 @@ public final class ItemGroup {
 
     public CompoundTag save(HolderLookup.Provider registries) {
         CompoundTag tag = new CompoundTag();
-        ItemStackHandler tmp = new ItemStackHandler(1);
-        tmp.setStackInSlot(0, item);
-        tag.put("item", tmp.serializeNBT(registries));
+        tag.put("item", item.save(registries));
         tag.putInt("count", count);
         tag.putFloat("headPos", headPos);
         return tag;
     }
 
     public static ItemGroup load(CompoundTag tag, HolderLookup.Provider registries) {
-        ItemStackHandler tmp = new ItemStackHandler(1);
-        tmp.deserializeNBT(registries, tag.getCompound("item"));
-        ItemStack item = tmp.getStackInSlot(0);
+        ItemStack item = ItemStack.parseOptional(registries, tag.getCompound("item"));
         int count = tag.getInt("count");
         float headPos = tag.getFloat("headPos");
         return new ItemGroup(item, count, headPos);

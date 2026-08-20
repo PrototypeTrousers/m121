@@ -73,7 +73,7 @@ public final class BeltNetworkData extends SavedData {
      * it faces or that faces it, merging subnetworks as needed.
      */
     public void onBeltPlaced(BlockPos pos, Direction facing, ServerLevel level) {
-        BeltNode node = new BeltNode(pos);
+        BeltNode node = new BeltNode(pos, facing);
         boolean powered = level.getBlockState(pos).getValue(BlockBelt.POWERED);
         node.setStopped(powered);
 
@@ -152,10 +152,10 @@ public final class BeltNetworkData extends SavedData {
 
             snapshots.add(new BeltInitPayload.NodeSnapshot(
                     bpos,
+                    node.facing(),
                     node.outputPos(),
                     node.lane(0).deepCopy(),
                     node.lane(1).deepCopy(),
-                    node.isWrapPoint(),
                     node.outputPos() != null,
                     node.isStopped()
             ));
@@ -193,10 +193,10 @@ public final class BeltNetworkData extends SavedData {
 
             snapshots.add(new BeltInitPayload.NodeSnapshot(
                     bpos,
+                    node.facing(),
                     node.outputPos(),
                     node.lane(0).deepCopy(),
                     node.lane(1).deepCopy(),
-                    node.isWrapPoint(),
                     node.outputPos() != null,
                     node.isStopped()
             ));
@@ -312,11 +312,11 @@ public final class BeltNetworkData extends SavedData {
         if (node == null) return;
         BeltCorrectionPayload pkt = new BeltCorrectionPayload(
                 pos,
+                node.facing(),
                 node.outputPos(),
                 node.lane(0).deepCopy(),
                 node.lane(1).deepCopy(),
                 level.getGameTime(),
-                node.isWrapPoint(),
                 node.outputPos() != null,
                 node.isStopped()
         );

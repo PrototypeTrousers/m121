@@ -130,14 +130,7 @@ public final class BeltSubnetwork implements Effect {
             return false;
         }
 
-        int lane = to.addInput(fromPos);
-        if (lane < 0) {
-            MechanicalArmory.LOGGER.warn(
-                    "[BeltSubnetwork] link refused: {} -> {} has both merge lanes occupied",
-                    fromPos.toShortString(), toPos.toShortString());
-            return false;
-        }
-
+        to.addInput(fromPos);
         from.setOutputPos(toPos);
         topoDirty = true;
         return true;

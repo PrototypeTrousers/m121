@@ -32,6 +32,7 @@ import proto.mechanicalarmory.client.flywheel.instances.capturing.CapturingBuffe
 import proto.mechanicalarmory.common.belt.data.BeltLane;
 import proto.mechanicalarmory.common.belt.data.BeltNode;
 import proto.mechanicalarmory.common.belt.data.ItemGroup;
+import proto.mechanicalarmory.common.belt.network.BeltSimulation;
 import proto.mechanicalarmory.common.belt.network.BeltSubnetwork;
 import proto.mechanicalarmory.common.blocks.BlockBelt;
 
@@ -102,57 +103,7 @@ public class BeltSubnetworkVisual extends AbstractVisual
 
         long ticks = Math.min(elapsed, 20);
         for (int t = 0; t < ticks; t++) {
-            // Topological order evaluates downstream nodes first
-            for (BeltNode node : subnet.topoOrder()) {
-                if (node.isStopped()) continue;
-
-                // Side-loading (Factorio-style): a node with a single input
-                // keeps lane[l] -> output.lane[l] (left/right preserved on a
-                // straight run). A node that's one of two inputs feeding a
-                // merge collapses both of its lanes onto the single lane it's
-                // assigned to on the output — matching BeltNetworkTick's
-                // authoritative server logic exactly, so client prediction
-                // renders items on the correct lane immediately instead of
-                // only after the next server correction overwrites it.
-                BeltNode outNode = null;
-                int mergedInputLane = -1;
-                boolean isSoleInput = true;
-                if (node.outputPos() != null) {
-                    BeltNode candidate = subnet.node(node.outputPos());
-                    if (candidate != null && !candidate.isStopped()) {
-                        mergedInputLane = candidate.laneForInput(node.pos());
-                        if (mergedInputLane >= 0) {
-                            outNode = candidate;
-                            isSoleInput = candidate.inputPositions().size() <= 1;
-                        }
-                        // mergedInputLane < 0: topology points here but we're
-                        // not registered on either lane (stale edge mid-relink)
-                        // — treat as no output this tick, same as the server.
-                    }
-                }
-
-                for (int l = 0; l < 2; l++) {
-                    BeltLane lane = node.lane(l);
-                    BeltLane outLane = outNode == null ? null
-                            : outNode.lane(isSoleInput ? l : mergedInputLane);
-
-                    float maxExitPos = 1.0f;
-                    if (outLane != null) {
-                        if (outLane.isEmpty()) {
-                            maxExitPos = Float.MAX_VALUE;
-                        } else {
-                            float outRoom = outLane.peekLast().tailPos(outLane.itemSpacing());
-                            maxExitPos = 1.0f + outRoom * (lane.itemSpacing() / outLane.itemSpacing());
-                        }
-                    }
-
-                    lane.advance(1.0f, maxExitPos);
-
-                    if (outLane != null) {
-                        lane.transferOut(outLane);
-                    }
-                }
-            }
+            BeltSimulation.tickSubnetwork(subnet);
         }
     }
 
@@ -297,8 +248,7 @@ public class BeltSubnetworkVisual extends AbstractVisual
         if (node.outputPos() != null) {
             BeltNode outNode = subnet.node(node.outputPos());
             if (outNode != null) {
-                int assigned = outNode.laneForInput(node.pos());
-                if (assigned >= 0) destLaneIdx = assigned;
+                destLaneIdx = BeltSimulation.getDestinationLane(node, outNode, laneIdx);
             }
         }
 

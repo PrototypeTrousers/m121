@@ -2,6 +2,7 @@ package proto.mechanicalarmory.common.network;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.RegistryFriendlyByteBuf;
@@ -15,11 +16,10 @@ import proto.mechanicalarmory.common.belt.data.BeltLane;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.UUID;
 
 /**
  * Sent once from the server to a client when a chunk containing belt blocks
- * loads.  The client seeds its autonomous simulation from this snapshot.
+ * loads. The client seeds its autonomous simulation from this snapshot.
  */
 public record BeltInitPayload(List<NodeSnapshot> snapshots, long serverTick)
         implements CustomPacketPayload {
@@ -42,6 +42,7 @@ public record BeltInitPayload(List<NodeSnapshot> snapshots, long serverTick)
         HolderLookup.Provider regs = buf.registryAccess();
         for (NodeSnapshot snap : pkt.snapshots) {
             buf.writeBlockPos(snap.pos());
+            buf.writeByte(snap.facing().get3DDataValue());
             buf.writeBoolean(snap.outputId() != null);
             if (snap.outputId() != null) buf.writeBlockPos(snap.outputId());
             buf.writeNbt(snap.lane0().save(regs));
@@ -58,12 +59,14 @@ public record BeltInitPayload(List<NodeSnapshot> snapshots, long serverTick)
         List<NodeSnapshot> snaps = new ArrayList<>(count);
         for (int i = 0; i < count; i++) {
             BlockPos pos      = buf.readBlockPos();
-            BlockPos outputPos     = buf.readBoolean() ? buf.readBlockPos() : null;
+            Direction facing  = Direction.from3DDataValue(buf.readByte());
+            if (facing.getAxis().isVertical()) facing = Direction.NORTH;
+            BlockPos outputPos = buf.readBoolean() ? buf.readBlockPos() : null;
             BeltLane l0       = BeltLane.load((CompoundTag) buf.readNbt(), regs);
             BeltLane l1       = BeltLane.load((CompoundTag) buf.readNbt(), regs);
             boolean hasOut    = buf.readBoolean();
             boolean stopped   = buf.readBoolean();
-            snaps.add(new NodeSnapshot(pos, outputPos, l0, l1, hasOut, stopped));
+            snaps.add(new NodeSnapshot(pos, facing, outputPos, l0, l1, hasOut, stopped));
         }
         return new BeltInitPayload(snaps, tick);
     }
@@ -81,13 +84,13 @@ public record BeltInitPayload(List<NodeSnapshot> snapshots, long serverTick)
                 BeltLane l1 = snap.lane1();
 
                 ClientBeltNetwork.get().updateNode(
-                        snap.pos(), snap.outputId(), l0, l1, snap.stopped(), snap.hasOutput());
+                        snap.pos(), snap.facing(), snap.outputId(), l0, l1, snap.stopped(), snap.hasOutput());
             }
         });
     }
 
     // ── Inner type ────────────────────────────────────────────────────────────
 
-    public record NodeSnapshot(BlockPos pos, BlockPos outputId, BeltLane lane0, BeltLane lane1,
+    public record NodeSnapshot(BlockPos pos, Direction facing, BlockPos outputId, BeltLane lane0, BeltLane lane1,
                                boolean hasOutput, boolean stopped) {}
 }

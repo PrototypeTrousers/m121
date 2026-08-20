@@ -52,24 +52,23 @@ public final class ClientBeltNetwork {
      * Called when a BeltInitPayload or BeltCorrectionPayload arrives from the server,
      * or when chunk NBT data is loaded.
      */
-    public synchronized void updateNode(BlockPos pos, @Nullable BlockPos serverOutputPos,
-                                        BeltLane lane0, BeltLane lane1,
-                                        boolean stopped, boolean hasOutput) {
+    public void updateNode(BlockPos pos, @Nullable Direction serverFacing, @Nullable BlockPos serverOutputPos,
+                           BeltLane lane0, BeltLane lane1,
+                           boolean stopped, boolean hasOutput) {
         Level level = Minecraft.getInstance().level;
         if (level == null) return;
 
-        Direction facing = Direction.NORTH;
+        Direction facing = serverFacing != null ? serverFacing : Direction.NORTH;
         BlockState state = level.getBlockState(pos);
         if (state.getBlock() instanceof BlockBelt) {
             facing = state.getValue(BlockBelt.FACING);
         }
 
-        BeltNode node = registry.getOrCreateNode(pos);
+        BeltNode node = registry.getOrCreateNode(pos, facing);
+        node.setFacing(facing);
         BeltSubnetwork subnet = registry.subnetworkAt(pos);
         if (subnet != null) subnet.setLevel(level);
 
-        // serverOutputId is now just BeltNode.posToId(outPos) – keep it for
-        // the case where outPos hasn't loaded yet and relink can't merge.
         if (serverOutputPos != null) {
             node.setOutputPos(serverOutputPos);
         }
@@ -88,9 +87,15 @@ public final class ClientBeltNetwork {
         syncToFlywheel();
     }
 
-    public synchronized void updateNode(BlockPos pos, BeltLane lane0, BeltLane lane1,
-                                        boolean stopped, boolean hasOutput) {
-        updateNode(pos, null, lane0, lane1, stopped, hasOutput);
+    public void updateNode(BlockPos pos, @Nullable BlockPos serverOutputPos,
+                           BeltLane lane0, BeltLane lane1,
+                           boolean stopped, boolean hasOutput) {
+        updateNode(pos, null, serverOutputPos, lane0, lane1, stopped, hasOutput);
+    }
+
+    public void updateNode(BlockPos pos, BeltLane lane0, BeltLane lane1,
+                           boolean stopped, boolean hasOutput) {
+        updateNode(pos, null, null, lane0, lane1, stopped, hasOutput);
     }
 
     private static void copyLane(BeltLane source, BeltLane dest) {
@@ -107,14 +112,14 @@ public final class ClientBeltNetwork {
 
     // ── Flywheel sync ────────────────────────────────────────────────────────
 
-    public synchronized void onVisualDeleted(UUID subnetId) {
+    public void onVisualDeleted(UUID subnetId) {
         registeredWithFlywheel.remove(subnetId);
     }
 
     /**
      * Ensures all active client subnetworks are registered with Flywheel.
      */
-    public synchronized void syncToFlywheel() {
+    public void syncToFlywheel() {
         Level level = Minecraft.getInstance().level;
         if (level == null) return;
         VisualizationManager vm = VisualizationManager.get(level);
@@ -248,7 +253,7 @@ public final class ClientBeltNetwork {
     /**
      * Remove a node when its block is broken or chunk unloaded.
      */
-    public synchronized void removeNode(BlockPos pos) {
+    public void removeNode(BlockPos pos) {
         Level level = Minecraft.getInstance().level;
 
         // Unlink any neighbor belts that were facing into the removed pos
@@ -295,7 +300,7 @@ public final class ClientBeltNetwork {
     /**
      * Clear on level unload or disconnect.
      */
-    public synchronized void clear() {
+    public void clear() {
         Level level = Minecraft.getInstance().level;
         if (level != null) {
             VisualizationManager vm = VisualizationManager.get(level);

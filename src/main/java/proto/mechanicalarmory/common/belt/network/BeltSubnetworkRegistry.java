@@ -1,6 +1,7 @@
 package proto.mechanicalarmory.common.belt.network;
 
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import org.jetbrains.annotations.Nullable;
 import proto.mechanicalarmory.MechanicalArmory;
 import proto.mechanicalarmory.common.belt.data.BeltNode;
@@ -89,12 +90,19 @@ public final class BeltSubnetworkRegistry {
      * Get the existing node at {@code pos}, or create one in a fresh solo
      * subnetwork if none is registered yet.
      */
-    public BeltNode getOrCreateNode(BlockPos pos) {
+    public BeltNode getOrCreateNode(BlockPos pos, Direction facing) {
         BeltNode existing = nodeAt(pos);
-        if (existing != null) return existing;
-        BeltNode node = new BeltNode(pos); // deterministic id == BeltNode.posToId(pos)
+        if (existing != null) {
+            if (facing != null) existing.setFacing(facing);
+            return existing;
+        }
+        BeltNode node = new BeltNode(pos, facing);
         registerSolo(node);
         return node;
+    }
+
+    public BeltNode getOrCreateNode(BlockPos pos) {
+        return getOrCreateNode(pos, Direction.NORTH);
     }
 
     public void adoptSubnetwork(BeltSubnetwork subnet) {
