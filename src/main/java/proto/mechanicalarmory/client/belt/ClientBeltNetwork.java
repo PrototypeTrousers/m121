@@ -10,12 +10,15 @@ import proto.mechanicalarmory.MechanicalArmory;
 import proto.mechanicalarmory.common.belt.data.BeltLane;
 import proto.mechanicalarmory.common.belt.data.BeltNode;
 import proto.mechanicalarmory.common.belt.data.ItemGroup;
+import proto.mechanicalarmory.common.belt.network.BeltGraphHelper;
 import proto.mechanicalarmory.common.belt.network.BeltSubnetwork;
 import proto.mechanicalarmory.common.belt.network.BeltSubnetworkRegistry;
 import proto.mechanicalarmory.common.blocks.BlockBelt;
 
 import javax.annotation.Nullable;
-import java.util.*;
+import java.util.HashSet;
+import java.util.Set;
+import java.util.UUID;
 
 /**
  * Client-side belt network manager.
@@ -56,13 +59,12 @@ public final class ClientBeltNetwork {
      * Called when a BeltInitPayload or BeltCorrectionPayload arrives from the server,
      * or when chunk NBT data is loaded.
      */
-    public void updateNode(BlockPos pos, @Nullable Direction serverFacing, @Nullable BlockPos serverOutputPos,
+    public void updateNode(BlockPos pos, @Nullable Direction facing, @Nullable BlockPos serverOutputPos,
                            BeltLane lane0, BeltLane lane1,
                            boolean stopped, boolean hasOutput) {
         Level level = Minecraft.getInstance().level;
         if (level == null) return;
 
-        Direction facing = serverFacing != null ? serverFacing : Direction.NORTH;
         BlockState state = level.getBlockState(pos);
         if (state.getBlock() instanceof BlockBelt) {
             facing = state.getValue(BlockBelt.FACING);
@@ -158,6 +160,12 @@ public final class ClientBeltNetwork {
         // Snapshot to avoid ConcurrentModificationException (mergeAndLink can
         // mutate the registry's position map while we iterate).
         for (BlockPos pos : registry.trackedPositions()) {
+            BlockState state = level.getBlockState(pos);
+            if (!(state.getBlock() instanceof BlockBelt)) {
+                removeNode(pos);
+                continue;
+            }
+
             BeltSubnetwork sub = registry.subnetworkAt(pos);
             if (sub == null) continue;
             BeltNode node = sub.nodeAt(pos);
@@ -168,8 +176,6 @@ public final class ClientBeltNetwork {
 
             // The outputId isn't in our subnet. Derive the downstream position
             // from the block world and check if it's registered somewhere.
-            BlockState state = level.getBlockState(pos);
-            if (!(state.getBlock() instanceof BlockBelt)) continue;
             Direction facing = state.getValue(BlockBelt.FACING);
             BlockPos outPos = pos.relative(facing);
 
@@ -192,26 +198,15 @@ public final class ClientBeltNetwork {
         if (!registry.isTracked(pos)) return;
 
         BlockPos outPos = pos.relative(facing);
-        BlockState outState = level.getBlockState(outPos);
-        if (outState.getBlock() instanceof BlockBelt) {
-            // Forward neighbour is loaded and is a belt – merge + link.
-            mergeAndLink(pos, outPos, level);
-        } else if (!hasOutput) {
-            // Server says no output and no belt block found – truly unlinked.
-            registry.unlink(pos);
-        }
-        // else: server says hasOutput but the block isn't visible yet; keep existing outputId.
-
-        for (Direction d : Direction.Plane.HORIZONTAL) {
-            BlockPos inPos = pos.relative(d);
-            BlockState inState = level.getBlockState(inPos);
-            if (inState.getBlock() instanceof BlockBelt) {
-                Direction inFacing = inState.getValue(BlockBelt.FACING);
-                if (inFacing == d.getOpposite()) {
-                    mergeAndLink(inPos, pos, level);
-                }
+        BlockState outState = level != null ? level.getBlockState(outPos) : null;
+        if (outState == null || !(outState.getBlock() instanceof BlockBelt)) {
+            if (!hasOutput) {
+                // Server says no output and no belt block found – truly unlinked.
+                registry.unlink(pos);
             }
         }
+
+        BeltGraphHelper.linkNeighbours(pos, facing, level, (from, to) -> mergeAndLink(from, to, level));
     }
 
     /**
@@ -223,8 +218,8 @@ public final class ClientBeltNetwork {
      * — see {@link BeltNode#addInput}.
      */
     private void mergeAndLink(BlockPos fromPos, BlockPos toPos, Level level) {
-        registry.getOrCreateNode(fromPos);
-        BeltNode toNode = registry.getOrCreateNode(toPos);
+        BeltNode fromNode = registry.getOrCreateNode(fromPos, level.getBlockState(fromPos).getValue(BlockBelt.FACING));
+        BeltNode toNode = registry.getOrCreateNode(toPos, level.getBlockState(toPos).getValue(BlockBelt.FACING));
         BeltSubnetwork toSubBefore = registry.subnetworkAt(toPos);
 
         BeltSubnetworkRegistry.MergeResult result = registry.mergeAndLink(fromPos, toPos);
@@ -232,12 +227,10 @@ public final class ClientBeltNetwork {
             unregisterFromFlywheel(result.removedSubnetId(), toSubBefore, level);
         }
 
-        BeltNode fromNode = registry.nodeAt(fromPos);
         MechanicalArmory.LOGGER.info(
                 "[ClientBeltNetwork] Linked {} -> {} ({}), from.outId={}, to.inCount={}",
                 fromPos.toShortString(), toPos.toShortString(), result.linked() ? "ok" : "refused",
-                fromNode != null && fromNode.outputPos() != null
-                        ? fromNode.outputPos().toString().substring(0, 8) : "null",
+                fromNode.outputPos() != null ? fromNode.outputPos().toString().substring(0, 8) : "null",
                 toNode.inputPositions().size());
     }
 
@@ -250,36 +243,19 @@ public final class ClientBeltNetwork {
         Level level = Minecraft.getInstance().level;
 
         // Unlink any neighbor belts that were facing into the removed pos
-        if (level != null) {
-            for (Direction d : Direction.Plane.HORIZONTAL) {
-                BlockPos neighborPos = pos.relative(d);
-                if (!registry.isTracked(neighborPos)) continue;
-                BlockState nState = level.getBlockState(neighborPos);
-                if (nState.getBlock() instanceof BlockBelt) {
-                    Direction nFacing = nState.getValue(BlockBelt.FACING);
-                    if (neighborPos.relative(nFacing).equals(pos)) {
-                        registry.unlink(neighborPos);
-                    }
-                }
-            }
-        }
+        BeltGraphHelper.unlinkIncomingNeighbours(pos, level, registry);
 
         BeltSubnetworkRegistry.RemovalResult result = registry.removeNode(pos);
         if (result == null) return;
 
-        if (result.emptied()) {
-            // Subnetwork had only this node — it's gone. Tell Flywheel to stop
-            // rendering it (mirrors the pre-refactor behaviour of calling
-            // queueRemove on the now-empty subnetwork object).
-            if (level != null && result.emptiedSubnetwork() != null) {
-                unregisterFromFlywheel(result.originalSubnetId(), result.emptiedSubnetwork(), level);
+        if (result.emptied() || result.split()) {
+            // Subnetwork had only this node or was split into parts. Tell Flywheel to stop
+            // rendering the old subnetwork so its instances get destroyed.
+            if (level != null && result.oldSubnetwork() != null) {
+                unregisterFromFlywheel(result.originalSubnetId(), result.oldSubnetwork(), level);
             } else {
                 registeredWithFlywheel.remove(result.originalSubnetId());
             }
-        } else if (result.split()) {
-            // Original id is stale; syncToFlywheel() below re-registers the
-            // newly-adopted parts under their own fresh ids.
-            registeredWithFlywheel.remove(result.originalSubnetId());
         }
 
         if (level == null) return;

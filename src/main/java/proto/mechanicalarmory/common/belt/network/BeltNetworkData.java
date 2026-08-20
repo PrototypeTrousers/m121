@@ -8,6 +8,8 @@ import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.Containers;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.saveddata.SavedData;
@@ -16,6 +18,7 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import proto.mechanicalarmory.common.belt.data.BeltLane;
 import proto.mechanicalarmory.common.belt.data.BeltNode;
+import proto.mechanicalarmory.common.belt.data.ItemGroup;
 import proto.mechanicalarmory.common.blocks.BlockBelt;
 import proto.mechanicalarmory.common.network.BeltCorrectionPayload;
 import proto.mechanicalarmory.common.network.BeltDeltaPayload;
@@ -97,14 +100,26 @@ public final class BeltNetworkData extends SavedData {
         BeltSubnetwork owning = registry.subnetworkAt(pos);
 
         List<BlockPos> affected = new ArrayList<>();
-        if (node != null && owning != null) {
-            if (node.outputPos() != null) {
-                BeltNode out = owning.node(node.outputPos());
-                if (out != null) affected.add(out.pos());
+        if (node != null) {
+            for (int l = 0; l < 2; l++) {
+                BeltLane lane = node.lane(l);
+                for (int i = 0; i < lane.groupCount(); i++) {
+                    ItemGroup g = lane.groupArray()[i];
+                    if (g != null && !g.item().isEmpty()) {
+                        Containers.dropItemStack(level, pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5,
+                                g.item().copyWithCount(g.count()));
+                    }
+                }
             }
-            for (BlockPos inPos : node.inputPositions()) {
-                BeltNode in = owning.node(inPos);
-                if (in != null) affected.add(in.pos());
+            if (owning != null) {
+                if (node.outputPos() != null) {
+                    BeltNode out = owning.node(node.outputPos());
+                    if (out != null) affected.add(out.pos());
+                }
+                for (BlockPos inPos : node.inputPositions()) {
+                    BeltNode in = owning.node(inPos);
+                    if (in != null) affected.add(in.pos());
+                }
             }
         }
 
@@ -190,30 +205,8 @@ public final class BeltNetworkData extends SavedData {
 
     // ── Internal helpers ──────────────────────────────────────────────────────
 
-    /**
-     * After placing a belt at {@code pos} facing {@code facing}, scan the four
-     * horizontal neighbours to create edges and merge subnetworks.
-     */
     private void relinkNeighbours(BlockPos pos, Direction facing, ServerLevel level) {
-        // 1. The belt at pos outputs in the direction it faces
-        BlockPos outputPos = pos.relative(facing);
-        BlockState outState = level.getBlockState(outputPos);
-        if (outState.getBlock() instanceof BlockBelt) {
-            mergeAndLink(pos, outputPos, level);
-        }
-
-        // 2. Belts that face toward pos feed into it
-        for (Direction d : Direction.Plane.HORIZONTAL) {
-            if (d == facing) continue;
-            BlockPos neighbourPos = pos.relative(d);
-            BlockState state = level.getBlockState(neighbourPos);
-            if (state.getBlock() instanceof BlockBelt) {
-                Direction neighbourFacing = state.getValue(BlockBelt.FACING);
-                if (neighbourFacing == d.getOpposite()) {
-                    mergeAndLink(neighbourPos, pos, level);
-                }
-            }
-        }
+        BeltGraphHelper.linkNeighbours(pos, facing, level, (from, to) -> mergeAndLink(from, to, level));
     }
 
     /**
@@ -241,41 +234,9 @@ public final class BeltNetworkData extends SavedData {
 
     public void updateCurveSpeeds(BlockPos pos, ServerLevel level) {
         BeltNode node = nodeAt(pos);
-        if (node == null) return;
-        BlockState state = level.getBlockState(pos);
-        if (!(state.getBlock() instanceof BlockBelt)) return;
-
-        Direction facing = state.getValue(BlockBelt.FACING);
-        Direction back = facing.getOpposite();
-        Direction left = facing.getCounterClockWise();
-        Direction right = facing.getClockWise();
-
-        boolean hasBack = isBeltFacing(level, pos.relative(back), pos);
-        boolean hasLeft = isBeltFacing(level, pos.relative(left), pos);
-        boolean hasRight = isBeltFacing(level, pos.relative(right), pos);
-
-        if (!hasBack) {
-            if (hasRight && !hasLeft) {
-                node.lane(1).setSpeed(BeltLane.SPEED_INNER);
-                node.lane(0).setSpeed(BeltLane.SPEED_OUTER);
-                return;
-            } else if (hasLeft && !hasRight) {
-                node.lane(0).setSpeed(BeltLane.SPEED_INNER);
-                node.lane(1).setSpeed(BeltLane.SPEED_OUTER);
-                return;
-            }
+        if (node != null) {
+            BeltGraphHelper.updateCurveSpeeds(node, level, null);
         }
-        node.lane(0).setSpeed(BeltLane.SPEED_DEFAULT);
-        node.lane(1).setSpeed(BeltLane.SPEED_DEFAULT);
-    }
-
-    private static boolean isBeltFacing(ServerLevel level, BlockPos fromPos, BlockPos toPos) {
-        BlockState state = level.getBlockState(fromPos);
-        if (state.getBlock() instanceof BlockBelt) {
-            Direction f = state.getValue(BlockBelt.FACING);
-            return fromPos.relative(f).equals(toPos);
-        }
-        return false;
     }
 
     /** Send a full lane correction to all nearby clients for one belt position. */
@@ -287,7 +248,7 @@ public final class BeltNetworkData extends SavedData {
     }
 
     /** Send a lightweight single-item delta to all nearby clients. */
-    public void sendDelta(BlockPos pos, int lane, net.minecraft.world.item.ItemStack item, float headPos, byte action, ServerLevel level) {
+    public void sendDelta(BlockPos pos, int lane, ItemStack item, float headPos, byte action, ServerLevel level) {
         BeltNetworkSync.sendDelta(pos, lane, item, headPos, action, level);
     }
 

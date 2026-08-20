@@ -1,8 +1,10 @@
 package proto.mechanicalarmory.common.belt.data;
 
+import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
+import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.world.item.ItemStack;
 
 /**
@@ -336,7 +338,7 @@ public final class BeltLane {
 
     // ── Network ByteBuf Codec ─────────────────────────────────────────────────
 
-    public void encode(net.minecraft.network.RegistryFriendlyByteBuf buf) {
+    public void encode(RegistryFriendlyByteBuf buf) {
         buf.writeFloat(speed);
         buf.writeVarInt(size);
         for (int i = 0; i < size; i++) {
@@ -346,7 +348,7 @@ public final class BeltLane {
         }
     }
 
-    public static BeltLane decode(net.minecraft.network.RegistryFriendlyByteBuf buf) {
+    public static BeltLane decode(RegistryFriendlyByteBuf buf) {
         float spd = buf.readFloat();
         int count = buf.readVarInt();
         BeltLane lane = new BeltLane(spd);
@@ -358,7 +360,7 @@ public final class BeltLane {
 
     // ── NBT ───────────────────────────────────────────────────────────────────
 
-    public CompoundTag save(net.minecraft.core.HolderLookup.Provider registries) {
+    public CompoundTag save(HolderLookup.Provider registries) {
         CompoundTag tag = new CompoundTag();
         tag.putFloat("speed", speed);
         ListTag list = new ListTag();
@@ -369,7 +371,7 @@ public final class BeltLane {
         return tag;
     }
 
-    public static BeltLane load(CompoundTag tag, net.minecraft.core.HolderLookup.Provider registries) {
+    public static BeltLane load(CompoundTag tag, HolderLookup.Provider registries) {
         float spd = tag.contains("speed") ? tag.getFloat("speed") : SPEED_DEFAULT;
         if (spd <= 0.0f) spd = SPEED_DEFAULT;
         BeltLane lane = new BeltLane(spd);

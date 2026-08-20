@@ -21,7 +21,12 @@ import net.neoforged.neoforge.event.server.ServerStartingEvent;
 import net.neoforged.neoforge.event.tick.LevelTickEvent;
 import net.neoforged.neoforge.registries.DeferredRegister;
 import org.slf4j.Logger;
+import net.minecraft.core.Direction;
+import net.neoforged.neoforge.capabilities.Capabilities;
+import net.neoforged.neoforge.capabilities.RegisterCapabilitiesEvent;
+import proto.mechanicalarmory.common.belt.capability.BeltItemHandler;
 import proto.mechanicalarmory.common.belt.network.BeltNetworkData;
+import proto.mechanicalarmory.common.blocks.BlockBelt;
 import proto.mechanicalarmory.common.blocks.MABlocks;
 import proto.mechanicalarmory.common.entities.MAEntities;
 import proto.mechanicalarmory.common.items.MAItems;
@@ -78,13 +83,13 @@ public class MechanicalArmory {
         modContainer.registerConfig(ModConfig.Type.COMMON, Config.SPEC);
     }
 
-    private void registerCapabilities(net.neoforged.neoforge.capabilities.RegisterCapabilitiesEvent event) {
+    private void registerCapabilities(RegisterCapabilitiesEvent event) {
         event.registerBlock(
-                net.neoforged.neoforge.capabilities.Capabilities.ItemHandler.BLOCK,
+                Capabilities.ItemHandler.BLOCK,
                 (level, pos, state, be, side) -> {
                     if (level instanceof ServerLevel srv) {
-                        net.minecraft.core.Direction facing = state.getValue(proto.mechanicalarmory.common.blocks.BlockBelt.FACING);
-                        return new proto.mechanicalarmory.common.belt.capability.BeltItemHandler(srv, pos, facing, side);
+                        Direction facing = state.getValue(BlockBelt.FACING);
+                        return new BeltItemHandler(srv, pos, facing, side);
                     }
                     return null;
                 },

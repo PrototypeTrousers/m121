@@ -93,16 +93,11 @@ public final class BeltSubnetworkRegistry {
     public BeltNode getOrCreateNode(BlockPos pos, Direction facing) {
         BeltNode existing = nodeAt(pos);
         if (existing != null) {
-            if (facing != null) existing.setFacing(facing);
             return existing;
         }
         BeltNode node = new BeltNode(pos, facing);
         registerSolo(node);
         return node;
-    }
-
-    public BeltNode getOrCreateNode(BlockPos pos) {
-        return getOrCreateNode(pos, Direction.NORTH);
     }
 
     public void adoptSubnetwork(BeltSubnetwork subnet) {
@@ -193,8 +188,8 @@ public final class BeltSubnetworkRegistry {
      * render-registration set).
      */
     public record RemovalResult(UUID originalSubnetId, boolean emptied,
-                                 @Nullable BeltSubnetwork emptiedSubnetwork,
-                                 List<BeltSubnetwork> newParts) {
+                                @Nullable BeltSubnetwork oldSubnetwork,
+                                List<BeltSubnetwork> newParts) {
         public boolean split() { return newParts.size() > 1; }
     }
 
@@ -230,10 +225,10 @@ public final class BeltSubnetworkRegistry {
             for (BeltSubnetwork part : parts) {
                 adoptSubnetwork(part);
             }
-            return new RemovalResult(subnetId, false, null, parts);
+            return new RemovalResult(subnetId, false, subnet, parts);
         }
 
-        return new RemovalResult(subnetId, false, null, List.of(subnet));
+        return new RemovalResult(subnetId, false, subnet, List.of(subnet));
     }
 
     public void clear() {

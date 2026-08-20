@@ -27,6 +27,8 @@ import net.neoforged.neoforge.client.extensions.common.IClientItemExtensions;
 import net.neoforged.neoforge.client.extensions.common.RegisterClientExtensionsEvent;
 import net.neoforged.neoforge.client.gui.ConfigurationScreen;
 import net.neoforged.neoforge.client.gui.IConfigScreenFactory;
+import proto.mechanicalarmory.client.belt.ClientBeltNetwork;
+import proto.mechanicalarmory.client.flywheel.instances.belt.BeltSubnetworkVisual;
 import proto.mechanicalarmory.client.flywheel.gltf.GltfFlywheelModelTree;
 import proto.mechanicalarmory.client.flywheel.gltf.MyModelTree;
 import proto.mechanicalarmory.client.flywheel.instances.arm.ArmVisualiser;
@@ -40,6 +42,7 @@ import proto.mechanicalarmory.client.renderer.arm.MyItemRenderer;
 import proto.mechanicalarmory.client.renderer.shredder.ShredderRenderer;
 import proto.mechanicalarmory.common.entities.MAEntities;
 import proto.mechanicalarmory.common.items.MAItems;
+import net.neoforged.neoforge.event.level.LevelEvent;
 
 import java.io.BufferedInputStream;
 import java.io.IOException;
@@ -118,7 +121,7 @@ public class MechanicalArmoryClient {
 
     @SubscribeEvent
     public static void onModifyBakingResult(ModelEvent.ModifyBakingResult event) {
-        proto.mechanicalarmory.client.flywheel.instances.belt.BeltSubnetworkVisual.clearModelCache();
+        BeltSubnetworkVisual.clearModelCache();
         // We replace whatever Minecraft thinks is there with our custom class
         event.getModels().put(ModelResourceLocation.inventory(armItemModel.id()), new MyCustomItemBakedModel());
         event.getModels().put(ModelResourceLocation.inventory(chestplateItemModel.id()), new MyCustomItemBakedModel());
@@ -138,15 +141,15 @@ public class MechanicalArmoryClient {
     @SubscribeEvent
     public static void onRenderFrame(RenderFrameEvent.Pre event) {
         limiter.tick();
-        proto.mechanicalarmory.client.belt.ClientBeltNetwork.get().syncToFlywheel();
+        ClientBeltNetwork.get().syncToFlywheel();
     }
 
     @EventBusSubscriber(modid = MechanicalArmory.MODID, value = Dist.CLIENT)
     public static class GameEvents {
         @SubscribeEvent
-        public static void onLevelUnload(net.neoforged.neoforge.event.level.LevelEvent.Unload event) {
+        public static void onLevelUnload(LevelEvent.Unload event) {
             if (event.getLevel().isClientSide()) {
-                proto.mechanicalarmory.client.belt.ClientBeltNetwork.get().clear();
+                ClientBeltNetwork.get().clear();
             }
         }
     }

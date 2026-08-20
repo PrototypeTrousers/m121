@@ -4,7 +4,8 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.state.BlockState;
-import proto.mechanicalarmory.common.belt.data.BeltNode;
+import proto.mechanicalarmory.common.belt.network.BeltGraphHelper;
+import proto.mechanicalarmory.common.belt.network.BeltGraphHelper.CurveType;
 import proto.mechanicalarmory.common.belt.network.BeltSubnetwork;
 import proto.mechanicalarmory.common.blocks.BlockBelt;
 
@@ -13,48 +14,17 @@ import proto.mechanicalarmory.common.blocks.BlockBelt;
  */
 public final class BeltCurveGeometry {
 
-    public enum CurveType {
-        STRAIGHT,
-        CURVE_LEFT,
-        CURVE_RIGHT
-    }
-
     private BeltCurveGeometry() {}
 
     /**
      * Determines whether the belt at {@code pos} forms a curve based on connected inputs.
      */
     public static CurveType getCurveType(BlockPos pos, Direction facing, Level level, BeltSubnetwork subnet) {
-        Direction back = facing.getOpposite();
-        Direction left = facing.getCounterClockWise();
-        Direction right = facing.getClockWise();
-
-        boolean hasBack = isBeltFacingInto(pos.relative(back), pos, level, subnet);
-        boolean hasLeft = isBeltFacingInto(pos.relative(left), pos, level, subnet);
-        boolean hasRight = isBeltFacingInto(pos.relative(right), pos, level, subnet);
-
-        if (!hasBack) {
-            if (hasRight && !hasLeft) {
-                return CurveType.CURVE_RIGHT;
-            } else if (hasLeft && !hasRight) {
-                return CurveType.CURVE_LEFT;
-            }
-        }
-        return CurveType.STRAIGHT;
+        return BeltGraphHelper.getCurveType(pos, facing, level, subnet);
     }
 
     public static boolean isBeltFacingInto(BlockPos fromPos, BlockPos toPos, Level level, BeltSubnetwork subnet) {
-        BeltNode fromNode = subnet.node(fromPos);
-        if (fromNode != null) {
-            return fromPos.relative(fromNode.facing()).equals(toPos);
-        }
-        if (level != null) {
-            BlockState state = level.getBlockState(fromPos);
-            if (state.getBlock() instanceof BlockBelt) {
-                return fromPos.relative(state.getValue(BlockBelt.FACING)).equals(toPos);
-            }
-        }
-        return false;
+        return BeltGraphHelper.isBeltFacingInto(fromPos, toPos, level, subnet);
     }
 
     /**

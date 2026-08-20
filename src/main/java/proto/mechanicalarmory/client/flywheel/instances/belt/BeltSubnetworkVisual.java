@@ -24,6 +24,7 @@ import proto.mechanicalarmory.client.flywheel.CapturedModel;
 import proto.mechanicalarmory.common.belt.data.BeltLane;
 import proto.mechanicalarmory.common.belt.data.BeltNode;
 import proto.mechanicalarmory.common.belt.data.ItemGroup;
+import proto.mechanicalarmory.common.belt.network.BeltGraphHelper.CurveType;
 import proto.mechanicalarmory.common.belt.network.BeltSimulation;
 import proto.mechanicalarmory.common.belt.network.BeltSubnetwork;
 
@@ -124,7 +125,7 @@ public class BeltSubnetworkVisual extends AbstractVisual
     private void renderNode(BeltNode node, float partialTick) {
         BlockPos pos = node.pos();
         Direction facing = node.facing();
-        BeltCurveGeometry.CurveType curve = BeltCurveGeometry.getCurveType(pos, facing, level, subnet);
+        CurveType curve = BeltCurveGeometry.getCurveType(pos, facing, level, subnet);
         int packedLight = LevelRenderer.getLightColor(level, pos);
 
         List<List<TransformedInstance>> lanes = nodeInstances.computeIfAbsent(pos, p -> {
@@ -139,7 +140,7 @@ public class BeltSubnetworkVisual extends AbstractVisual
         }
     }
 
-    private void renderLane(BeltNode node, int laneIdx, Direction facing, BeltCurveGeometry.CurveType curve,
+    private void renderLane(BeltNode node, int laneIdx, Direction facing, CurveType curve,
                             List<TransformedInstance> instances, int packedLight, float partialTick) {
         BeltLane lane = node.lane(laneIdx);
         if (lane.isEmpty()) {
